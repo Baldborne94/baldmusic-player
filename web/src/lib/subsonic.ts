@@ -99,6 +99,24 @@ export function normalizeServerUrl(raw: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/**
+ * Da una pagina https il browser blocca le richieste http ("contenuto misto"),
+ * tranne quelle verso il PC stesso: localhost e 127.x sono considerati sicuri.
+ */
+export function blockedAsMixedContent(pageProtocol: string, serverUrl: string): boolean {
+  if (pageProtocol !== "https:") return false;
+  let url: URL;
+  try {
+    url = new URL(serverUrl);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:") return false;
+  const host = url.hostname;
+  const loopback = host === "localhost" || host.endsWith(".localhost") || /^127\./.test(host) || host === "[::1]";
+  return !loopback;
+}
+
 export function randomSalt(bytes = 8): string {
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);

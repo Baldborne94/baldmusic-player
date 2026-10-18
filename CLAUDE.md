@@ -3,7 +3,7 @@
 Player musicale open source personale. Tre pezzi, un'unica libreria:
 
 - `server/` — documentazione + config per **Navidrome** sul PC di casa (API Subsonic), raggiunto da fuori con **Tailscale** (`tailscale serve` → `https://<pc>.<tailnet>.ts.net`). Non scriviamo un backend nostro: Navidrome fa scansione, tag, copertine, transcodifica.
-- `web/` — SPA **Vite + React + TypeScript**, hash router, pubblicata su GitHub Pages. Parla Subsonic direttamente col server (Navidrome manda gli header CORS). Pagina https ⇒ il server dev'essere https (`…ts.net`), mai http.
+- `web/` — SPA **Vite + React + TypeScript**, hash router, pubblicata su GitHub Pages. Parla Subsonic direttamente col server (Navidrome manda gli header CORS). Pagina https ⇒ il server dev'essere https (`…ts.net`); unica eccezione `http://localhost`/`127.x`, che i browser non trattano come contenuto misto (`blockedAsMixedContent`).
 - `android/` — app **nativa Kotlin** (Compose + **Media3**). Due sorgenti: MediaStore (file sul telefono) e Navidrome. **Android Auto** arriva da `MediaLibraryService`: le app WebView/Capacitor non sono visibili ad Auto, per questo l'app è nativa.
 
 ## Architettura Android

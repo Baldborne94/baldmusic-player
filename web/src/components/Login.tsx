@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { makeCredentials, SubsonicClient, SubsonicError } from "../lib/subsonic";
+import { blockedAsMixedContent, makeCredentials, SubsonicClient, SubsonicError } from "../lib/subsonic";
 import { saveCredentials } from "../lib/session";
 
 export function Login() {
@@ -15,8 +15,8 @@ export function Login() {
     setError(null);
     const creds = makeCredentials(url, user, password);
     // Pagina in https + server in http: il browser blocca la richiesta senza dire perché.
-    if (location.protocol === "https:" && creds.url.startsWith("http:")) {
-      setError("Questa pagina è in HTTPS, quindi anche il server deve esserlo. Usa l'indirizzo https://….ts.net di Tailscale (vedi la guida del server).");
+    if (blockedAsMixedContent(location.protocol, creds.url)) {
+      setError("Da questa pagina il browser accetta solo server in HTTPS: usa l'indirizzo https://….ts.net di Tailscale. Sul PC dove gira Navidrome va bene anche http://localhost:4533.");
       setBusy(false);
       return;
     }
@@ -38,7 +38,7 @@ export function Login() {
         <p className="muted">Collegati al tuo server Navidrome.</p>
         <label>
           Indirizzo del server
-          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://pc-di-casa.tail1234.ts.net" inputMode="url" autoComplete="url" required />
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://localhost:4533 oppure https://….ts.net" inputMode="url" autoComplete="url" required />
         </label>
         <label>
           Utente
