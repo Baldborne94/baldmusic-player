@@ -7,6 +7,13 @@ describe("normalizeServerUrl", () => {
     expect(normalizeServerUrl(" pc.tail1234.ts.net/ ")).toBe("https://pc.tail1234.ts.net");
     expect(normalizeServerUrl("http://192.168.1.10:4533//")).toBe("http://192.168.1.10:4533");
   });
+
+  it("aggiunge la porta di Navidrome a IP e localhost che non ce l'hanno", () => {
+    expect(normalizeServerUrl("http://192.168.1.191")).toBe("http://192.168.1.191:4533");
+    expect(normalizeServerUrl("localhost")).toBe("http://localhost:4533");
+    expect(normalizeServerUrl("http://localhost:8080")).toBe("http://localhost:8080");
+    expect(normalizeServerUrl("https://pc.tail1.ts.net")).toBe("https://pc.tail1.ts.net");
+  });
 });
 
 describe("makeCredentials", () => {

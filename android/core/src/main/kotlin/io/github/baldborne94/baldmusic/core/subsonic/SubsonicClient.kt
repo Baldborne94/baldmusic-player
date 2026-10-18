@@ -27,10 +27,22 @@ data class Credentials(val url: String, val user: String, val salt: String, val 
 
 class SubsonicException(message: String, val code: Int? = null) : IOException(message)
 
+/** Porta predefinita di Navidrome. */
+const val DEFAULT_PORT = 4533
+
+/**
+ * Normalizza l'indirizzo digitato: aggiunge lo schema, toglie lo slash finale e,
+ * se è un indirizzo IP o localhost senza porta, aggiunge :4533. Dimenticare la
+ * porta è l'errore più comune; i nomi (es. …ts.net) restano invariati perché lì
+ * di solito c'è un proxy sulla porta standard.
+ */
 fun normalizeServerUrl(raw: String): String {
-    var url = raw.trim()
+    var url = raw.trim().trimEnd('/')
     if (!Regex("^https?://", RegexOption.IGNORE_CASE).containsMatchIn(url)) url = "http://$url"
-    return url.trimEnd('/')
+    val match = Regex("^(https?://)([^/:]+)(:\\d+)?(.*)$", RegexOption.IGNORE_CASE).find(url) ?: return url
+    val (scheme, host, port, rest) = match.destructured
+    val isIp = Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host)
+    return if (port.isEmpty() && (isIp || host.equals("localhost", ignoreCase = true))) "$scheme$host:$DEFAULT_PORT$rest" else url
 }
 
 fun randomSalt(bytes: Int = 8): String {
@@ -81,7 +93,7 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
         } catch (e: SubsonicException) {
             throw e
         } catch (e: IOException) {
-            throw SubsonicException("Server non raggiungibile. È acceso? Tailscale è attivo?")
+            throw SubsonicException("Server non raggiungibile. Controlla indirizzo e porta (di solito :4533), che il PC sia acceso e, fuori casa, che Tailscale sia attivo.")
         }
         parse(body)
     }
