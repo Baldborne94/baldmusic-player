@@ -43,6 +43,28 @@ data class LocalTrack(
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
 
+    /** I dati del brano come li vede l'app, per la scheda "Informazioni sul brano". */
+    fun details(tagsRead: Boolean): List<Pair<String, String>> {
+        fun yes(b: Boolean) = if (b) "sì" else "no"
+        return listOfNotNull(
+            "Titolo" to title,
+            "Artista" to (artist ?: "—"),
+            artists.takeIf { it.size > 1 }?.let { "Artisti" to it.joinToString(", ") },
+            "Album" to (album ?: "—"),
+            "Artista dell'album" to (albumArtist ?: "—"),
+            "Traccia" to (if (track > 0) "$track" else "—") + (if (disc > 0) " · disco $disc" else ""),
+            "Anno" to (if (year > 0) "$year" else "—"),
+            originalYear.takeIf { it > 0 && it != year }?.let { "Prima uscita" to "$it" },
+            releaseTypes.takeIf { it.isNotEmpty() }?.let { "Tipo di uscita" to it.joinToString(", ") },
+            "Raccolta" to yes(compilation),
+            "Riconosciuto da MusicBrainz" to yes(albumMbid != null || releaseGroupMbid != null || artistMbids.isNotEmpty()),
+            replayGain?.let { rg -> "ReplayGain" to listOfNotNull(rg.trackGain?.let { "brano %+.1f dB".format(it) }, rg.albumGain?.let { "album %+.1f dB".format(it) }).joinToString(" · ") },
+            "Durata" to "%d:%02d".format(durationMs / 60_000, durationMs / 1000 % 60),
+            "Cartella" to folder,
+            "Tag letti dal file" to if (tagsRead) "sì" else "non ancora (valgono quelli di Android)",
+        )
+    }
+
     /** Il brano con i tag letti dal file, che valgono più di quelli di MediaStore. */
     fun withTags(t: FileTags): LocalTrack {
         if (t.isEmpty) return this
@@ -54,7 +76,8 @@ data class LocalTrack(
             albumArtist = t.albumArtist ?: albumArtist,
             disc = if (t.disc > 0) t.disc else disc,
             track = if (t.track > 0) t.track else track,
-            year = if (t.year > 0) t.year else year,
+            // Anche l'anno: se il file non ce l'ha (o ha la data zero), non c'è.
+            year = t.year,
             artists = t.artists,
             artistMbids = t.artistMbids,
             albumArtistMbids = t.albumArtistMbids,
@@ -439,6 +462,24 @@ class LocalCatalog(
         const val SINGLES = "singles"
 
         private fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
+
+        /**
+         * Toglie il 1970 quando è chiaramente un segnaposto: è l'anno della data zero dei
+         * computer, e certi programmi per scaricare musica lo scrivono quando non sanno la
+         * data. Se un brano datato su cinque (e almeno trenta) è "del 1970", non è vero:
+         * senza, i decenni si riempirebbero di brani che con gli anni 70 non c'entrano.
+         */
+        fun withoutPlaceholderYears(tracks: List<LocalTrack>): List<LocalTrack> {
+            val dated = tracks.count { it.shownYear > 0 }
+            val epoch = tracks.count { it.shownYear == EPOCH_YEAR }
+            if (epoch < 30 || epoch * 5 < dated) return tracks
+            return tracks.map { t ->
+                if (t.shownYear != EPOCH_YEAR) t
+                else t.copy(year = if (t.year == EPOCH_YEAR) 0 else t.year, originalYear = if (t.originalYear == EPOCH_YEAR) 0 else t.originalYear)
+            }
+        }
+
+        private const val EPOCH_YEAR = 1970
 
         private fun decadeName(decade: Int) = if (decade >= 2000) "Anni $decade" else "Anni ${decade % 100}"
     }

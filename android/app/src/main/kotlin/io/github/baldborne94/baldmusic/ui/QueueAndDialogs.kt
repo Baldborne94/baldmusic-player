@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
@@ -38,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,10 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 
@@ -199,4 +204,37 @@ fun SettingsPage(vm: PlayerViewModel) {
         Box(Modifier.weight(1f)) { SettingsScreen(vm) }
         Spacer(Modifier.height(8.dp))
     }
+}
+
+/** "Informazioni sul brano": i tag come li ha letti l'app, per capire dove finisce un brano e perché. */
+@Composable
+fun TrackInfoDialog(trackId: Long, title: String, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var details by remember(trackId) { mutableStateOf<List<Pair<String, String>>?>(null) }
+    var missing by remember(trackId) { mutableStateOf(false) }
+    LaunchedEffect(trackId) {
+        val found = context.app.local.details(trackId)
+        details = found
+        missing = found == null
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface1,
+        title = { Text(title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                when {
+                    missing -> Text("Il file non c'è più.", color = TextMuted)
+                    details == null -> Text("Lettura…", color = TextMuted)
+                    else -> details.orEmpty().forEach { (label, value) ->
+                        Column(Modifier.padding(vertical = 5.dp)) {
+                            Text(label, color = TextMuted, fontSize = 12.sp)
+                            Text(value, fontSize = 15.sp)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Chiudi", color = Accent, fontWeight = FontWeight.Bold) } },
+    )
 }

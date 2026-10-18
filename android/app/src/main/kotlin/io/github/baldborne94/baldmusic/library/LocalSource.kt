@@ -77,11 +77,20 @@ class LocalSource(private val context: Context, private val onTagsRead: () -> Un
         if (!hasPermission()) emptyList() else catalog.search(query, songs())
     }
 
+    /** I dati di un brano per la scheda "Informazioni sul brano"; null se non c'è più. */
+    suspend fun details(trackId: Long): List<Pair<String, String>>? = withContext(Dispatchers.IO) {
+        if (!hasPermission()) return@withContext null
+        val row = rows("${MediaStore.Audio.Media._ID} = ?", arrayOf("$trackId")).firstOrNull() ?: return@withContext null
+        val tags = scanner.index.tags(row.stamp)
+        val shown = songs().firstOrNull { it.id == trackId } ?: withTags(row)
+        shown.details(tagsRead = tags != null && !tags.isEmpty)
+    }
+
     /** Tutti i brani, riletti al massimo ogni 30 secondi (Auto chiede le liste a pagine). */
     private fun songs(): List<LocalTrack> {
         cached?.let { (at, list) -> if (System.currentTimeMillis() - at < 30_000) return list }
         val rows = rows(null, null)
-        val list = rows.map(::withTags)
+        val list = LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))
         cached = System.currentTimeMillis() to list
         if (scanner.index.stale(rows.map { it.stamp }).isNotEmpty() || scanner.index.size() > rows.size) scan(rows.map { it.stamp })
         return list

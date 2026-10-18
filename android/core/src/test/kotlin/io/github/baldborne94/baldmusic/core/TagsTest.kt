@@ -106,6 +106,14 @@ class TagsTest {
     }
 
     @Test
+    fun `la data zero dei computer non e un anno`() {
+        assertEquals(0, FileTags.from(raw("TITLE" to "X", "DATE" to "1970-01-01")).year)
+        assertEquals(0, FileTags.from(raw("TITLE" to "X", "TDRC" to "1970-01-01T00:00:00Z")).year)
+        assertEquals(1970, FileTags.from(raw("TITLE" to "Paranoid", "DATE" to "1970-09-18")).year)
+        assertEquals(1970, FileTags.from(raw("TITLE" to "Paranoid", "DATE" to "1970")).year)
+    }
+
+    @Test
     fun `un file senza tag e vuoto`() {
         assertTrue(FileTags.from(emptyList()).isEmpty)
         assertNull(FileTags.from(emptyList()).replayGain)
@@ -166,5 +174,8 @@ class TagsTest {
         assertEquals(0, TagIndex.fromJson("{rotto").size())
         assertEquals(0, TagIndex.fromJson(null).size())
         assertEquals(0, TagIndex.fromJson("""{"version":0,"entries":{"7":{"modified":1,"size":2,"tags":{}}}}""").size())
+        // Un indice della prima versione, salvato senza numero: si rifà.
+        assertEquals(0, TagIndex.fromJson("""{"entries":{"7":{"modified":1,"size":2,"tags":{}}}}""").size())
+        assertTrue(index.toJson().contains("\"version\":${TagIndex.VERSION}"))
     }
 }

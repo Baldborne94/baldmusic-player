@@ -308,6 +308,42 @@ class LocalCatalogTest {
     }
 
     @Test
+    fun `il 1970 usato come segnaposto da mezza libreria si toglie`() {
+        val fake = (1..40).map { t("Brano $it", "Artista $it", 500L + it, "Album $it", 600L + it, year = 1970) }
+        val real = (1..60).map { t("Vero $it", "Artista $it", 500L + it, "Disco $it", 700L + it, year = 2000 + it % 20) }
+        val cleaned = LocalCatalog.withoutPlaceholderYears(fake + real)
+        assertTrue(cleaned.take(40).all { it.shownYear == 0 })
+        assertEquals(real.map { it.year }, cleaned.drop(40).map { it.year })
+        assertTrue(catalog.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES), cleaned).none { it.title == "Anni 70" })
+    }
+
+    @Test
+    fun `qualche disco vero del 1970 resta del 1970`() {
+        val paranoid = (1..8).map { t("Paranoid $it", "Black Sabbath", 900, "Paranoid", 901, track = it, year = 1970) }
+        val real = (1..60).map { t("Vero $it", "Artista $it", 500L + it, "Disco $it", 700L + it, year = 2000 + it % 20) }
+        assertEquals(paranoid + real, LocalCatalog.withoutPlaceholderYears(paranoid + real))
+    }
+
+    @Test
+    fun `un file letto senza anno non riprende l'anno di Android`() {
+        val withEpoch = t("X", "Io", 300, "A", 400, year = 1970, tags = FileTags(title = "X", artist = "Io", album = "A"))
+        assertEquals(0, withEpoch.year)
+    }
+
+    @Test
+    fun `la scheda del brano dice cosa ha letto l'app`() {
+        val d = Picard.letMeGo.details(tagsRead = true).toMap()
+        assertEquals("Avril Lavigne feat. Chad Kroeger", d["Artista"])
+        assertEquals("Avril Lavigne, Chad Kroeger", d["Artisti"])
+        assertEquals("Avril Lavigne", d["Artista dell'album"])
+        assertEquals("sì", d["Riconosciuto da MusicBrainz"])
+        assertEquals("3", d["Traccia"])
+        assertEquals("3:20", d["Durata"])
+        assertEquals("no", Plain.all.first().details(tagsRead = false).toMap()["Riconosciuto da MusicBrainz"])
+        assertTrue(Plain.all.first().details(tagsRead = false).toMap()["Tag letti dal file"]!!.startsWith("non ancora"))
+    }
+
+    @Test
     fun `un file senza album nei tag non prende il nome della cartella`() {
         val noAlbum = t("Demo", "Io", 300, "Download", 400, tags = FileTags(title = "Demo", artist = "Io"))
         assertEquals(null, noAlbum.album)
