@@ -3,6 +3,7 @@ package io.github.baldborne94.baldmusic
 import android.app.Application
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.library.LibraryTree
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.MusicSource
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
@@ -52,7 +53,12 @@ class BaldMusicApp : Application() {
         super.onCreate()
         settings = Settings(this)
         // Tag letti dai file: si ricarica la libreria, come quando cambiano le impostazioni.
-        local = LocalSource(this) { settings.touch() }
+        local = LocalSource(
+            this,
+            onTagsRead = { settings.touch() },
+            // Le cartelle diventano raccolte, e restano allineate ai file.
+            onSongs = { songs -> userData.syncFolders(LocalCatalog.folderCollections(songs), songs.mapTo(HashSet()) { LocalCatalog.ref(it).id }) },
+        )
         userData = UserData(this)
         personal = PersonalSource { userData.value }
     }

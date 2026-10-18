@@ -365,6 +365,7 @@ fun TrackActionsSheet(
     onGoAlbum: (() -> Unit)?,
     onGoArtist: (() -> Unit)?,
     onRemoveFromPlaylist: (() -> Unit)? = null,
+    removeLabel: String = "Rimuovi da questa playlist",
     onRadio: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onInfo: (() -> Unit)? = null,
@@ -382,7 +383,7 @@ fun TrackActionsSheet(
         val act: (() -> Unit) -> () -> Unit = { f -> { f(); onDismiss() } }
         SheetAction(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Togli da Brani che ti piacciono" else "Aggiungi a Brani che ti piacciono", if (liked) Accent else MaterialTheme.colorScheme.onBackground, act(onToggleLike))
         SheetAction(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi a playlist", onClick = act(onAddToPlaylist))
-        onRemoveFromPlaylist?.let { SheetAction(Icons.Rounded.RemoveCircleOutline, "Rimuovi da questa playlist", onClick = act(it)) }
+        onRemoveFromPlaylist?.let { SheetAction(Icons.Rounded.RemoveCircleOutline, removeLabel, onClick = act(it)) }
         SheetAction(Icons.Rounded.SkipNext, "Riproduci dopo", onClick = act(onPlayNext))
         SheetAction(Icons.AutoMirrored.Rounded.QueueMusic, "Aggiungi in coda", onClick = act(onEnqueue))
         onRadio?.let { SheetAction(Icons.Rounded.Radio, "Avvia radio", onClick = act(it)) }

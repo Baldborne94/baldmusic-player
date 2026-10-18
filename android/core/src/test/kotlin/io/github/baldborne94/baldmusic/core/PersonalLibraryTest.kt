@@ -1,6 +1,7 @@
 package io.github.baldborne94.baldmusic.core
 
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.FolderCollection
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.LibraryTree
@@ -124,5 +125,71 @@ class ListeningStatsTest {
         assertEquals(listOf("Queen" to 4, "Muse" to 2), s.topArtists.map { it.name to it.plays })
         assertEquals("Brano 1", s.topTracks.first().name)
         assertEquals("A Night", s.topAlbums.first().name)
+    }
+
+    // --- Raccolte dalle cartelle ---
+
+    private fun local(n: Int) = TrackRef("local/track/$n", "Brano $n")
+    private val ids = generateSequence(1) { it + 1 }.map { "r$it" }.iterator()
+    private fun sync(lib: UserLibrary, folders: List<FolderCollection>, present: Set<Int> = (1..20).toSet()) =
+        lib.syncFolders(folders, present.mapTo(HashSet()) { "local/track/$it" }, now = 1) { ids.next() }
+
+    @Test
+    fun `una cartella nuova diventa una raccolta`() {
+        val lib = sync(UserLibrary(), listOf(FolderCollection("Music/Disney", "Disney", listOf(local(1), local(2)))))
+        val c = lib.collections.single()
+        assertEquals("Disney", c.name)
+        assertEquals(listOf("local/track/1", "local/track/2"), c.tracks.map { it.id })
+        assertTrue(lib.playlists.single().isCollection)
+    }
+
+    @Test
+    fun `i brani nuovi della cartella si aggiungono, quelli tolti a mano no`() {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/Disney", "Disney", listOf(local(1), local(2)))))
+        val id = lib.collections.single().id
+        lib = lib.removeFromPlaylist(id, "local/track/1|me/playlist/$id")
+        lib = sync(lib, listOf(FolderCollection("Music/Disney", "Disney", listOf(local(1), local(2), local(3)))))
+        assertEquals(listOf("local/track/2", "local/track/3"), lib.collections.single().tracks.map { it.id })
+        // Rimesso a mano, torna e non è più "tolto".
+        lib = lib.addToPlaylist(id, listOf(local(1)))
+        assertEquals(listOf("local/track/2", "local/track/3", "local/track/1"), lib.collections.single().tracks.map { it.id })
+        assertTrue(lib.collections.single().removed.isEmpty())
+    }
+
+    @Test
+    fun `le aggiunte da fuori restano, i file spariti escono`() {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/Disney", "Disney", listOf(local(1), local(2)))))
+        val id = lib.collections.single().id
+        lib = lib.addToPlaylist(id, listOf(local(9), TrackRef("remote/track/s1", "Dal server")))
+        lib = sync(lib, listOf(FolderCollection("Music/Disney", "Disney", listOf(local(2)))), present = setOf(2, 9))
+        assertEquals(listOf("local/track/2", "local/track/9", "remote/track/s1"), lib.collections.single().tracks.map { it.id })
+    }
+
+    @Test
+    fun `una raccolta eliminata non torna, e rinominata resta col suo nome`() {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/A", "A", listOf(local(1))), FolderCollection("Music/B", "B", listOf(local(2)))))
+        val a = lib.collections.first { it.folder == "Music/A" }.id
+        val b = lib.collections.first { it.folder == "Music/B" }.id
+        lib = lib.deletePlaylist(a).renamePlaylist(b, "Le mie preferite")
+        lib = sync(lib, listOf(FolderCollection("Music/A", "A", listOf(local(1))), FolderCollection("Music/B", "B", listOf(local(2), local(3)))))
+        assertEquals(listOf("Le mie preferite"), lib.collections.map { it.name })
+        assertEquals(2, lib.collections.single().tracks.size)
+    }
+
+    @Test
+    fun `se non cambia niente la libreria resta la stessa`() {
+        val folders = listOf(FolderCollection("Music/A", "A", listOf(local(1))))
+        val lib = sync(UserLibrary(), folders)
+        assertTrue(sync(lib, folders) === lib)
+    }
+
+    @Test
+    fun `raccolte e playlist stanno in sezioni diverse`() = runTest {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/A", "A", listOf(local(1)))))
+        lib = lib.createPlaylist("p1", "Mia", now = 2)
+        val src = PersonalSource { lib }
+        assertEquals(listOf("A"), src.children(MediaId(PersonalSource.KEY, PersonalSource.COLLECTIONS)).map { it.title })
+        assertEquals(listOf("Mia"), src.children(MediaId(PersonalSource.KEY, PersonalSource.PLAYLISTS)).map { it.title })
+        assertEquals("Raccolta · 1 brano", src.children(MediaId(PersonalSource.KEY, PersonalSource.COLLECTIONS)).single().subtitle)
     }
 }

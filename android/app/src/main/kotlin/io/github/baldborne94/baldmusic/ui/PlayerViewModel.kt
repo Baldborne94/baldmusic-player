@@ -17,6 +17,7 @@ import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.playback.EXTRA_SHUFFLE
 import io.github.baldborne94.baldmusic.playback.PlaybackService
@@ -129,7 +130,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val b = browser ?: return Result.failure(IllegalStateException("Servizio non pronto"))
         val r = b.getChildren(mediaId, 0, Int.MAX_VALUE, null).await()
         return if (r.resultCode == LibraryResult.RESULT_SUCCESS) Result.success(r.value.orEmpty())
-        else Result.failure(IllegalStateException("Impossibile caricare. Il server è acceso? Tailscale è attivo?"))
+        // Il server può essere spento; il telefono no: lì un errore è un problema dell'app.
+        else Result.failure(IllegalStateException(
+            if (mediaId.startsWith("${RemoteSource.KEY}/") || mediaId == RemoteSource.KEY) "Impossibile caricare. Il server è acceso? Tailscale è attivo?"
+            else "Impossibile caricare questa sezione.",
+        ))
     }
 
     suspend fun item(mediaId: String): MediaItem? {

@@ -28,6 +28,14 @@ Quindi, dispositivo per dispositivo:
 > supportato e domani si sposta sul NAS senza cambiare nulla nell'app. Un tablet che non è Android
 > (iPad) usa l'app web e quindi ha bisogno di un Navidrome raggiungibile (PC acceso + Tailscale, o il NAS).
 
+> **Principio**: sul telefono la musica si organizza in **cartelle** (Music/Disney Italia, Music/Movie
+> Soundtracks…) e l'app segue quelle. Le cartelle diventano **raccolte** modificabili e vengono per
+> prime ovunque (Home, Libreria, Cerca, Android Auto). Album, artisti e decenni dai tag restano come
+> secondo modo di sfogliare, e migliorano quanto più i tag sono buoni.
+>
+> Ogni volta che carichi musica nuova si guarda insieme come è disposta nelle cartelle (uno screenshot
+> della cartella Music basta) e si sistema l'app perché la mostri nel modo migliore.
+
 ## Dove siamo
 
 La prima stesura funziona già: app Android nativa con Android Auto, app web stile Spotify,
@@ -67,8 +75,10 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 - [x] **Artisti multipli**: dai tag multi-valore di Picard (`ARTISTS`, anche in ID3 v2.3 dove sono uniti da "/": si separano solo se tornano col numero di ID); nei tag senza Picard si separa solo su separatori non ambigui (`;`, `/`, ` feat. `, ` ft. `) e sugli ospiti nel titolo ("(feat. X)"). "Simon & Garfunkel" e "AC/DC" restano interi.
 - [x] **Album = gruppo di pubblicazione MusicBrainz** (le edizioni diverse dello stesso disco si fondono), oppure artista dell'album + titolo: lo stesso album in due cartelle è una scheda, "Greatest Hits" di due artisti sono due schede.
 - [x] **Tipo di uscita**: un singolo resta tra i singoli anche con il lato B, sul telefono e da Navidrome. EP, live e raccolte dello stesso artista divisi in discografia: fase 2.
-- [x] **Raccolte**: album con il flag compilation, artista dell'album "Various Artists" o (senza tag) più artisti nello stesso disco, in una sezione "Raccolte"; i loro artisti li ritrovano in "Compare in".
+- [x] **Dischi di artisti vari**: album con il flag compilation, artista dell'album "Various Artists" o (senza tag) più artisti nello stesso disco stanno tra gli album con "Artisti vari"; i loro artisti li ritrovano in "Compare in".
 - [x] **Navidrome (PC)**: `releaseTypes` e `originalReleaseDate` di OpenSubsonic nell'app web e nel telefono (singoli fuori dagli album, anno originale in discografia). Gli artisti multipli li gestisce già Navidrome. Restano per le fasi successive `sortName` (fase 2) e `replayGain` (fase 3).
+
+- [x] **Raccolte dalle cartelle**: ogni cartella in cui hai organizzato la musica sul telefono è una raccolta modificabile (aggiungi, togli, rinomina, elimina), che si aggiorna da sola quando arrivano file nuovi.
 
 ## Fase 2 — L'ordine giusto
 

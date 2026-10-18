@@ -2,6 +2,7 @@ package io.github.baldborne94.baldmusic.data
 
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.FolderCollection
 import io.github.baldborne94.baldmusic.core.library.TrackRef
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +41,9 @@ class UserData(context: Context) {
     }.getOrDefault(UserLibrary())
 
     private fun update(change: (UserLibrary) -> UserLibrary) {
+        val before = _state.value
         _state.update(change)
+        if (_state.value === before) return
         // Gli ascolti arrivano a raffica (salti di brano): si salva una volta sola.
         pendingSave?.cancel()
         pendingSave = scope.launch {
@@ -66,6 +69,9 @@ class UserData(context: Context) {
     fun deletePlaylist(id: String) = update { it.deletePlaylist(id) }
     fun addToPlaylist(id: String, tracks: List<TrackRef>) = update { it.addToPlaylist(id, tracks) }
     fun removeFromPlaylist(id: String, trackId: String) = update { it.removeFromPlaylist(id, trackId) }
+    fun syncFolders(folders: List<FolderCollection>, present: Set<String>) =
+        update { it.syncFolders(folders, present, System.currentTimeMillis()) { UUID.randomUUID().toString().take(8) } }
+
     fun addSearch(query: String) = update { it.addSearch(query) }
     fun clearSearches() = update { it.clearSearches() }
 }

@@ -16,8 +16,10 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
     override suspend fun sections(): List<LibraryNode> {
         val lib = library()
         return listOf(
+            // Prima le raccolte: le cartelle sono il modo in cui organizzi la musica (anche in auto).
+            section(COLLECTIONS, "Raccolte", grid = true, subtitle = collections(lib.collections.size)),
             section(LIKED, "Brani che ti piacciono", subtitle = count(lib.liked.size)),
-            section(PLAYLISTS, "Le tue playlist", grid = true, subtitle = playlists(lib.playlists.size)),
+            section(PLAYLISTS, "Le tue playlist", grid = true, subtitle = playlists(lib.playlists.count { !it.isCollection })),
             section(RECENT, "Ascoltati di recente", grid = true),
             section(TOP, "I più ascoltati"),
         )
@@ -29,7 +31,8 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
             LIKED -> lib.liked.mapNotNull { trackNode(it, MediaId(KEY, LIKED)) }
             TOP -> lib.topTracks().mapNotNull { trackNode(it, MediaId(KEY, TOP)) }
             RECENT -> lib.recent.map(::containerNode)
-            PLAYLISTS -> lib.playlists.map(::playlistNode)
+            COLLECTIONS -> lib.collections.sortedBy { it.name.lowercase() }.map(::playlistNode)
+            PLAYLISTS -> lib.playlists.filterNot { it.isCollection }.map(::playlistNode)
             PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }?.let { pl ->
                 pl.tracks.mapNotNull { trackNode(it, MediaId(KEY, PLAYLIST, pl.id)) }
             }.orEmpty()
@@ -61,7 +64,7 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
         mediaId = MediaId(KEY, PLAYLIST, pl.id).toString(),
         title = pl.name,
         kind = Kind.PLAYLIST,
-        subtitle = "Playlist · ${count(pl.tracks.size)}",
+        subtitle = "${if (pl.isCollection) "Raccolta" else "Playlist"} · ${count(pl.tracks.size)}",
         artwork = pl.tracks.firstNotNullOfOrNull { it.artwork },
     )
 
@@ -92,11 +95,14 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
         const val KEY = "me"
         const val LIKED = "liked"
         const val PLAYLISTS = "playlists"
+        /** Le raccolte: le cartelle del telefono, modificabili come playlist. */
+        const val COLLECTIONS = "collections"
         const val PLAYLIST = "playlist"
         const val RECENT = "recent"
         const val TOP = "top"
 
         fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
         private fun playlists(n: Int) = if (n == 1) "1 playlist" else "$n playlist"
+        private fun collections(n: Int) = if (n == 1) "1 raccolta" else "$n raccolte"
     }
 }

@@ -35,7 +35,16 @@ data class UserPlaylist(
     val name: String,
     val tracks: List<TrackRef> = emptyList(),
     val createdAt: Long = 0,
-)
+    /** Per le raccolte: la cartella del telefono da cui nasce, es. "Music/Movie Soundtracks". */
+    val folder: String? = null,
+    /** Brani della cartella tolti a mano: non vanno rimessi. */
+    val removed: Set<String> = emptySet(),
+) {
+    val isCollection get() = folder != null
+}
+
+/** Una cartella del telefono vista come raccolta: nome e brani nell'ordine in cui sono arrivati. */
+data class FolderCollection(val folder: String, val name: String, val tracks: List<TrackRef>)
 
 @Serializable
 data class PlayCount(val track: TrackRef, val count: Int, val lastPlayed: Long)
@@ -50,7 +59,39 @@ data class UserLibrary(
     val plays: Map<String, PlayCount> = emptyMap(),
     /** Ultime ricerche, dalla più recente. */
     val searches: List<String> = emptyList(),
+    /** Cartelle la cui raccolta è stata eliminata: non si ricrea. */
+    val ignoredFolders: Set<String> = emptySet(),
 ) {
+    val collections get() = playlists.filter { it.isCollection }
+
+    /**
+     * Allinea le raccolte alle cartelle del telefono: una cartella nuova diventa una
+     * raccolta, i brani nuovi di una cartella si aggiungono in fondo, quelli tolti a
+     * mano restano fuori e quelli il cui file non c'è più ([present]) spariscono.
+     * Le aggiunte a mano da altre cartelle o dal server restano. Restituisce la
+     * stessa istanza se non cambia niente.
+     */
+    fun syncFolders(folders: List<FolderCollection>, present: Set<String>, now: Long, newId: () -> String): UserLibrary {
+        var changed = false
+        val byFolder = folders.associateBy { it.folder }
+        val updated = playlists.map { pl ->
+            val folder = pl.folder ?: return@map pl
+            val source = byFolder[folder]
+            val kept = pl.tracks.filter { t -> !t.id.startsWith(LOCAL_TRACK) || t.id in present }
+            val have = kept.mapTo(HashSet()) { it.id }
+            val added = source?.tracks.orEmpty().filter { it.id !in have && it.id !in pl.removed }
+            if (kept.size == pl.tracks.size && added.isEmpty()) pl else {
+                changed = true
+                pl.copy(tracks = kept + added)
+            }
+        }
+        val known = updated.mapNotNullTo(HashSet()) { it.folder } + ignoredFolders
+        val created = folders.filter { it.folder !in known && it.tracks.isNotEmpty() }
+            .map { UserPlaylist(newId(), it.name, it.tracks, now, folder = it.folder) }
+        if (!changed && created.isEmpty()) return this
+        return copy(playlists = updated + created)
+    }
+
     fun isLiked(trackId: String) = liked.any { it.id == baseId(trackId) }
 
     fun toggleLike(track: TrackRef): UserLibrary {
@@ -82,6 +123,7 @@ data class UserLibrary(
 
     fun deletePlaylist(id: String) = copy(
         playlists = playlists.filterNot { it.id == id },
+        ignoredFolders = ignoredFolders + listOfNotNull(playlists.firstOrNull { it.id == id }?.folder),
         recent = recent.filterNot { it.id == MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, id).toString() },
     )
 
@@ -91,13 +133,22 @@ data class UserLibrary(
             if (pl.id != id) pl
             else {
                 val present = pl.tracks.map { it.id }.toSet()
-                pl.copy(tracks = pl.tracks + tracks.map { it.copy(id = baseId(it.id)) }.filter { it.id !in present }.distinctBy { it.id })
+                val adding = tracks.map { it.copy(id = baseId(it.id)) }.filter { it.id !in present }.distinctBy { it.id }
+                // Un brano rimesso a mano in una raccolta non è più "tolto".
+                pl.copy(tracks = pl.tracks + adding, removed = pl.removed - adding.map { it.id }.toSet())
             }
         },
     )
 
+    /** Toglie un brano; da una raccolta lo toglie per sempre, anche se resta nella cartella. */
     fun removeFromPlaylist(id: String, trackId: String) = copy(
-        playlists = playlists.map { pl -> if (pl.id == id) pl.copy(tracks = pl.tracks.filterNot { it.id == baseId(trackId) }) else pl },
+        playlists = playlists.map { pl ->
+            if (pl.id != id) pl
+            else {
+                val base = baseId(trackId)
+                pl.copy(tracks = pl.tracks.filterNot { it.id == base }, removed = if (pl.isCollection) pl.removed + base else pl.removed)
+            }
+        },
     )
 
     fun addSearch(query: String): UserLibrary {
@@ -116,6 +167,7 @@ data class UserLibrary(
         const val MAX_RECENT = 20
         const val MAX_SEARCHES = 10
         const val MAX_PLAYS = 2000
+        private const val LOCAL_TRACK = "local/track/"
 
         /** L'ID di un brano senza il contenitore da cui è stato scelto. */
         fun baseId(trackId: String): String = MediaId.parse(trackId)?.copy(parent = null)?.toString() ?: trackId

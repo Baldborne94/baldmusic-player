@@ -68,6 +68,8 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
 
     val likedPage = isLikedSongs(mediaId)
     val playlistId = personalPlaylistId(mediaId)
+    // Una raccolta è una playlist nata da una cartella del telefono: si modifica allo stesso modo.
+    val isCollection = playlistId?.let { pid -> lib.playlists.firstOrNull { it.id == pid }?.isCollection } == true
     val kind = node?.kind
     val list = items.orEmpty()
     val tracks = list.filter { it.kind == Kind.TRACK }
@@ -173,7 +175,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     }
 
     if (renaming && playlistId != null) {
-        NewPlaylistDialog(title = "Rinomina playlist", initial = shownTitle, confirm = "Salva", onDismiss = { renaming = false }) { name ->
+        NewPlaylistDialog(title = if (isCollection) "Rinomina raccolta" else "Rinomina playlist", initial = shownTitle, confirm = "Salva", onDismiss = { renaming = false }) { name ->
             vm.renamePlaylist(playlistId, name)
             renaming = false
         }
@@ -181,7 +183,8 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     if (confirmDelete && playlistId != null) {
         ConfirmDialog(
             title = "Eliminare “$shownTitle”?",
-            text = "La playlist sparirà dalla libreria. I brani restano dove sono.",
+            text = if (isCollection) "La raccolta sparirà dalla libreria e non verrà ricreata. I file restano sul telefono, nella loro cartella."
+            else "La playlist sparirà dalla libreria. I brani restano dove sono.",
             confirm = "Elimina",
             onDismiss = { confirmDelete = false },
         ) {
@@ -249,7 +252,7 @@ private fun HeroHeader(
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Altro", tint = TextMuted) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         onRename?.let { DropdownMenuItem(text = { Text("Rinomina") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) }, onClick = { menu = false; it() }) }
-                        onDelete?.let { DropdownMenuItem(text = { Text("Elimina playlist") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { menu = false; it() }) }
+                        onDelete?.let { DropdownMenuItem(text = { Text("Elimina") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { menu = false; it() }) }
                     }
                 }
             }
