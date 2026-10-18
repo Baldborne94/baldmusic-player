@@ -1,0 +1,15 @@
+# Configurazione di Navidrome per BaldMusic.
+# Su Windows l'installer la crea in C:\ProgramData\Navidrome\navidrome.toml:
+# basta cambiare MusicFolder e riavviare il servizio "Navidrome".
+
+# Cartella con la musica (sottocartelle comprese). Su Windows usa / o \\.
+MusicFolder = "C:/Users/TUO_UTENTE/Music"
+
+# Porta su cui risponde il server.
+Port = 4533
+
+# Ogni quanto ricontrollare la cartella per brani nuovi.
+ScanSchedule = "1h"
+
+# Le playlist .m3u nella cartella della musica vengono importate.
+AutoImportPlaylists = true

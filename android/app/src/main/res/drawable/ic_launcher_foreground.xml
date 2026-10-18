@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Un disco: cerchio sfumato con il foro centrale (area sicura 66dp su 108dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M54,22a32,32 0,1 1,0 64a32,32 0,1 1,0 -64z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endColor="#C026D3"
+                android:endX="86"
+                android:endY="86"
+                android:startColor="#FF7A59"
+                android:startX="22"
+                android:startY="22"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#0E0F13"
+        android:pathData="M54,43.5a10.5,10.5 0,1 1,0 21a10.5,10.5 0,1 1,0 -21z" />
+    <path
+        android:fillColor="#FF7A59"
+        android:pathData="M54,50.5a3.5,3.5 0,1 1,0 7a3.5,3.5 0,1 1,0 -7z" />
+</vector>

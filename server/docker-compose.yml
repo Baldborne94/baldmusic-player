@@ -1,0 +1,18 @@
+# Alternativa all'installer Windows: Navidrome in Docker (Linux, NAS, Docker Desktop).
+#   docker compose up -d
+# Poi apri http://localhost:4533 e crea l'utente amministratore.
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    environment:
+      ND_SCANSCHEDULE: "1h"
+      ND_LOGLEVEL: info
+      ND_ENABLESHARING: "false"
+    volumes:
+      - ./data:/data
+      # Cambia il percorso a sinistra con la cartella della tua musica.
+      - /percorso/della/tua/musica:/music:ro

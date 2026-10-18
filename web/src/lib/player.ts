@@ -1,0 +1,286 @@
+import { useSyncExternalStore } from "react";
+import * as Q from "./queue";
+import { getClient } from "./session";
+import type { Song } from "./subsonic";
+
+// Il player: un solo <audio> per tutta l'app, la coda pura di queue.ts,
+// e la Media Session API (tasti multimediali, schermata di blocco, notifica
+// Android sul tablet).
+
+export interface PlayerState {
+  queue: Q.QueueState;
+  playing: boolean;
+  buffering: boolean;
+  position: number;
+  duration: number;
+  volume: number;
+  error: string | null;
+}
+
+const VOLUME_KEY = "baldmusic.volume";
+
+function storedVolume(): number {
+  try {
+    const v = Number(localStorage.getItem(VOLUME_KEY));
+    return Number.isFinite(v) && v > 0 && v <= 1 ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+
+let state: PlayerState = {
+  queue: Q.emptyQueue,
+  playing: false,
+  buffering: false,
+  position: 0,
+  duration: 0,
+  volume: storedVolume(),
+  error: null,
+};
+
+const listeners = new Set<() => void>();
+
+function set(patch: Partial<PlayerState>): void {
+  state = { ...state, ...patch };
+  listeners.forEach((l) => l());
+}
+
+export function usePlayer(): PlayerState {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => state,
+  );
+}
+
+export function getPlayerState(): PlayerState {
+  return state;
+}
+
+// --- audio ---------------------------------------------------------------
+
+let audio: HTMLAudioElement | null = null;
+let loadedUid: number | null = null;
+/** Ascolto già registrato sul server per il brano corrente. */
+let scrobbled = false;
+
+function el(): HTMLAudioElement {
+  if (audio) return audio;
+  audio = new Audio();
+  audio.preload = "auto";
+  audio.volume = state.volume;
+  audio.addEventListener("play", () => set({ playing: true, error: null }));
+  audio.addEventListener("pause", () => set({ playing: false }));
+  audio.addEventListener("waiting", () => set({ buffering: true }));
+  audio.addEventListener("playing", () => set({ buffering: false }));
+  audio.addEventListener("canplay", () => set({ buffering: false }));
+  audio.addEventListener("durationchange", () => set({ duration: finite(audio!.duration) }));
+  audio.addEventListener("timeupdate", onTime);
+  audio.addEventListener("ended", () => advance(true));
+  audio.addEventListener("error", () => {
+    if (!audio?.src) return;
+    set({ playing: false, buffering: false, error: "Impossibile riprodurre questo brano" });
+  });
+  return audio;
+}
+
+const finite = (n: number) => (Number.isFinite(n) ? n : 0);
+
+function onTime(): void {
+  const a = el();
+  set({ position: a.currentTime });
+  updatePositionState();
+  // Regola di Last.fm/Subsonic: un ascolto conta dopo metà brano o 4 minuti.
+  const song = Q.current(state.queue);
+  if (song && !scrobbled && a.duration > 0 && (a.currentTime >= a.duration / 2 || a.currentTime >= 240)) {
+    scrobbled = true;
+    getClient()?.scrobble(song.id, true).catch(() => {});
+  }
+}
+
+function load(autoplay: boolean): void {
+  const entry = state.queue.entries[state.queue.index];
+  const a = el();
+  if (!entry) {
+    a.pause();
+    a.removeAttribute("src");
+    a.load();
+    loadedUid = null;
+    set({ playing: false, position: 0, duration: 0 });
+    updateMediaSession();
+    return;
+  }
+  const client = getClient();
+  if (!client) return;
+  if (loadedUid !== entry.uid) {
+    loadedUid = entry.uid;
+    scrobbled = false;
+    a.src = client.streamUrl(entry.song.id);
+    set({ position: 0, duration: entry.song.duration ?? 0, error: null });
+    client.scrobble(entry.song.id, false).catch(() => {});
+  }
+  updateMediaSession();
+  if (autoplay) {
+    set({ buffering: true });
+    a.play().catch((e: unknown) => {
+      // NotAllowedError: il browser vuole un gesto dell'utente prima di suonare.
+      set({ playing: false, buffering: false, error: e instanceof DOMException && e.name === "NotAllowedError" ? null : "Riproduzione non riuscita" });
+    });
+  }
+}
+
+function setQueue(queue: Q.QueueState, autoplay: boolean): void {
+  set({ queue });
+  load(autoplay);
+}
+
+function advance(auto: boolean): void {
+  const i = Q.nextIndex(state.queue, auto);
+  if (i === null) {
+    el().pause();
+    set({ playing: false });
+    return;
+  }
+  if (i === state.queue.index) {
+    // Ripeti uno, oppure coda di un solo brano in "ripeti tutto".
+    const a = el();
+    a.currentTime = 0;
+    scrobbled = false;
+    a.play().catch(() => {});
+    return;
+  }
+  setQueue(Q.jumpTo(state.queue, i), true);
+}
+
+// --- azioni --------------------------------------------------------------
+
+export const player = {
+  play(songs: Song[], start = 0, shuffle = false): void {
+    setQueue(Q.playList(state.queue, songs, start, shuffle), true);
+  },
+  toggle(): void {
+    if (el().paused) player.resume();
+    else player.pause();
+  },
+  resume(): void {
+    const a = el();
+    if (!Q.current(state.queue)) return;
+    if (!a.src) load(true);
+    else a.play().catch(() => {});
+  },
+  pause(): void {
+    el().pause();
+  },
+  next(): void {
+    advance(false);
+  },
+  prev(): void {
+    const a = el();
+    // Come ogni player: oltre i 3 secondi "indietro" riavvolge il brano.
+    if (a.currentTime > 3) {
+      a.currentTime = 0;
+      return;
+    }
+    setQueue(Q.jumpTo(state.queue, Q.prevIndex(state.queue)), true);
+  },
+  seek(seconds: number): void {
+    const a = el();
+    if (a.src) a.currentTime = Math.max(0, Math.min(seconds, a.duration || seconds));
+    set({ position: seconds });
+  },
+  jumpTo(index: number): void {
+    setQueue(Q.jumpTo(state.queue, index), true);
+  },
+  enqueue(songs: Song[]): void {
+    const wasEmpty = state.queue.entries.length === 0;
+    setQueue(Q.enqueue(state.queue, songs), wasEmpty);
+  },
+  playNext(songs: Song[]): void {
+    const wasEmpty = state.queue.entries.length === 0;
+    setQueue(Q.playNext(state.queue, songs), wasEmpty);
+  },
+  removeAt(index: number): void {
+    const playingRemoved = index === state.queue.index;
+    setQueue(Q.removeAt(state.queue, index), playingRemoved && state.playing);
+  },
+  move(from: number, to: number): void {
+    set({ queue: Q.move(state.queue, from, to) });
+  },
+  toggleShuffle(): void {
+    set({ queue: Q.toggleShuffle(state.queue) });
+  },
+  cycleRepeat(): void {
+    set({ queue: Q.cycleRepeat(state.queue) });
+  },
+  setVolume(v: number): void {
+    const volume = Math.max(0, Math.min(1, v));
+    el().volume = volume;
+    set({ volume });
+    try {
+      localStorage.setItem(VOLUME_KEY, String(volume));
+    } catch {
+      // ignorato: il volume semplicemente non viene ricordato
+    }
+  },
+  clear(): void {
+    setQueue(Q.emptyQueue, false);
+  },
+  /** Aggiorna il brano in coda dopo un "mi piace", senza toccare la riproduzione. */
+  patchSong(id: string, patch: Partial<Song>): void {
+    const mapEntries = (es: Q.Entry[]) => es.map((e) => (e.song.id === id ? { ...e, song: { ...e.song, ...patch } } : e));
+    const q = state.queue;
+    set({ queue: { ...q, entries: mapEntries(q.entries), unshuffled: q.unshuffled ? mapEntries(q.unshuffled) : null } });
+  },
+};
+
+// --- Media Session -------------------------------------------------------
+
+function updateMediaSession(): void {
+  if (!("mediaSession" in navigator)) return;
+  const song = Q.current(state.queue);
+  if (!song) {
+    navigator.mediaSession.metadata = null;
+    return;
+  }
+  const client = getClient();
+  const artwork = client && song.coverArt ? [96, 256, 512].map((size) => ({ src: client.coverUrl(song.coverArt, size)!, sizes: `${size}x${size}` })) : [];
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: song.title,
+    artist: song.artist ?? "",
+    album: song.album ?? "",
+    artwork,
+  });
+}
+
+function updatePositionState(): void {
+  if (!("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+  const a = el();
+  if (!(a.duration > 0)) return;
+  try {
+    navigator.mediaSession.setPositionState({ duration: a.duration, position: Math.min(a.currentTime, a.duration), playbackRate: a.playbackRate });
+  } catch {
+    // Alcuni browser rifiutano valori durante il caricamento: si riprova al prossimo timeupdate.
+  }
+}
+
+if (typeof navigator !== "undefined" && "mediaSession" in navigator) {
+  const ms = navigator.mediaSession;
+  const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+    ["play", () => player.resume()],
+    ["pause", () => player.pause()],
+    ["nexttrack", () => player.next()],
+    ["previoustrack", () => player.prev()],
+    ["seekto", (d) => d.seekTime !== undefined && player.seek(d.seekTime)],
+    ["seekbackward", (d) => player.seek(el().currentTime - (d.seekOffset ?? 10))],
+    ["seekforward", (d) => player.seek(el().currentTime + (d.seekOffset ?? 10))],
+  ];
+  for (const [action, handler] of handlers) {
+    try {
+      ms.setActionHandler(action, handler);
+    } catch {
+      // Azione non supportata da questo browser.
+    }
+  }
+}
