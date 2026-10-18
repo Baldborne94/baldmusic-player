@@ -102,6 +102,8 @@ class RemoteSource(
         discNumber = s.discNumber,
         year = s.year,
         streamUri = client.streamUrl(s.id, maxBitRate()),
+        albumId = s.albumId?.let { MediaId(KEY, ALBUM, it).toString() },
+        artistId = s.artistId?.let { MediaId(KEY, ARTIST, it).toString() },
     )
 
     companion object {

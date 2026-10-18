@@ -37,6 +37,12 @@ class SubsonicClientTest {
     fun `indirizzo normalizzato`() {
         assertEquals("http://192.168.1.10:4533", normalizeServerUrl(" 192.168.1.10:4533/ "))
         assertEquals("https://pc.tail1.ts.net", normalizeServerUrl("https://pc.tail1.ts.net//"))
+        // Porta dimenticata: per IP e localhost si aggiunge quella di Navidrome.
+        assertEquals("http://192.168.1.191:4533", normalizeServerUrl("http://192.168.1.191"))
+        assertEquals("http://192.168.1.191:4533", normalizeServerUrl("192.168.1.191/"))
+        assertEquals("http://localhost:4533", normalizeServerUrl("localhost"))
+        assertEquals("http://192.168.1.191:8080", normalizeServerUrl("http://192.168.1.191:8080"))
+        assertEquals("https://pc.tail1.ts.net", normalizeServerUrl("https://pc.tail1.ts.net"))
     }
 
     @Test

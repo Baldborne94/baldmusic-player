@@ -2,116 +2,282 @@ package io.github.baldborne94.baldmusic.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.MediaId
+import io.github.baldborne94.baldmusic.core.library.PersonalSource
+import io.github.baldborne94.baldmusic.playback.albumId
+import io.github.baldborne94.baldmusic.playback.artistId
 
-/** Le schermate dell'app; la pila si scorre col tasto indietro. */
+enum class Tab { HOME, SEARCH, LIBRARY }
+
 sealed interface Screen {
-    data object Home : Screen
-    data class Browse(val mediaId: String, val title: String) : Screen
-    data object Search : Screen
+    data object Root : Screen
+    data class Detail(val mediaId: String, val title: String) : Screen
     data object Settings : Screen
-    data object Queue : Screen
+    data object Stats : Screen
+    data object Audio : Screen
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
+class Ui(
+    val open: (mediaId: String, title: String) -> Unit,
+    val trackMenu: (item: MediaItem, playlistId: String?) -> Unit,
+    val addToPlaylist: (items: List<MediaItem>) -> Unit,
+    val settings: () -> Unit,
+    val back: () -> Unit,
+    val push: (Screen) -> Unit,
+)
+
+val LocalUi = staticCompositionLocalOf<Ui> { error("Ui non fornita") }
+
 @Composable
 fun AppScaffold(vm: PlayerViewModel) {
-    val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
+    var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
+    val stacks = remember { Tab.entries.associateWith { mutableStateListOf<Screen>(Screen.Root) } }
+    val stack = stacks.getValue(tab)
     var nowPlaying by rememberSaveable { mutableStateOf(false) }
-    val screen = stack.last()
-    val go: (Screen) -> Unit = { stack.add(it) }
+    var queueOpen by rememberSaveable { mutableStateOf(false) }
+    var menuFor by remember { mutableStateOf<Pair<MediaItem, String?>?>(null) }
+    var addTo by remember { mutableStateOf<List<MediaItem>?>(null) }
+    val lib by vm.library.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    BackHandler(enabled = nowPlaying || stack.size > 1) {
-        if (nowPlaying) nowPlaying = false else stack.removeAt(stack.lastIndex)
+    val ui = remember(tab) {
+        Ui(
+            open = { id, title -> stacks.getValue(tab).add(Screen.Detail(id, title)) },
+            trackMenu = { item, playlist -> menuFor = item to playlist },
+            addToPlaylist = { items -> addTo = items },
+            settings = { stacks.getValue(tab).add(Screen.Settings) },
+            back = { stacks.getValue(tab).let { if (it.size > 1) it.removeAt(it.lastIndex) } },
+            push = { stacks.getValue(tab).add(it) },
+        )
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            when (screen) {
-                                Screen.Home -> "BaldMusic"
-                                is Screen.Browse -> screen.title
-                                Screen.Search -> "Cerca"
-                                Screen.Settings -> "Impostazioni"
-                                Screen.Queue -> "Coda"
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    navigationIcon = {
-                        if (stack.size > 1) {
-                            IconButton(onClick = { stack.removeAt(stack.lastIndex) }) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Indietro")
-                            }
+    BackHandler(enabled = nowPlaying || queueOpen || stack.size > 1 || tab != Tab.HOME) {
+        when {
+            queueOpen -> queueOpen = false
+            nowPlaying -> nowPlaying = false
+            stack.size > 1 -> stack.removeAt(stack.lastIndex)
+            else -> tab = Tab.HOME
+        }
+    }
+
+    CompositionLocalProvider(LocalUi provides ui) {
+        Box(Modifier.fillMaxSize().background(Background)) {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (val screen = stack.last()) {
+                        Screen.Root -> when (tab) {
+                            Tab.HOME -> HomeScreen(vm)
+                            Tab.SEARCH -> SearchScreen(vm)
+                            Tab.LIBRARY -> LibraryScreen(vm)
                         }
-                    },
-                    actions = {
-                        if (screen != Screen.Search) IconButton(onClick = { go(Screen.Search) }) { Icon(Icons.Rounded.Search, "Cerca") }
-                        if (screen != Screen.Queue) IconButton(onClick = { go(Screen.Queue) }) { Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Coda") }
-                        if (screen != Screen.Settings) IconButton(onClick = { go(Screen.Settings) }) { Icon(Icons.Rounded.Settings, "Impostazioni") }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-                )
-            },
-            bottomBar = {
-                Column(Modifier.navigationBarsPadding()) {
-                    MiniPlayer(vm, onOpen = { nowPlaying = true })
+                        is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
+                        Screen.Settings -> SettingsPage(vm)
+                        Screen.Stats -> StatsScreen(vm)
+                        Screen.Audio -> AudioScreen(vm)
+                    }
                 }
+                MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
+                BottomBar(tab) { selected ->
+                    // Toccare di nuovo la scheda attiva riporta alla sua radice, come in Spotify.
+                    if (selected == tab) stacks.getValue(tab).let { while (it.size > 1) it.removeAt(it.lastIndex) }
+                    tab = selected
+                }
+            }
+
+            AnimatedVisibility(
+                visible = nowPlaying && vm.current != null,
+                enter = slideInVertically(tween(320)) { it } + fadeIn(),
+                exit = slideOutVertically(tween(280)) { it } + fadeOut(),
+            ) {
+                NowPlayingScreen(
+                    vm,
+                    onClose = { nowPlaying = false },
+                    onOpenScreen = { screen ->
+                        nowPlaying = false
+                        stack.add(screen)
+                    },
+                    onQueue = { queueOpen = true },
+                    onNavigate = { id, title ->
+                        nowPlaying = false
+                        stack.add(Screen.Detail(id, title))
+                    },
+                )
+            }
+
+            AnimatedVisibility(visible = queueOpen, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                QueueScreen(vm, onClose = { queueOpen = false })
+            }
+
+            menuFor?.let { (item, playlistId) ->
+                val liked = vm.isLiked(lib, item)
+                TrackActionsSheet(
+                    item = item,
+                    liked = liked,
+                    onDismiss = { menuFor = null },
+                    onToggleLike = { vm.toggleLike(item) },
+                    onAddToPlaylist = { addTo = listOf(item) },
+                    onPlayNext = { vm.playNext(item) },
+                    onEnqueue = { vm.enqueue(item) },
+                    onGoAlbum = item.albumId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.albumTitle?.toString().orEmpty())) } },
+                    onGoArtist = item.artistId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.artist?.toString().orEmpty())) } },
+                    onRemoveFromPlaylist = playlistId?.let { pl -> { vm.removeFromPlaylist(pl, item) } },
+                    onRadio = if (vm.canStartRadio(item)) ({ vm.startRadio(item) }) else null,
+                    onShare = { shareTrack(context, item) },
+                )
+            }
+
+            addTo?.let { items ->
+                AddToPlaylistSheet(lib, onDismiss = { addTo = null }, onCreate = { name -> vm.createPlaylist(name, items) }, onPick = { id -> vm.addToPlaylist(id, items) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun BottomBar(tab: Tab, onSelect: (Tab) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(listOf(Background.copy(alpha = 0.92f), Color.Black)))
+            .navigationBarsPadding()
+            .height(64.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NavItem("Home", Icons.Rounded.Home, Icons.Outlined.Home, tab == Tab.HOME) { onSelect(Tab.HOME) }
+        NavItem("Cerca", Icons.Rounded.Search, Icons.Outlined.Search, tab == Tab.SEARCH) { onSelect(Tab.SEARCH) }
+        NavItem("La tua libreria", Icons.Rounded.LibraryMusic, Icons.Outlined.LibraryMusic, tab == Tab.LIBRARY) { onSelect(Tab.LIBRARY) }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.NavItem(label: String, selectedIcon: ImageVector, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.weight(1f).clickable(onClick = onClick).padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) Color.White else TextMuted, modifier = Modifier.size(26.dp))
+        Text(label, fontSize = 11.sp, color = if (selected) Color.White else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+/**
+ * Il mini-player sopra la barra: colorato con la copertina, cuore, play/pausa.
+ * Si scorre di lato per cambiare brano e si tocca per aprire il player.
+ */
+@Composable
+fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
+    val item = vm.current ?: return
+    val color by rememberArtworkColor(item.mediaMetadata.artworkUri)
+    var drag by remember { mutableStateOf(0f) }
+    Column(
+        Modifier
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(color)
+            .clickable(onClick = onOpen)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (drag < -120) vm.next() else if (drag > 120) vm.previous()
+                        drag = 0f
+                    },
+                ) { _, delta -> drag += delta }
             },
-        ) { padding ->
-            Box(Modifier.padding(padding).fillMaxSize()) {
-                when (screen) {
-                    Screen.Home -> HomeScreen(vm, go)
-                    is Screen.Browse -> BrowseScreen(vm, screen, go)
-                    Screen.Search -> SearchScreen(vm, go)
-                    Screen.Settings -> SettingsScreen(vm)
-                    Screen.Queue -> QueueScreen(vm)
+    ) {
+        Row(Modifier.fillMaxWidth().padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Artwork(item, Modifier.size(42.dp), shape = RoundedCornerShape(4.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.title(), fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.subtitle().orEmpty(), color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            IconButton(onClick = { vm.toggleLike(item) }) {
+                Icon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (liked) "Togli da Mi piace" else "Mi piace", tint = if (liked) Accent else Color.White)
+            }
+            IconButton(onClick = { vm.toggle() }) {
+                when {
+                    vm.buffering -> CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                    vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = Color.White, modifier = Modifier.size(30.dp))
+                    else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
             }
         }
-
-        AnimatedVisibility(
-            visible = nowPlaying && vm.current != null,
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it },
-        ) {
-            NowPlayingScreen(vm, onClose = { nowPlaying = false }, onQueue = {
-                nowPlaying = false
-                go(Screen.Queue)
-            })
+        val progress = if (vm.duration > 0) (vm.position.toFloat() / vm.duration).coerceIn(0f, 1f) else 0f
+        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.25f))) {
+            Box(Modifier.fillMaxWidth(progress).height(2.dp).background(Color.White))
         }
+        Spacer(Modifier.height(2.dp))
     }
+}
+
+/** L'ID di una playlist tua da un ID di contenitore, se lo è. */
+fun personalPlaylistId(mediaId: String): String? =
+    MediaId.parse(mediaId)?.takeIf { it.source == PersonalSource.KEY && it.kind == PersonalSource.PLAYLIST }?.id
+
+/** Condivide titolo e artista con le altre app (messaggi, social…). */
+fun shareTrack(context: android.content.Context, item: MediaItem) {
+    val text = listOfNotNull(item.title().takeIf { it.isNotBlank() }, item.mediaMetadata.artist?.toString()).joinToString(" – ")
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_TEXT, "🎵 $text")
+    }
+    context.startActivity(android.content.Intent.createChooser(send, "Condividi").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
 }

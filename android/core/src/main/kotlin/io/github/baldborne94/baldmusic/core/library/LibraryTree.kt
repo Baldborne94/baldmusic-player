@@ -25,9 +25,10 @@ class LibraryTree(
 
     suspend fun children(mediaId: String): List<LibraryNode> {
         if (mediaId == MediaId.ROOT) return rootNodes()
-        synchronized(cache) { cache[mediaId] }?.let { if (clock() - it.at < CACHE_MS) return it.nodes }
         val id = MediaId.parse(mediaId) ?: return emptyList()
         val src = source(id.source) ?: return emptyList()
+        if (!src.cacheable) return if (id.kind == null) src.sections() else src.children(id)
+        synchronized(cache) { cache[mediaId] }?.let { if (clock() - it.at < CACHE_MS) return it.nodes }
         val nodes = if (id.kind == null) src.sections() else src.children(id)
         synchronized(cache) { cache[mediaId] = Cached(clock(), nodes) }
         return nodes
@@ -39,6 +40,7 @@ class LibraryTree(
         val src = source(id.source) ?: return null
         if (id.isTrack) return src.track(id)
         if (id.kind == null) return rootNodes().firstOrNull { it.mediaId == mediaId }
+        src.node(id)?.let { return it }
         // Un contenitore si trova tra i figli di chi l'ha elencato: basta il titolo
         // dall'elenco già in cache, senza una chiamata apposita.
         synchronized(cache) { cache.values.toList() }.forEach { c ->

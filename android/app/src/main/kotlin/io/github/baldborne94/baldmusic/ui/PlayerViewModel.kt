@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.os.Bundle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,10 +15,14 @@ import androidx.media3.common.Player
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
+import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.playback.EXTRA_SHUFFLE
 import io.github.baldborne94.baldmusic.playback.PlaybackService
+import io.github.baldborne94.baldmusic.playback.toTrackRef
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
@@ -27,6 +32,8 @@ import kotlinx.coroutines.launch
  * vede in macchina.
  */
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val app = application.app
 
     var browser by mutableStateOf<MediaBrowser?>(null)
         private set
@@ -39,7 +46,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var shuffle by mutableStateOf(false)
         private set
-    var repeat by mutableStateOf(Player.REPEAT_MODE_OFF)
+    var repeat by mutableIntStateOf(Player.REPEAT_MODE_OFF)
         private set
     var position by mutableLongStateOf(0L)
         private set
@@ -47,14 +54,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var queue by mutableStateOf<List<MediaItem>>(emptyList())
         private set
-    var queueIndex by mutableStateOf(-1)
+    var queueIndex by mutableIntStateOf(-1)
         private set
     var error by mutableStateOf<String?>(null)
         private set
 
-    /** Cresce a ogni cambio di libreria (server, permessi): le schermate si ricaricano. */
-    var libraryVersion by mutableStateOf(0)
+    /** Da dove arriva quello che suona ("Brani che ti piacciono", il nome dell'album…). */
+    var playingFrom by mutableStateOf<String?>(null)
         private set
+
+    /** Il contenitore della coda in corso, per il tasto play/pausa delle pagine. */
+    var playingContainer by mutableStateOf<String?>(null)
+        private set
+
+    /** Cresce a ogni cambio di libreria (server, permessi): le schermate si ricaricano. */
+    var libraryVersion by mutableIntStateOf(0)
+        private set
+
+    val library: StateFlow<UserLibrary> = app.userData.state
+    val sleepTimer: StateFlow<Long?> = app.sleepTimer
+    val audio: StateFlow<io.github.baldborne94.baldmusic.core.audio.AudioPrefs> = app.settings.audio
+    val audioEffects get() = app.audioEffects.info
+
+    fun updateAudio(change: (io.github.baldborne94.baldmusic.core.audio.AudioPrefs) -> io.github.baldborne94.baldmusic.core.audio.AudioPrefs) =
+        app.settings.updateAudio(change)
+
+    fun setSpeed(speed: Float) = updateAudio { it.withSpeed(speed) }
+    fun presetLevels(preset: Int) = app.audioEffects.presetLevels(preset)
+
+    var lyricsOnline: Boolean
+        get() = app.settings.lyricsOnline
+        set(value) {
+            app.settings.lyricsOnline = value
+        }
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = sync(player)
@@ -71,11 +103,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             while (true) {
                 browser?.let { if (it.isPlaying) position = it.currentPosition }
-                delay(500)
+                delay(250)
             }
         }
         viewModelScope.launch {
-            application.app.settings.changes.collect { libraryVersion = it }
+            app.settings.changes.collect { libraryVersion = it }
         }
     }
 
@@ -90,6 +122,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         queue = (0 until p.mediaItemCount).map { p.getMediaItemAt(it) }
         queueIndex = p.currentMediaItemIndex
         error = p.playerError?.let { "Impossibile riprodurre: ${it.errorCodeName}" }
+        if (current == null) playingContainer = null
     }
 
     override fun onCleared() {
@@ -99,11 +132,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // --- libreria --------------------------------------------------------
+
     suspend fun children(mediaId: String): Result<List<MediaItem>> {
         val b = browser ?: return Result.failure(IllegalStateException("Servizio non pronto"))
         val r = b.getChildren(mediaId, 0, Int.MAX_VALUE, null).await()
         return if (r.resultCode == LibraryResult.RESULT_SUCCESS) Result.success(r.value.orEmpty())
         else Result.failure(IllegalStateException("Impossibile caricare. Il server è acceso? Tailscale è attivo?"))
+    }
+
+    suspend fun item(mediaId: String): MediaItem? {
+        val b = browser ?: return null
+        val r = b.getItem(mediaId).await()
+        return if (r.resultCode == LibraryResult.RESULT_SUCCESS) r.value else null
     }
 
     suspend fun search(query: String): List<MediaItem> {
@@ -113,9 +154,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         return if (r.resultCode == LibraryResult.RESULT_SUCCESS) r.value.orEmpty() else emptyList()
     }
 
+    // --- riproduzione ----------------------------------------------------
+
     /** Un brano: il servizio ricostruisce da solo l'album o la playlist da cui viene. */
-    fun play(item: MediaItem) {
+    fun play(item: MediaItem, from: String? = null) {
         val b = browser ?: return
+        playingFrom = from ?: item.mediaMetadata.albumTitle?.toString()
+        playingContainer = io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId)?.parent?.toString()
         b.shuffleModeEnabled = false
         b.setMediaItem(MediaItem.Builder().setMediaId(item.mediaId).build())
         b.prepare()
@@ -123,8 +168,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** Un contenitore intero (album, artista, playlist), in ordine o in casuale. */
-    fun playAll(containerId: String, shuffled: Boolean) {
+    fun playAll(containerId: String, shuffled: Boolean, from: String? = null) {
         val b = browser ?: return
+        playingFrom = from
+        playingContainer = containerId
         val request = MediaItem.RequestMetadata.Builder()
             .setExtras(Bundle().apply { putBoolean(EXTRA_SHUFFLE, shuffled) })
             .build()
@@ -132,6 +179,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         b.setMediaItem(MediaItem.Builder().setMediaId(containerId).setRequestMetadata(request).build())
         b.prepare()
         b.play()
+    }
+
+    /** Il tasto play di una pagina: se quella pagina sta già suonando, è pausa/riprendi. */
+    fun playOrToggle(containerId: String, from: String?) {
+        if (playingContainer == containerId && current != null) toggle() else playAll(containerId, shuffled = shuffle, from = from)
     }
 
     fun playNext(item: MediaItem) {
@@ -171,6 +223,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun removeAt(index: Int) = browser?.removeMediaItem(index)
+    fun move(from: Int, to: Int) = browser?.moveMediaItem(from, to)
 
     fun toggleShuffle() {
         browser?.let { it.shuffleModeEnabled = !it.shuffleModeEnabled }
@@ -186,8 +239,47 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun clearQueue() = browser?.run {
-        stop()
-        clearMediaItems()
+    fun clearUpcoming() = browser?.run {
+        val from = currentMediaItemIndex + 1
+        if (from < mediaItemCount) removeMediaItems(from, mediaItemCount)
     }
+
+    // --- la tua musica ---------------------------------------------------
+
+    fun isLiked(lib: UserLibrary, item: MediaItem?) = item != null && lib.isLiked(item.mediaId)
+    fun toggleLike(item: MediaItem) = app.userData.toggleLike(item.toTrackRef())
+    fun createPlaylist(name: String, first: List<MediaItem> = emptyList()) = app.userData.createPlaylist(name, first.map { it.toTrackRef() })
+    fun addToPlaylist(playlistId: String, items: List<MediaItem>) = app.userData.addToPlaylist(playlistId, items.map { it.toTrackRef() })
+    fun removeFromPlaylist(playlistId: String, item: MediaItem) = app.userData.removeFromPlaylist(playlistId, item.mediaId)
+    fun renamePlaylist(playlistId: String, name: String) = app.userData.renamePlaylist(playlistId, name)
+    fun deletePlaylist(playlistId: String) = app.userData.deletePlaylist(playlistId)
+    fun addSearch(query: String) = app.userData.addSearch(query)
+    fun clearSearches() = app.userData.clearSearches()
+
+    /** Timer di spegnimento: minuti, 0 = a fine brano, null = spento. */
+    fun setSleepTimer(minutes: Int?) {
+        app.sleepTimer.value = when (minutes) {
+            null -> null
+            0 -> BaldMusicApp.SLEEP_END_OF_TRACK
+            else -> System.currentTimeMillis() + minutes * 60_000L
+        }
+    }
+
+    suspend fun lyricsFor(item: MediaItem) = app.lyrics.get(
+        item.mediaMetadata.artist?.toString(),
+        item.mediaMetadata.title?.toString().orEmpty(),
+        item.mediaMetadata.albumTitle?.toString(),
+        item.mediaMetadata.durationMs ?: duration.takeIf { it > 0 },
+        online = app.settings.lyricsOnline,
+    )
+
+    /** Radio da un brano del telefono: lui e poi musica simile. */
+    fun startRadio(item: MediaItem) {
+        val id = io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId) ?: return
+        if (id.source != io.github.baldborne94.baldmusic.library.LocalSource.KEY || id.id == null) return
+        playAll("${id.source}/${io.github.baldborne94.baldmusic.library.LocalSource.RADIO}/${id.id}", shuffled = false, from = "Radio: ${item.title()}")
+    }
+
+    fun canStartRadio(item: MediaItem) =
+        io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId)?.source == io.github.baldborne94.baldmusic.library.LocalSource.KEY
 }

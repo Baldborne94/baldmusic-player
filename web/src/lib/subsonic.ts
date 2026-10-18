@@ -92,11 +92,22 @@ export class SubsonicError extends Error {
   }
 }
 
-/** Normalizza l'indirizzo digitato dall'utente: aggiunge lo schema, toglie lo slash finale. */
+/** Porta predefinita di Navidrome. */
+export const DEFAULT_PORT = 4533;
+
+/**
+ * Normalizza l'indirizzo digitato: aggiunge lo schema, toglie lo slash finale e,
+ * se è un indirizzo IP o localhost senza porta, aggiunge :4533 (la porta
+ * dimenticata è l'errore più comune). I nomi come …ts.net restano invariati.
+ */
 export function normalizeServerUrl(raw: string): string {
-  let url = raw.trim();
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-  return url.replace(/\/+$/, "");
+  let url = raw.trim().replace(/\/+$/, "");
+  const bare = url.replace(/^https?:\/\//i, "").split(/[/:]/)[0];
+  const local = /^\d{1,3}(\.\d{1,3}){3}$/.test(bare) || bare.toLowerCase() === "localhost";
+  if (!/^https?:\/\//i.test(url)) url = `${local ? "http" : "https"}://${url}`;
+  const m = /^(https?:\/\/)([^/:]+)(:\d+)?(.*)$/i.exec(url);
+  if (m && !m[3] && local) url = `${m[1]}${m[2]}:${DEFAULT_PORT}${m[4]}`;
+  return url;
 }
 
 /**
