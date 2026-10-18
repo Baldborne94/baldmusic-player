@@ -10,6 +10,7 @@ import io.github.baldborne94.baldmusic.core.library.MusicSource
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.TrackRef
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.library.UserPlaylist
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -212,5 +213,33 @@ class ListeningStatsTest {
         assertTrue(lib.collections.isEmpty())
         lib = sync(lib, listOf(FolderCollection("Music/A", "A", listOf(local(5)))))
         assertEquals(listOf("local/track/5"), lib.collections.single().tracks.map { it.id })
+    }
+
+    // --- Ordine e copertina ---
+
+    private fun song(n: Int, title: String, artist: String, art: String? = "local/$n") = TrackRef("local/track/$n", title, artist = artist, artwork = art)
+
+    @Test
+    fun `l'ordine trascinato si salva, e chi manca resta in fondo`() {
+        var lib = UserLibrary().createPlaylist("p", "Mia", now = 1, first = listOf(song(1, "A", "x"), song(2, "B", "x"), song(3, "C", "x")))
+        lib = lib.reorderPlaylist("p", listOf("local/track/3|me/playlist/p", "local/track/1"))
+        assertEquals(listOf("local/track/3", "local/track/1", "local/track/2"), lib.playlists.single().tracks.map { it.id })
+    }
+
+    @Test
+    fun `si ordina per titolo o per artista`() {
+        var lib = UserLibrary().createPlaylist("p", "Mia", now = 1, first = listOf(song(1, "Zeta", "Avril"), song(2, "Alfa", "Tool"), song(3, "Beta", "Avril")))
+        assertEquals(listOf("Alfa", "Beta", "Zeta"), lib.sortPlaylist("p", byArtist = false).playlists.single().tracks.map { it.title })
+        lib = lib.sortPlaylist("p", byArtist = true)
+        assertEquals(listOf("Beta", "Zeta", "Alfa"), lib.playlists.single().tracks.map { it.title })
+    }
+
+    @Test
+    fun `con quattro copertine diverse la raccolta ha il mosaico`() {
+        val four = UserPlaylist("p", "Mia", listOf(song(1, "A", "x"), song(2, "B", "x", art = "local/1"), song(3, "C", "x"), song(4, "D", "x"), song(5, "E", "x")))
+        assertEquals("mosaic/local/1,local/3,local/4,local/5", PersonalSource.artworkOf(four))
+        val few = UserPlaylist("q", "Poca", listOf(song(1, "A", "x"), song(2, "B", "x", art = null)))
+        assertEquals("local/1", PersonalSource.artworkOf(few))
+        assertEquals(null, PersonalSource.artworkOf(UserPlaylist("v", "Vuota")))
     }
 }

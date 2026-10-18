@@ -1,6 +1,8 @@
 package io.github.baldborne94.baldmusic.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,9 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.RemoveCircleOutline
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,18 +42,25 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
@@ -80,6 +93,30 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
+    // Selezione di più brani (pressione lunga o "Seleziona brani").
+    var selecting by remember(mediaId) { mutableStateOf(false) }
+    val selected = remember(mediaId) { mutableStateListOf<String>() }
+    fun toggle(item: MediaItem) {
+        if (!selected.remove(item.mediaId)) selected.add(item.mediaId)
+    }
+    // Riordino trascinando: si sposta una copia della lista, e si salva quando si lascia.
+    var reordering by remember(mediaId) { mutableStateOf(false) }
+    val order = remember(mediaId) { mutableStateListOf<MediaItem>() }
+    var dragging by remember(mediaId) { mutableStateOf<String?>(null) }
+    var dragOffset by remember(mediaId) { mutableFloatStateOf(0f) }
+    var rowHeight by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(tracks, reordering) {
+        if (dragging == null) {
+            order.clear()
+            order.addAll(tracks)
+        }
+    }
+    BackHandler(enabled = selecting || reordering) {
+        selecting = false
+        selected.clear()
+        reordering = false
+    }
+
     val artworkColor by rememberArtworkColor(node?.mediaMetadata?.artworkUri ?: tracks.firstOrNull()?.mediaMetadata?.artworkUri, tileColor(mediaId))
     val headerColor = when {
         likedPage -> Color(0xFF4A2DB0)
@@ -105,6 +142,14 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                     tracks = tracks,
                     containers = containers,
                     onAddAll = { ui.addToPlaylist(tracks) },
+                    menuItems = buildList {
+                        if (tracks.isNotEmpty()) add("Seleziona brani" to { reordering = false; selecting = true })
+                        if (playlistId != null && tracks.size > 1) {
+                            add("Riordina brani" to { selecting = false; selected.clear(); reordering = true })
+                            add("Ordina per titolo" to { vm.sortPlaylist(playlistId, byArtist = false) })
+                            add("Ordina per artista" to { vm.sortPlaylist(playlistId, byArtist = true) })
+                        }
+                    },
                     onRename = if (playlistId != null) ({ renaming = true }) else null,
                     onDelete = if (playlistId != null) ({ confirmDelete = true }) else null,
                     // Solo le raccolte: buttare i file di una playlist (magari col server dentro) non avrebbe senso.
@@ -159,16 +204,90 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
         }
 
         val numbered = id?.kind == "album"
-        items(tracks, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
-            TrackRow(
-                item,
-                active = sameTrack(item.mediaId, vm.current?.mediaId),
-                liked = lib.isLiked(item.mediaId),
-                number = if (numbered) item.mediaMetadata.trackNumber else null,
-                onClick = { vm.play(item, from = shownTitle) },
-                onMenu = { ui.trackMenu(item, playlistId) },
+        if (selecting) {
+            item(span = full) {
+                val chosen = tracks.filter { it.mediaId in selected }
+                Row(Modifier.fillMaxWidth().background(Surface2).padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { selecting = false; selected.clear() }) { Icon(Icons.Rounded.Close, "Esci dalla selezione") }
+                    Text(if (chosen.size == 1) "1 selezionato" else "${chosen.size} selezionati", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    IconButton(onClick = {
+                        if (chosen.size == tracks.size) selected.clear() else { selected.clear(); selected.addAll(tracks.map { it.mediaId }) }
+                    }) { Icon(Icons.Rounded.SelectAll, "Seleziona tutti") }
+                    IconButton(enabled = chosen.isNotEmpty(), onClick = { ui.addToPlaylist(chosen) }) {
+                        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi a una playlist o raccolta")
+                    }
+                    if (playlistId != null) {
+                        IconButton(enabled = chosen.isNotEmpty(), onClick = { vm.removeFromPlaylist(playlistId, chosen); selected.clear() }) {
+                            Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection) "Togli dalla raccolta" else "Togli dalla playlist")
+                        }
+                    }
+                    val trash = ui.trash
+                    if (trash != null && chosen.any { localFileUri(it) != null }) {
+                        IconButton(onClick = {
+                            val files = chosen.filter { localFileUri(it) != null }
+                            trash(files, "Eliminare ${if (files.size == 1) "1 brano" else "${files.size} brani"} dal telefono?", null) {
+                                selected.clear()
+                                selecting = false
+                            }
+                        }) { Icon(Icons.Rounded.Delete, "Elimina dal telefono", tint = Danger) }
+                    }
+                }
+            }
+        }
+        if (reordering && playlistId != null) {
+            item(span = full) {
+                Row(Modifier.fillMaxWidth().background(Surface2).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Trascina ≡ per spostare un brano", Modifier.weight(1f), color = TextMuted, fontSize = 14.sp)
+                    androidx.compose.material3.TextButton(onClick = { reordering = false }) { Text("Fatto", color = Accent, fontWeight = FontWeight.Bold) }
+                }
+            }
+            items(order, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
+                val moving = dragging == item.mediaId
+                ReorderRow(
+                    item,
+                    Modifier
+                        .zIndex(if (moving) 1f else 0f)
+                        .graphicsLayer { translationY = if (moving) dragOffset else 0f }
+                        .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) },
+                    onDragStart = { dragging = item.mediaId; dragOffset = 0f },
+                    onDrag = { dy ->
+                        dragOffset += dy
+                        val i = order.indexOfFirst { it.mediaId == item.mediaId }
+                        // Superata metà della riga vicina, il brano prende il suo posto.
+                        if (dragOffset > rowHeight / 2 && i in 0 until order.lastIndex) {
+                            order.add(i + 1, order.removeAt(i))
+                            dragOffset -= rowHeight
+                        } else if (dragOffset < -rowHeight / 2 && i > 0) {
+                            order.add(i - 1, order.removeAt(i))
+                            dragOffset += rowHeight
+                        }
+                    },
+                    onDragEnd = {
+                        dragging = null
+                        dragOffset = 0f
+                        vm.reorderPlaylist(playlistId, order.toList())
+                    },
+                )
+            }
+        } else {
+            items(tracks, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
+                TrackRow(
+                    item,
+                    active = sameTrack(item.mediaId, vm.current?.mediaId),
+                    liked = lib.isLiked(item.mediaId),
+                    number = if (numbered) item.mediaMetadata.trackNumber else null,
+                    onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
+                    onMenu = { ui.trackMenu(item, playlistId) },
                     onSwipeQueue = { vm.enqueue(item) },
-            )
+                    selected = if (selecting) item.mediaId in selected else null,
+                    // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).
+                    onLongClick = {
+                        selecting = true
+                        reordering = false
+                        toggle(item)
+                    },
+                )
+            }
         }
 
         if (tracks.size > 1) {
@@ -216,6 +335,7 @@ private fun HeroHeader(
     tracks: List<MediaItem>,
     containers: List<MediaItem>,
     onAddAll: () -> Unit,
+    menuItems: List<Pair<String, () -> Unit>> = emptyList(),
     onRename: (() -> Unit)?,
     onDelete: (() -> Unit)?,
     onTrashAll: (() -> Unit)? = null,
@@ -258,10 +378,11 @@ private fun HeroHeader(
             if (tracks.isNotEmpty()) {
                 IconButton(onClick = onAddAll) { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi tutto a una playlist", tint = TextMuted) }
             }
-            if (onRename != null || onDelete != null || onTrashAll != null) {
+            if (menuItems.isNotEmpty() || onRename != null || onDelete != null || onTrashAll != null) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Altro", tint = TextMuted) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        menuItems.forEach { (label, action) -> DropdownMenuItem(text = { Text(label) }, onClick = { menu = false; action() }) }
                         onRename?.let { DropdownMenuItem(text = { Text("Rinomina") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) }, onClick = { menu = false; it() }) }
                         onDelete?.let { DropdownMenuItem(text = { Text("Elimina") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { menu = false; it() }) }
                         onTrashAll?.let {
@@ -287,5 +408,42 @@ private fun HeroHeader(
                 }
             }
         }
+    }
+}
+
+/** Riga di un brano mentre si riordina: si sposta trascinando la maniglia ≡. */
+@Composable
+private fun ReorderRow(item: MediaItem, modifier: Modifier, onDragStart: () -> Unit, onDrag: (Float) -> Unit, onDragEnd: () -> Unit) {
+    val start by rememberUpdatedState(onDragStart)
+    val drag by rememberUpdatedState(onDrag)
+    val end by rememberUpdatedState(onDragEnd)
+    Row(
+        modifier.fillMaxWidth().background(Background).padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Artwork(item, Modifier.size(50.dp), shape = RoundedCornerShape(4.dp))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(item.title(), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(item.subtitle().orEmpty(), color = TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
+        }
+        Icon(
+            Icons.Rounded.DragHandle,
+            "Trascina per spostare",
+            tint = TextMuted,
+            modifier = Modifier
+                .size(48.dp)
+                .pointerInput(item.mediaId) {
+                    detectDragGestures(
+                        onDragStart = { start() },
+                        onDragEnd = { end() },
+                        onDragCancel = { end() },
+                    ) { change, amount ->
+                        change.consume()
+                        drag(amount.y)
+                    }
+                }
+                .padding(12.dp),
+        )
     }
 }
