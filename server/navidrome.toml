@@ -13,3 +13,10 @@ ScanSchedule = "1h"
 
 # Le playlist .m3u nella cartella della musica vengono importate.
 AutoImportPlaylists = true
+
+# Un album, una scheda: senza questa riga due edizioni dello stesso disco
+# (CD europeo e digitale USA, per esempio) diventano due album separati.
+# Con Picard capita spesso, perché ogni brano può essere abbinato a
+# un'edizione diversa.
+[Scanner]
+GroupAlbumReleases = true
