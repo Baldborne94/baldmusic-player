@@ -57,6 +57,7 @@ class LocalSource(private val context: Context) : MusicSource {
         return listOf(
             section(RECENT, "Aggiunti di recente", grid = true),
             section(ALBUMS, "Album", grid = true),
+            section(SINGLES, "Singoli e brani sparsi"),
             section(ARTISTS, "Artisti"),
             section(SONGS, "Tutti i brani"),
             section(SHUFFLE, "Mix casuale"),
@@ -72,11 +73,17 @@ class LocalSource(private val context: Context) : MusicSource {
         if (!hasPermission()) return@withContext emptyList()
         val all = songs()
         when (id.kind) {
+            // Un "album" con un solo brano quasi sempre non è un album: è un file con il
+            // tag album sbagliato (titolo al posto dell'album) o un singolo. Non lo si
+            // mostra tra gli album: si raccoglie con gli altri come brano sparso.
             RECENT -> {
-                val newest = all.groupBy { it.albumId }.mapValues { (_, t) -> t.maxOf { it.dateAdded } }
-                albums(all).sortedByDescending { newest[MediaId.parse(it.mediaId)?.id?.toLongOrNull()] ?: 0 }.take(60)
+                val (real, singles) = all.groupBy { it.albumId }.values.partition { it.size > 1 }
+                val newest = real.associate { t -> t.first().albumId to t.maxOf { it.dateAdded } }
+                albums(real.flatten()).sortedByDescending { newest[MediaId.parse(it.mediaId)?.id?.toLongOrNull()] ?: 0 }.take(30) +
+                    singles.flatten().sortedByDescending { it.dateAdded }.take(30).map { it.node(MediaId(KEY, RECENT)) }
             }
-            ALBUMS -> albums(all).sortedBy { it.title.lowercase() }
+            ALBUMS -> albums(realAlbums(all)).sortedBy { it.title.lowercase() }
+            SINGLES -> singlesOf(all).sortedWith(compareBy({ it.artist?.lowercase() }, { it.year }, { it.title.lowercase() })).map { it.node(id.copy(parent = null)) }
             DECADES -> all.filter { it.year > 0 }.groupBy { it.year / 10 * 10 }.toSortedMap(compareByDescending { it }).map { (decade, tracks) ->
                 LibraryNode(MediaId(KEY, DECADE, "$decade").toString(), decadeName(decade), Kind.SECTION, subtitle = count(tracks.size))
             }
@@ -123,7 +130,17 @@ class LocalSource(private val context: Context) : MusicSource {
             }
             ARTIST -> {
                 val artistId = id.id?.toLongOrNull()
-                albums(all.filter { it.artistId == artistId }).sortedByDescending { it.year ?: 0 }
+                val own = all.filter { it.artistId == artistId }
+                val singles = singlesOf(own)
+                albums(realAlbums(own)).sortedByDescending { it.year ?: 0 } + listOfNotNull(
+                    singles.takeIf { it.isNotEmpty() }?.let { s ->
+                        LibraryNode(MediaId(KEY, ARTIST_SINGLES, "$artistId").toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}")
+                    },
+                )
+            }
+            ARTIST_SINGLES -> {
+                val artistId = id.id?.toLongOrNull()
+                singlesOf(all.filter { it.artistId == artistId }).sortedWith(compareBy({ it.year }, { it.title.lowercase() })).map { it.node(id.copy(parent = null)) }
             }
             else -> emptyList()
         }
@@ -176,6 +193,12 @@ class LocalSource(private val context: Context) : MusicSource {
         artists + albums + songs
     }
 
+    /** I brani che stanno in un album con almeno due brani. */
+    private fun realAlbums(songs: List<Song>): List<Song> = songs.groupBy { it.albumId }.values.filter { it.size > 1 }.flatten()
+
+    /** I brani soli nel loro "album": singoli veri o tag sbagliati. */
+    private fun singlesOf(songs: List<Song>): List<Song> = songs.groupBy { it.albumId }.values.filter { it.size == 1 }.flatten()
+
     private fun albums(songs: List<Song>): List<LibraryNode> = songs.groupBy { it.albumId }.map { (albumId, tracks) ->
         val artists = tracks.mapNotNull { it.artist }.distinct()
         LibraryNode(
@@ -190,13 +213,18 @@ class LocalSource(private val context: Context) : MusicSource {
     }
 
     private fun artists(songs: List<Song>): List<LibraryNode> = songs.groupBy { it.artistId }.map { (artistId, tracks) ->
-        val albums = tracks.map { it.albumId }.distinct()
+        val groups = tracks.groupBy { it.albumId }.values
+        val real = groups.count { it.size > 1 }
+        val singles = groups.size - real
         LibraryNode(
             mediaId = MediaId(KEY, ARTIST, "$artistId").toString(),
             title = tracks.first().artist ?: "Artista sconosciuto",
             kind = Kind.ARTIST,
-            subtitle = if (albums.size == 1) "1 album" else "${albums.size} album",
-            artwork = "$KEY/${albums.first()}",
+            subtitle = listOfNotNull(
+                real.takeIf { it > 0 }?.let { if (it == 1) "1 album" else "$it album" },
+                singles.takeIf { it > 0 }?.let { if (it == 1) "1 singolo" else "$it singoli" },
+            ).joinToString(" · "),
+            artwork = "$KEY/${(groups.firstOrNull { it.size > 1 } ?: groups.first()).first().albumId}",
             gridChildren = true,
         )
     }.sortedBy { it.title.lowercase() }
@@ -278,6 +306,8 @@ class LocalSource(private val context: Context) : MusicSource {
         const val SHUFFLE = "shuffle"
         const val ALBUM = "album"
         const val ARTIST = "artist"
+        const val ARTIST_SINGLES = "artistsingles"
+        const val SINGLES = "singles"
 
         private fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
 

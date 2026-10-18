@@ -6,6 +6,9 @@ import io.github.baldborne94.baldmusic.core.subsonic.Artist
 import io.github.baldborne94.baldmusic.core.subsonic.Playlist
 import io.github.baldborne94.baldmusic.core.subsonic.Song
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /** La libreria sul server Navidrome. */
 class RemoteSource(
@@ -33,8 +36,13 @@ class RemoteSource(
         LibraryNode(MediaId(KEY, kind).toString(), title, Kind.SECTION, gridChildren = grid)
 
     override suspend fun children(id: MediaId): List<LibraryNode> = when (id.kind) {
-        RECENT -> client.albumList("newest", 60).map(::albumNode)
-        ALBUMS -> client.albumList("alphabeticalByName", 500).map(::albumNode)
+        // Un "album" con un solo brano è quasi sempre un tag sbagliato o un singolo:
+        // non va tra gli album, si elenca come brano (vedi singlesOf).
+        RECENT -> {
+            val (real, singles) = client.albumList("newest", 60).partition { it.isReal }
+            real.map(::albumNode) + songsOf(singles.take(30)).map { songNode(it, MediaId(KEY, RECENT)) }
+        }
+        ALBUMS -> client.albumList("alphabeticalByName", 500).filter { it.isReal }.map(::albumNode)
         ARTISTS -> client.artists().map(::artistNode)
         PLAYLISTS -> client.playlists().map(::playlistNode)
         STARRED -> client.starred().song.map { songNode(it, id) }
@@ -43,7 +51,17 @@ class RemoteSource(
             songs.map { songNode(it, stableRandomId()) }
         }
         ALBUM -> client.album(requireNotNull(id.id)).song.map { songNode(it, id.copy(parent = null)) }
-        ARTIST -> client.artist(requireNotNull(id.id)).album.sortedByDescending { it.year ?: 0 }.map(::albumNode)
+        ARTIST -> {
+            val (real, singles) = client.artist(requireNotNull(id.id)).album.sortedByDescending { it.year ?: 0 }.partition { it.isReal }
+            real.map(::albumNode) + listOfNotNull(
+                singles.takeIf { it.isNotEmpty() }?.let { s ->
+                    LibraryNode(MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = s.first().coverArt?.let { "$KEY/$it" })
+                },
+            )
+        }
+        ARTIST_SINGLES -> songsOf(client.artist(requireNotNull(id.id)).album.filterNot { it.isReal })
+            .sortedWith(compareBy({ it.year ?: 0 }, { it.title.lowercase() }))
+            .map { songNode(it, id.copy(parent = null)) }
         PLAYLIST -> client.playlist(requireNotNull(id.id)).entry.map { songNode(it, id.copy(parent = null)) }
         else -> emptyList()
     }
@@ -58,6 +76,16 @@ class RemoteSource(
         val r = client.search(query)
         return r.artist.map(::artistNode) + r.album.map(::albumNode) + r.song.map { songNode(it, null) }
     }
+
+    /** Album con almeno due brani; il resto sono singoli o tag sbagliati. */
+    private val Album.isReal get() = (songCount ?: 2) > 1
+
+    /** I brani di tanti piccoli album, pochi alla volta per non intasare il server. */
+    private suspend fun songsOf(albums: List<Album>): List<Song> = albums.chunked(6).flatMap { chunk ->
+        coroutineScope { chunk.map { a -> async { runCatching { client.album(a.id).song }.getOrDefault(emptyList()) } }.awaitAll() }
+    }.flatten()
+
+    private fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
 
     /** Il mix già pescato: chi lo riapre trova gli stessi brani della coda in corso. */
     fun stableRandomId() = MediaId(KEY, RANDOM, "last")
@@ -116,6 +144,7 @@ class RemoteSource(
         const val RANDOM = "random"
         const val ALBUM = "album"
         const val ARTIST = "artist"
+        const val ARTIST_SINGLES = "artistsingles"
         const val PLAYLIST = "playlist"
     }
 }

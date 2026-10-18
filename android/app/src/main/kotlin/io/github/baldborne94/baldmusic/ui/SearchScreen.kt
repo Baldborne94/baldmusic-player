@@ -207,8 +207,7 @@ private fun SearchField(value: String, onChange: (String) -> Unit) {
 
 @Composable
 private fun BrowseTileView(tile: BrowseTile, modifier: Modifier, onClick: () -> Unit) {
-    val color = tileColor(tile.id)
-    Box(modifier.height(96.dp).clip(RoundedCornerShape(8.dp)).background(color).clickable(onClick = onClick)) {
+    Box(modifier.height(96.dp).clip(RoundedCornerShape(8.dp)).background(tileBrush(tile.id)).clickable(onClick = onClick)) {
         Text(tile.title, Modifier.padding(12.dp), fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
         // Il quadratino inclinato in basso a destra, come le categorie di Spotify.
         Box(

@@ -73,15 +73,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     val library: StateFlow<UserLibrary> = app.userData.state
     val sleepTimer: StateFlow<Long?> = app.sleepTimer
-    val audio: StateFlow<io.github.baldborne94.baldmusic.core.audio.AudioPrefs> = app.settings.audio
-    val audioEffects get() = app.audioEffects.info
-
-    fun updateAudio(change: (io.github.baldborne94.baldmusic.core.audio.AudioPrefs) -> io.github.baldborne94.baldmusic.core.audio.AudioPrefs) =
-        app.settings.updateAudio(change)
-
-    fun setSpeed(speed: Float) = updateAudio { it.withSpeed(speed) }
-    fun presetLevels(preset: Int) = app.audioEffects.presetLevels(preset)
-
     var lyricsOnline: Boolean
         get() = app.settings.lyricsOnline
         set(value) {

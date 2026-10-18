@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { findLyrics, lineAt, parseLrc } from "./lyrics";
-import { dominantFromPixels, tileColor } from "./colors";
+import { dominantFromPixels, tileColor, tileGradient } from "./colors";
 
 describe("parseLrc", () => {
   it("tempi, righe ripetute e offset", () => {
@@ -34,6 +34,7 @@ describe("findLyrics", () => {
 describe("colori", () => {
   it("colore stabile per lo stesso nome", () => {
     expect(tileColor("Rock")).toBe(tileColor("Rock"));
+    expect(tileGradient("Rock")).toMatch(/^linear-gradient\(135deg, #[0-9a-f]{6}, #[0-9a-f]{6}\)$/);
   });
 
   it("ignora nero e bianco, scurisce il colore vivo", () => {

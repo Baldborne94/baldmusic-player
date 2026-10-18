@@ -80,8 +80,6 @@ import io.github.baldborne94.baldmusic.playback.kind
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val BITRATES = listOf(0 to "Originale", 320 to "320 kbps", 192 to "192 kbps", 128 to "128 kbps")
-
 @Composable
 fun SettingsScreen(vm: PlayerViewModel) {
     val context = LocalContext.current
@@ -93,7 +91,6 @@ fun SettingsScreen(vm: PlayerViewModel) {
     var password by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
-    var bitrate by remember { mutableIntStateOf(settings.maxBitRate) }
 
     Column(
         Modifier
@@ -104,7 +101,6 @@ fun SettingsScreen(vm: PlayerViewModel) {
         val ui = LocalUi.current
         var lyricsOnline by remember { mutableStateOf(vm.lyricsOnline) }
         Text("Ascolto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        SettingsLink("Equalizzatore ed effetti", "Equalizzatore, bass boost, spazialità, volume uniforme, velocità") { ui.push(Screen.Audio) }
         SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -129,25 +125,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
                     status = "Server scollegato."
                 }) { Text("Scollega") }
             }
-            Text("Qualità in streaming", fontWeight = FontWeight.SemiBold)
-            Text(
-                "Su rete mobile un bitrate più basso consuma meno dati. La conversione richiede ffmpeg sul PC.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BITRATES.forEach { (kbps, label) ->
-                    FilterChip(
-                        selected = bitrate == kbps,
-                        onClick = {
-                            bitrate = kbps
-                            settings.maxBitRate = kbps
-                            settings.touch()
-                        },
-                        label = { Text(label) },
-                    )
-                }
-            }
+            Text("I brani arrivano dal server nella qualità originale, senza conversioni.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         } else {
             Text(
                 "Inserisci l'indirizzo del PC: a casa va bene http://192.168.x.x:4533, fuori casa serve l'indirizzo di Tailscale (es. http://100.x.x.x:4533 o https://pc.tail1234.ts.net).",

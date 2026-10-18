@@ -90,7 +90,8 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.plays.size)
     val (liked) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.LIKED}", lib.liked.size)
     val (localSections) = rememberChildren(vm, LocalSource.KEY)
-    val (newAlbums) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.RECENT}")
+    val (recentAdded) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.RECENT}")
+    val newAlbums = recentAdded?.filter { it.kind != Kind.TRACK }
     val (allAlbums) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ALBUMS}")
     val (decades) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.DECADES}")
     val (artists) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ARTISTS}")
@@ -256,12 +257,8 @@ private data class Mix(val title: String, val subtitle: String, val id: String)
 
 @Composable
 private fun MixCard(mix: Mix, onClick: () -> Unit) {
-    val color = tileColor(mix.id)
     Column(Modifier.width(150.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
-        Box(
-            Modifier.size(150.dp).clip(RoundedCornerShape(8.dp))
-                .background(Brush.linearGradient(listOf(color, androidx.compose.ui.graphics.lerp(color, Color.Black, 0.55f)))),
-        ) {
+        Box(Modifier.size(150.dp).clip(RoundedCornerShape(8.dp)).background(tileBrush(mix.id))) {
             Text(
                 mix.title,
                 Modifier.align(Alignment.BottomStart).padding(12.dp),

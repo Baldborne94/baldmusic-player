@@ -105,7 +105,8 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
   const lib = useLibrary();
   const [filter, setFilter] = useState<Filter>(initial ?? "playlists");
   const [sort, setSort] = useState<AlbumListType>("alphabeticalByName");
-  const albums = useLoad(() => (filter === "albums" ? getClient()!.albumList(sort, 500) : Promise.resolve([] as Album[])), [filter, sort]);
+  // Un "album" con un solo brano è quasi sempre un tag sbagliato (o un singolo): sta sotto l'artista, non qui.
+  const albums = useLoad(async () => (filter === "albums" ? (await getClient()!.albumList(sort, 500)).filter((a) => (a.songCount ?? 2) > 1) : ([] as Album[])), [filter, sort]);
   const artists = useLoad(() => (filter === "artists" ? getClient()!.artists() : Promise.resolve([])), [filter]);
   const likedAsPlaylist = useMemo(() => lib.likedSongs, [lib.likedSongs]);
 

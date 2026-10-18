@@ -127,7 +127,7 @@ fun AddToPlaylistSheet(lib: UserLibrary, onDismiss: () -> Unit, onCreate: (Strin
                     Modifier.fillMaxWidth().clickable { onPick(pl.id); onDismiss() }.padding(horizontal = 20.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).background(tileColor(pl.id)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).background(tileBrush(pl.id)), contentAlignment = Alignment.Center) {
                         Text(pl.name.take(1).uppercase(), fontWeight = FontWeight.Black, fontSize = 22.sp)
                     }
                     Spacer(Modifier.width(14.dp))

@@ -10,7 +10,6 @@ import { useCoverColor } from "./Ui";
 
 export type Panel = "now" | "lyrics" | "queue" | null;
 
-const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 const SLEEPS: [number | null, string][] = [[15, "15 minuti"], [30, "30 minuti"], [45, "45 minuti"], [60, "1 ora"], [0, "Fine del brano"], [null, "Spento"]];
 
 /** La barra in basso, come in Spotify sul PC. */
@@ -18,7 +17,7 @@ export function PlayerBar({ panel, setPanel, onExpand }: { panel: Panel; setPane
   const s = usePlayer();
   const { liked } = useLibrary();
   const song = current(s.queue);
-  const [menu, setMenu] = useState<"speed" | "sleep" | null>(null);
+  const [menu, setMenu] = useState<"sleep" | null>(null);
   const color = useCoverColor(song?.coverArt, song?.album ?? "");
   if (!song) return <footer className="bar bar--empty" />;
   const isLiked = liked.has(song.id);
@@ -68,18 +67,6 @@ export function PlayerBar({ panel, setPanel, onExpand }: { panel: Panel; setPane
       </div>
 
       <div className="bar__extra">
-        <div className="bar__pop">
-          <button className={`icon-btn speed ${s.speed !== 1 ? "is-on" : ""}`} onClick={() => setMenu(menu === "speed" ? null : "speed")} title="Velocità">
-            {s.speed}×
-          </button>
-          {menu === "speed" && (
-            <div className="pop">
-              {SPEEDS.map((v) => (
-                <button key={v} className={v === s.speed ? "is-on" : ""} onClick={() => (player.setSpeed(v), setMenu(null))}>{v}×</button>
-              ))}
-            </div>
-          )}
-        </div>
         <div className="bar__pop">
           <button className={`icon-btn ${s.sleepAt !== null ? "is-on dot" : ""}`} onClick={() => setMenu(menu === "sleep" ? null : "sleep")} title="Timer di spegnimento">
             <Icon name="timer" size={18} />

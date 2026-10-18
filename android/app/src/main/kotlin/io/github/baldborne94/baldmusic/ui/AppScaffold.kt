@@ -71,7 +71,6 @@ sealed interface Screen {
     data class Detail(val mediaId: String, val title: String) : Screen
     data object Settings : Screen
     data object Stats : Screen
-    data object Audio : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -131,7 +130,6 @@ fun AppScaffold(vm: PlayerViewModel) {
                         is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
                         Screen.Settings -> SettingsPage(vm)
                         Screen.Stats -> StatsScreen(vm)
-                        Screen.Audio -> AudioScreen(vm)
                     }
                 }
                 MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })

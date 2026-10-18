@@ -135,7 +135,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
             if (kind == Kind.ARTIST) {
                 item(span = full) { SectionHeader("Discografia") }
                 items(containers, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { c ->
-                    ContainerRow(c, subtitle = listOfNotNull(c.mediaMetadata.recordingYear?.toString(), "Album").joinToString(" · ")) { ui.open(c.mediaId, c.title()) }
+                    ContainerRow(c, subtitle = if (c.kind == Kind.SECTION) c.subtitle() else listOfNotNull(c.mediaMetadata.recordingYear?.toString(), "Album").joinToString(" · ")) { ui.open(c.mediaId, c.title()) }
                 }
             } else if (containers.all { it.kind == Kind.SECTION || it.kind == Kind.FOLDER }) {
                 items(containers, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { c -> ContainerRow(c) { ui.open(c.mediaId, c.title()) } }

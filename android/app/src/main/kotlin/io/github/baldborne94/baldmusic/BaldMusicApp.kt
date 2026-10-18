@@ -11,7 +11,6 @@ import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.library.LocalSource
-import io.github.baldborne94.baldmusic.playback.AudioEffects
 import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -36,9 +35,6 @@ class BaldMusicApp : Application() {
     }
 
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
-
-    /** Equalizzatore ed effetti: il servizio li aggancia al player, le impostazioni li regolano. */
-    val audioEffects = AudioEffects()
 
     /** Un solo albero: lo vedono identico l'app e Android Auto. */
     val tree: LibraryTree by lazy { LibraryTree(::sources) }
@@ -68,7 +64,7 @@ class BaldMusicApp : Application() {
         val creds = settings.credentials
         if (creds != remoteCreds) {
             remoteCreds = creds
-            remote = creds?.let { RemoteSource(SubsonicClient(it, http)) { settings.maxBitRate } }
+            remote = creds?.let { RemoteSource(SubsonicClient(it, http)) }
         }
         return remote
     }

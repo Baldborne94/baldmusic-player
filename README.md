@@ -19,7 +19,7 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
 
 ## Per iniziare
 
-1. **Server (facoltativo ma consigliato):** segui [`server/README.md`](server/README.md). Si installa Navidrome sul PC e Tailscale su PC e telefono, in circa 15 minuti.
+1. **Server (facoltativo ma consigliato):** segui [`server/README.md`](server/README.md). Si installa Navidrome sul PC e Tailscale su PC e telefono, in circa 15 minuti. Se gli album escono "spezzati" in tanti brani singoli, la causa sono i tag dei file: la guida spiega come sistemarli una volta per tutte con Picard.
 2. **App Android:** dal telefono apri la [release `apk-latest`](https://github.com/Baldborne94/baldmusic-player/releases/tag/apk-latest), scarica `baldmusic.apk` e installalo. Al primo avvio concedi l'accesso alla musica. Per la musica del PC vai in *Impostazioni → Collega server*.
 3. **Android Auto:** l'app non arriva dal Play Store, quindi Android Auto la mostra solo dopo aver attivato le *origini sconosciute*:
    1. apri le impostazioni di Android Auto;
@@ -36,7 +36,7 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
 - Interfaccia come Spotify sul PC: barra laterale con la tua libreria, pagine colorate dalla copertina, pannello "In riproduzione" con testo e coda.
 - **Home** con accessi rapidi, i tuoi mix (casuale, preferiti, per genere, per decennio), ascoltati di recente, più ascoltati, i tuoi artisti.
 - **Brani che ti piacciono** e **playlist** salvati su Navidrome: gli stessi su ogni dispositivo collegato al server.
-- **Testi sincronizzati**, **radio** da un brano, **velocità**, **timer di spegnimento**, coda riordinabile trascinando.
+- **Testi sincronizzati**, **radio** da un brano, **timer di spegnimento**, coda riordinabile trascinando.
 - Tasto destro su un brano per il menu; scorciatoie: <kbd>Spazio</kbd> play/pausa, <kbd>Shift</kbd>+<kbd>←/→</kbd> brano, <kbd>F</kbd> schermo intero, <kbd>/</kbd> cerca.
 
 ## Cosa fa l'app Android
@@ -45,7 +45,6 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
 - **Brani che ti piacciono** e **playlist tue**, che valgono per la musica del telefono e del server.
 - **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci.
 - **Radio** da qualsiasi brano: lui e poi musica simile.
-- **Equalizzatore** con preset, bass boost, spazialità, volume uniforme; **velocità** e **salta i silenzi**.
 - **Timer di spegnimento** (con dissolvenza o a fine brano), **coda** riordinabile, scorri un brano a destra per metterlo in coda.
 - **Le tue statistiche**: minuti ascoltati, artisti, brani e album preferiti.
 - **Widget** per la schermata home, cartelle, decenni, condivisione.
