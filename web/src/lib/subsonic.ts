@@ -31,6 +31,8 @@ export interface Song {
   starred?: string;
   suffix?: string;
   bitRate?: number;
+  playCount?: number;
+  genre?: string;
 }
 
 export interface Album {
@@ -44,6 +46,8 @@ export interface Album {
   year?: number;
   genre?: string;
   starred?: string;
+  playCount?: number;
+  created?: string;
   song?: Song[];
 }
 
@@ -65,6 +69,12 @@ export interface Playlist {
   coverArt?: string;
   owner?: string;
   entry?: Song[];
+}
+
+export interface Genre {
+  value: string;
+  songCount?: number;
+  albumCount?: number;
 }
 
 export interface SearchResult {
@@ -235,9 +245,75 @@ export class SubsonicClient {
     return { artist: list(s.artist), album: list(s.album), song: list(s.song) };
   }
 
-  async randomSongs(size = 50): Promise<Song[]> {
-    const r = await this.call("getRandomSongs", { size });
+  /** Brani a caso, filtrabili per genere e anni: la base dei mix. */
+  async randomSongs(size = 50, filter: { genre?: string; fromYear?: number; toYear?: number } = {}): Promise<Song[]> {
+    const r = await this.call("getRandomSongs", { size, ...filter });
     return list<Song>((r.randomSongs as Raw | undefined)?.song);
+  }
+
+  async genres(): Promise<Genre[]> {
+    const r = await this.call("getGenres");
+    return list<Genre>((r.genres as Raw | undefined)?.genre).sort((a, b) => (b.songCount ?? 0) - (a.songCount ?? 0));
+  }
+
+  async albumsByGenre(genre: string, size = 60): Promise<Album[]> {
+    const r = await this.call("getAlbumList2", { type: "byGenre", genre, size });
+    return list<Album>((r.albumList2 as Raw | undefined)?.album);
+  }
+
+  async albumsByYear(fromYear: number, toYear: number, size = 60): Promise<Album[]> {
+    const r = await this.call("getAlbumList2", { type: "byYear", fromYear, toYear, size });
+    return list<Album>((r.albumList2 as Raw | undefined)?.album);
+  }
+
+  /** Brani simili (radio). Richiede che il server sappia calcolarli; altrimenti lista vuota. */
+  async similarSongs(id: string, count = 50): Promise<Song[]> {
+    try {
+      const r = await this.call("getSimilarSongs2", { id, count });
+      return list<Song>((r.similarSongs2 as Raw | undefined)?.song);
+    } catch {
+      return [];
+    }
+  }
+
+  async topSongs(artist: string, count = 10): Promise<Song[]> {
+    try {
+      const r = await this.call("getTopSongs", { artist, count });
+      return list<Song>((r.topSongs as Raw | undefined)?.song);
+    } catch {
+      return [];
+    }
+  }
+
+  async createPlaylist(name: string, songIds: string[] = []): Promise<void> {
+    const q = new URLSearchParams();
+    songIds.forEach((id) => q.append("songId", id));
+    await this.callMulti("createPlaylist", { name }, q);
+  }
+
+  /** Rinomina, aggiunge brani, toglie brani per posizione. */
+  async updatePlaylist(id: string, change: { name?: string; add?: string[]; removeIndexes?: number[] }): Promise<void> {
+    const q = new URLSearchParams();
+    change.add?.forEach((s) => q.append("songIdToAdd", s));
+    change.removeIndexes?.forEach((i) => q.append("songIndexToRemove", String(i)));
+    await this.callMulti("updatePlaylist", { playlistId: id, name: change.name }, q);
+  }
+
+  async deletePlaylist(id: string): Promise<void> {
+    await this.call("deletePlaylist", { id });
+  }
+
+  /** Come call(), ma con parametri ripetuti (songId=…&songId=…). */
+  private async callMulti(method: string, params: Record<string, string | number | boolean | undefined>, extra: URLSearchParams): Promise<Raw> {
+    const url = `${buildUrl(this.creds, method, params)}&${extra.toString()}`;
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch {
+      throw new SubsonicError("Server non raggiungibile");
+    }
+    if (!res.ok) throw new SubsonicError(`Il server ha risposto ${res.status}`);
+    return parseResponse(await res.json());
   }
 
   async starred(): Promise<SearchResult> {

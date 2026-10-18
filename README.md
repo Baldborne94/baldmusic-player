@@ -31,6 +31,14 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
    - **Su altri dispositivi** (tablet, un altro PC) usa l'indirizzo `https://…ts.net` di Tailscale.
    - **Per averla come programma**: in Chrome o Edge clicca l'icona *Installa* (⊕) nella barra degli indirizzi. BaldMusic si apre nella sua finestra, ha l'icona sulla barra delle applicazioni e risponde ai tasti multimediali della tastiera.
 
+## Cosa fa l'app web (PC e tablet)
+
+- Interfaccia come Spotify sul PC: barra laterale con la tua libreria, pagine colorate dalla copertina, pannello "In riproduzione" con testo e coda.
+- **Home** con accessi rapidi, i tuoi mix (casuale, preferiti, per genere, per decennio), ascoltati di recente, più ascoltati, i tuoi artisti.
+- **Brani che ti piacciono** e **playlist** salvati su Navidrome: gli stessi su ogni dispositivo collegato al server.
+- **Testi sincronizzati**, **radio** da un brano, **velocità**, **timer di spegnimento**, coda riordinabile trascinando.
+- Tasto destro su un brano per il menu; scorciatoie: <kbd>Spazio</kbd> play/pausa, <kbd>Shift</kbd>+<kbd>←/→</kbd> brano, <kbd>F</kbd> schermo intero, <kbd>/</kbd> cerca.
+
 ## Cosa fa l'app Android
 
 - **Home** con accessi rapidi, ascoltati di recente, i tuoi mix (casuale, preferiti, per decennio, per artista), aggiunti di recente, più ascoltati.

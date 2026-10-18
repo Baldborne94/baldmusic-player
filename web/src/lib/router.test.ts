@@ -11,6 +11,11 @@ describe("router", () => {
       { name: "search", query: "lucio dalla & co" },
       { name: "queue" },
       { name: "settings" },
+      { name: "liked" },
+      { name: "library" },
+      { name: "stats" },
+      { name: "genre", id: "Rock & Roll" },
+      { name: "decade", id: "1990" },
     ];
     for (const r of routes) expect(parseRoute(href(r))).toEqual(r);
   });

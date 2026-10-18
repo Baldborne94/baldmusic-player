@@ -15,6 +15,11 @@ export interface PlayerState {
   duration: number;
   volume: number;
   error: string | null;
+  /** Da dove arriva la coda: nome mostrato e ID della pagina (per il tasto play/pausa). */
+  from: { label: string; id: string } | null;
+  speed: number;
+  /** Fine del timer di spegnimento (ms), -1 = a fine brano, null = spento. */
+  sleepAt: number | null;
 }
 
 const VOLUME_KEY = "baldmusic.volume";
@@ -36,7 +41,12 @@ let state: PlayerState = {
   duration: 0,
   volume: storedVolume(),
   error: null,
+  from: null,
+  speed: 1,
+  sleepAt: null,
 };
+
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -118,6 +128,7 @@ function load(autoplay: boolean): void {
     loadedUid = entry.uid;
     scrobbled = false;
     a.src = client.streamUrl(entry.song.id);
+    a.playbackRate = state.speed;
     set({ position: 0, duration: entry.song.duration ?? 0, error: null });
     client.scrobble(entry.song.id, false).catch(() => {});
   }
@@ -137,6 +148,11 @@ function setQueue(queue: Q.QueueState, autoplay: boolean): void {
 }
 
 function advance(auto: boolean): void {
+  if (auto && state.sleepAt === -1) {
+    // Timer "a fine brano": il brano è finito, ci si ferma qui.
+    set({ sleepAt: null, playing: false });
+    return;
+  }
   const i = Q.nextIndex(state.queue, auto);
   if (i === null) {
     el().pause();
@@ -157,8 +173,26 @@ function advance(auto: boolean): void {
 // --- azioni --------------------------------------------------------------
 
 export const player = {
-  play(songs: Song[], start = 0, shuffle = false): void {
+  play(songs: Song[], start = 0, shuffle = false, from?: { label: string; id: string }): void {
+    set({ from: from ?? null });
     setQueue(Q.playList(state.queue, songs, start, shuffle), true);
+  },
+  setSpeed(speed: number): void {
+    el().playbackRate = speed;
+    set({ speed });
+  },
+  /** Timer di spegnimento: minuti, 0 = a fine brano, null = spento. */
+  setSleep(minutes: number | null): void {
+    if (sleepTimer) clearTimeout(sleepTimer);
+    sleepTimer = null;
+    if (minutes === null) return set({ sleepAt: null });
+    if (minutes === 0) return set({ sleepAt: -1 });
+    const at = Date.now() + minutes * 60_000;
+    set({ sleepAt: at });
+    sleepTimer = setTimeout(() => {
+      player.pause();
+      set({ sleepAt: null });
+    }, minutes * 60_000);
   },
   toggle(): void {
     if (el().paused) player.resume();
