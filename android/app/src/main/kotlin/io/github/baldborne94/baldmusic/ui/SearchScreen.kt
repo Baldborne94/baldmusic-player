@@ -50,9 +50,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
-import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.playback.kind
 import kotlinx.coroutines.delay
 
@@ -77,17 +77,17 @@ fun SearchScreen(vm: PlayerViewModel) {
         searching = false
     }
 
-    val (decades) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.DECADES}")
+    val (decades) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.DECADES}")
     val (roots) = rememberChildren(vm, "root")
     val tiles = buildList {
         add(BrowseTile("Brani che ti piacciono", "${PersonalSource.KEY}/${PersonalSource.LIKED}"))
-        add(BrowseTile("Album", "${LocalSource.KEY}/${LocalSource.ALBUMS}"))
-        add(BrowseTile("Artisti", "${LocalSource.KEY}/${LocalSource.ARTISTS}"))
-        add(BrowseTile("Tutti i brani", "${LocalSource.KEY}/${LocalSource.SONGS}"))
-        add(BrowseTile("Aggiunti di recente", "${LocalSource.KEY}/${LocalSource.RECENT}"))
-        add(BrowseTile("Cartelle", "${LocalSource.KEY}/${LocalSource.FOLDERS}"))
+        add(BrowseTile("Album", "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}"))
+        add(BrowseTile("Artisti", "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}"))
+        add(BrowseTile("Tutti i brani", "${LocalCatalog.KEY}/${LocalCatalog.SONGS}"))
+        add(BrowseTile("Aggiunti di recente", "${LocalCatalog.KEY}/${LocalCatalog.RECENT}"))
+        add(BrowseTile("Cartelle", "${LocalCatalog.KEY}/${LocalCatalog.FOLDERS}"))
         add(BrowseTile("I più ascoltati", "${PersonalSource.KEY}/${PersonalSource.TOP}"))
-        add(BrowseTile("Mix casuale", "${LocalSource.KEY}/${LocalSource.SHUFFLE}"))
+        add(BrowseTile("Mix casuale", "${LocalCatalog.KEY}/${LocalCatalog.SHUFFLE}"))
         decades.orEmpty().forEach { add(BrowseTile(it.title(), it.mediaId)) }
         if (roots?.any { it.mediaId == RemoteSource.KEY } == true) {
             add(BrowseTile("Server: album", "${RemoteSource.KEY}/${RemoteSource.ALBUMS}"))

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { blockedAsMixedContent, buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicError } from "./subsonic";
+import { blockedAsMixedContent, buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicClient, SubsonicError } from "./subsonic";
 
 describe("normalizeServerUrl", () => {
   it("aggiunge https e toglie gli slash finali", () => {
@@ -41,6 +41,15 @@ describe("buildUrl", () => {
     const url = new URL(buildUrl(c, "getAlbum", { id: "a b", skip: undefined }));
     expect(url.pathname).toBe("/rest/getAlbum");
     expect(Object.fromEntries(url.searchParams)).toEqual({ u: "u", t: "t1", s: "s1", v: "1.16.1", c: "baldmusic", f: "json", id: "a b" });
+  });
+});
+
+describe("streamUrl", () => {
+  it("chiede sempre il file originale, senza conversioni", () => {
+    const url = new URL(new SubsonicClient(makeCredentials("https://pc.ts.net", "u", "p", "ab")).streamUrl("s1"));
+    expect(url.searchParams.get("format")).toBe("raw");
+    expect(url.searchParams.get("maxBitRate")).toBeNull();
+    expect(url.searchParams.get("id")).toBe("s1");
   });
 });
 

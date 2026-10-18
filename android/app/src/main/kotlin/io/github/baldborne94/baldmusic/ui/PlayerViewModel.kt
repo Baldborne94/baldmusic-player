@@ -267,10 +267,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Radio da un brano del telefono: lui e poi musica simile. */
     fun startRadio(item: MediaItem) {
         val id = io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId) ?: return
-        if (id.source != io.github.baldborne94.baldmusic.library.LocalSource.KEY || id.id == null) return
-        playAll("${id.source}/${io.github.baldborne94.baldmusic.library.LocalSource.RADIO}/${id.id}", shuffled = false, from = "Radio: ${item.title()}")
+        if (id.source != io.github.baldborne94.baldmusic.core.library.LocalCatalog.KEY || id.id == null) return
+        playAll("${id.source}/${io.github.baldborne94.baldmusic.core.library.LocalCatalog.RADIO}/${id.id}", shuffled = false, from = "Radio: ${item.title()}")
     }
 
     fun canStartRadio(item: MediaItem) =
-        io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId)?.source == io.github.baldborne94.baldmusic.library.LocalSource.KEY
+        io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId)?.source == io.github.baldborne94.baldmusic.core.library.LocalCatalog.KEY
 }

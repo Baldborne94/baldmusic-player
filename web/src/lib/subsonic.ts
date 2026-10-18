@@ -331,8 +331,9 @@ export class SubsonicClient {
     await this.call("scrobble", { id, submission, time: Date.now() });
   }
 
-  streamUrl(id: string, maxBitRate?: number): string {
-    return buildUrl(this.creds, "stream", { id, maxBitRate });
+  /** Sempre il file originale: "raw" impedisce a Navidrome di convertirlo. */
+  streamUrl(id: string): string {
+    return buildUrl(this.creds, "stream", { id, format: "raw" });
   }
 
   coverUrl(id: string | undefined, size = 300): string | undefined {

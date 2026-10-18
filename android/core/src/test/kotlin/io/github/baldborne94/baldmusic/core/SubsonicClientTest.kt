@@ -85,9 +85,9 @@ class SubsonicClientTest {
     }
 
     @Test
-    fun `stream senza limite di bitrate non manda maxBitRate`() {
-        val c = client()
-        assertEquals(null, c.streamUrl("s1").toHttpUrl().queryParameter("maxBitRate"))
-        assertEquals("192", c.streamUrl("s1", 192).toHttpUrl().queryParameter("maxBitRate"))
+    fun `lo stream chiede sempre il file originale`() {
+        val url = client().streamUrl("s1").toHttpUrl()
+        assertEquals("raw", url.queryParameter("format"))
+        assertEquals(null, url.queryParameter("maxBitRate"))
     }
 }

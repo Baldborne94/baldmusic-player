@@ -52,9 +52,9 @@ statistiche, widget. I punti deboli emersi leggendo il codice:
 
 Prima di toccare artisti e ordinamenti, la logica deve diventare testabile.
 
-- [ ] **Pulizia**: togliere `maxBitRate` da `RemoteSource` e il paragrafo sulla conversione da `server/README.md`.
-- [ ] **Catalogo locale in `:core`**: spostare raggruppamento e ordinamento della musica del telefono da `LocalSource` a una classe pura (`LocalCatalog`) che riceve i brani letti dal telefono e restituisce album, artisti, singoli. `LocalSource` resta solo la lettura dei file.
-- [ ] **Test con una libreria "difficile"**: brani finti che riproducono i casi reali (feat., compilation, accenti, articoli, dischi multipli, album omonimi, edizioni diverse). Lo stesso insieme, in JSON, lo usano anche i test dell'app web: le due app devono dare lo stesso risultato.
+- [x] **Pulizia**: tolti `maxBitRate` e il paragrafo sulla conversione da `server/README.md`; lo streaming chiede a Navidrome `format=raw`, cioè sempre il file originale.
+- [x] **Catalogo locale in `:core`**: raggruppamento e ordinamento della musica del telefono stanno in `LocalCatalog` (puro, testato); `LocalSource` legge solo MediaStore.
+- [x] **Test delle regole attuali** (`LocalCatalogTest`): album e singoli, dischi e tracce, artisti, recenti, decenni, cartelle, ricerca, radio, mix. Hanno già trovato un difetto: un brano in una raccolta finisce tra i "singoli" del suo artista (lo sistema la fase 1).
 
 ## Fase 1 — Leggere i tag di Picard e riconoscere gli artisti
 
@@ -76,7 +76,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 - [ ] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
 - [ ] **Ordine alfabetico come una persona**: prima i nomi di ordinamento di Picard ("Beatles, The"); senza, `Collator` italiano (gli accenti stanno con la loro lettera), articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"), numeri in ordine naturale. Lettere-indice laterali nell'elenco artisti.
 - [ ] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente, con l'**anno originale** (una ristampa 2011 di un disco del 1977 sta nel 1977, anche nei decenni).
-- [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui.
+- [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui, verificate con la stessa libreria di prova in JSON (casi difficili: feat., raccolte, accenti, articoli, dischi multipli, album omonimi) usata dai test Kotlin.
 
 ## Fase 3 — Ascoltare bene
 
