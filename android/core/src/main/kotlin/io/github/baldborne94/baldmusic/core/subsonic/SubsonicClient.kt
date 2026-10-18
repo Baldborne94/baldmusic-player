@@ -134,9 +134,8 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
         call("scrobble", "id" to id, "submission" to submission, "time" to System.currentTimeMillis())
     }
 
-    /** maxBitRate = 0 significa "originale, senza conversione". */
-    fun streamUrl(id: String, maxBitRate: Int = 0): String =
-        url("stream", "id" to id, "maxBitRate" to maxBitRate.takeIf { it > 0 }).toString()
+    /** Sempre il file originale: "raw" impedisce a Navidrome di convertirlo. */
+    fun streamUrl(id: String): String = url("stream", "id" to id, "format" to "raw").toString()
 
     fun coverUrl(id: String, size: Int = 512): String = url("getCoverArt", "id" to id, "size" to size).toString()
 }

@@ -36,10 +36,6 @@ Per cambiare la cartella in seguito, modifica `MusicFolder` nel file `navidrome.
 
 Usa [`docker-compose.yml`](docker-compose.yml): cambia il percorso della musica e lancia `docker compose up -d`.
 
-### Conversione per la rete mobile (facoltativa)
-
-Se installi [ffmpeg](https://www.gyan.dev/ffmpeg/builds/) sul PC, Navidrome può convertire i brani al volo a un bitrate più basso. Nell'app Android lo scegli in *Impostazioni → Qualità in streaming* e consumi meno dati in macchina.
-
 ## Sistemare i tag una volta per tutte
 
 Molti file scaricati da internet hanno il campo **album** uguale al titolo della canzone e un **anno** a caso. Il risultato è una libreria piena di "album" da un brano solo, con la copertina giusta ma il nome sbagliato, e decenni che non tornano. BaldMusic raccoglie questi brani sotto l'artista in *Singoli e brani sparsi*, ma il modo giusto per avere album completi, in ordine e con l'anno corretto è correggere i file.

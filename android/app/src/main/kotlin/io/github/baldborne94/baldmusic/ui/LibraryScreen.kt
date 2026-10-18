@@ -41,9 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
-import io.github.baldborne94.baldmusic.library.LocalSource
 
 private enum class Filter(val label: String) { PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti"), FOLDER("Cartelle") }
 
@@ -59,9 +59,9 @@ fun LibraryScreen(vm: PlayerViewModel) {
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
     val (playlists) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}", lib.playlists)
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
-    val (albums) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ALBUMS}")
-    val (artists) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ARTISTS}")
-    val (folders) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.FOLDERS}")
+    val (albums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
+    val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
+    val (folders) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.FOLDERS}")
     val (serverPlaylists) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.PLAYLISTS}") else (null to null)
 
     val items: List<MediaItem> = when (filter) {

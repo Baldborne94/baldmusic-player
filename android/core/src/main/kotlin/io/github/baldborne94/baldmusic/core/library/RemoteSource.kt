@@ -11,11 +11,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 /** La libreria sul server Navidrome. */
-class RemoteSource(
-    private val client: SubsonicClient,
-    /** Kbps massimi in streaming; 0 = file originale. */
-    private val maxBitRate: () -> Int = { 0 },
-) : MusicSource {
+class RemoteSource(private val client: SubsonicClient) : MusicSource {
 
     override val key = KEY
     override val title = "Server"
@@ -129,7 +125,7 @@ class RemoteSource(
         trackNumber = s.track,
         discNumber = s.discNumber,
         year = s.year,
-        streamUri = client.streamUrl(s.id, maxBitRate()),
+        streamUri = client.streamUrl(s.id),
         albumId = s.albumId?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = s.artistId?.let { MediaId(KEY, ARTIST, it).toString() },
     )

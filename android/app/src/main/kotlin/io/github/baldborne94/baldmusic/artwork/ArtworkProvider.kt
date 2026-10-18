@@ -13,7 +13,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Size
 import io.github.baldborne94.baldmusic.app
-import io.github.baldborne94.baldmusic.library.LocalSource
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import okhttp3.Request
 import java.io.File
@@ -47,7 +47,7 @@ class ArtworkProvider : ContentProvider() {
             val token = Binder.clearCallingIdentity()
             val ok = try {
                 when (source) {
-                    LocalSource.KEY -> fetchLocal(ctx, id, file)
+                    LocalCatalog.KEY -> fetchLocal(ctx, id, file)
                     RemoteSource.KEY -> fetchRemote(ctx, id, file)
                     else -> false
                 }

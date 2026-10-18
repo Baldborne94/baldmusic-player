@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.library.LocalSource
@@ -89,12 +90,12 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
     val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.plays.size)
     val (liked) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.LIKED}", lib.liked.size)
-    val (localSections) = rememberChildren(vm, LocalSource.KEY)
-    val (recentAdded) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.RECENT}")
+    val (localSections) = rememberChildren(vm, LocalCatalog.KEY)
+    val (recentAdded) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.RECENT}")
     val newAlbums = recentAdded?.filter { it.kind != Kind.TRACK }
-    val (allAlbums) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ALBUMS}")
-    val (decades) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.DECADES}")
-    val (artists) = rememberChildren(vm, "${LocalSource.KEY}/${LocalSource.ARTISTS}")
+    val (allAlbums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
+    val (decades) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.DECADES}")
+    val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
     val (serverNew) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.RECENT}") else (null to null)
@@ -158,17 +159,17 @@ fun HomeScreen(vm: PlayerViewModel) {
 
         // I tuoi mix: si generano dalla tua musica, come i Daily Mix.
         val mixes = buildList {
-            add(Mix("Mix casuale", "Tutta la tua musica, mescolata", "${LocalSource.KEY}/${LocalSource.SHUFFLE}"))
+            add(Mix("Mix casuale", "Tutta la tua musica, mescolata", "${LocalCatalog.KEY}/${LocalCatalog.SHUFFLE}"))
             if (!liked.isNullOrEmpty()) add(Mix("Preferiti in shuffle", "I brani che ti piacciono", "${PersonalSource.KEY}/${PersonalSource.LIKED}"))
             if (!top.isNullOrEmpty()) add(Mix("In loop", "Quelli che ascolti di più", "${PersonalSource.KEY}/${PersonalSource.TOP}"))
             // Un mix per ognuno dei tuoi artisti più ascoltati (brani del telefono).
-            lib.plays.values.filter { it.track.id.startsWith("${LocalSource.KEY}/") }
+            lib.plays.values.filter { it.track.id.startsWith("${LocalCatalog.KEY}/") }
                 .groupBy { it.track.artist }
                 .filterKeys { !it.isNullOrBlank() }
                 .entries.sortedByDescending { e -> e.value.sumOf { it.count } }
                 .take(4)
                 .forEach { (artist, _) ->
-                    add(Mix("Mix $artist", "$artist e musica simile", "${LocalSource.KEY}/${LocalSource.ARTIST_MIX}/${java.net.URLEncoder.encode(artist, "UTF-8")}"))
+                    add(Mix("Mix $artist", "$artist e musica simile", "${LocalCatalog.KEY}/${LocalCatalog.ARTIST_MIX}/${java.net.URLEncoder.encode(artist, "UTF-8")}"))
                 }
             decades.orEmpty().forEach { add(Mix("Mix ${it.title()}", it.subtitle().orEmpty(), it.mediaId)) }
         }
@@ -180,7 +181,7 @@ fun HomeScreen(vm: PlayerViewModel) {
         }
 
         if (!newAlbums.isNullOrEmpty()) {
-            item { SectionHeader("Aggiunti di recente", "Mostra tutto") { ui.open("${LocalSource.KEY}/${LocalSource.RECENT}", "Aggiunti di recente") } }
+            item { SectionHeader("Aggiunti di recente", "Mostra tutto") { ui.open("${LocalCatalog.KEY}/${LocalCatalog.RECENT}", "Aggiunti di recente") } }
             item { Carousel(newAlbums.take(15), 150.dp) { ui.open(it.mediaId, it.title()) } }
         }
 
