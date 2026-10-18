@@ -264,8 +264,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun forgetTrashed(items: List<MediaItem>) {
         val gone = items.mapTo(HashSet()) { UserLibrary.baseId(it.mediaId) }
         queue.indices.reversed().filter { UserLibrary.baseId(queue[it].mediaId) in gone }.forEach { removeAt(it) }
-        app.userData.forgetTracks(gone)
+        // Prima si svuotano le cache (brani del telefono e elenchi già aperti), poi si
+        // avvisa chi ricarica: altrimenti una pagina può rileggere l'elenco vecchio, col
+        // brano buttato ancora dentro, e toccarlo farebbe partire quello dopo.
         app.local.invalidate()
+        app.tree.invalidate()
+        app.userData.forgetTracks(gone)
         app.settings.touch()
     }
     fun addSearch(query: String) = app.userData.addSearch(query)

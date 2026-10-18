@@ -150,7 +150,12 @@ class LocalSource(
             MediaStore.Audio.Media.DATE_MODIFIED,
             MediaStore.Audio.Media.SIZE,
         ) + if (Build.VERSION.SDK_INT >= 30) arrayOf(ALBUM_ARTIST) else emptyArray()
-        val where = listOfNotNull("${MediaStore.Audio.Media.IS_MUSIC} != 0", selection).joinToString(" AND ") { "($it)" }
+        val where = listOfNotNull(
+            "${MediaStore.Audio.Media.IS_MUSIC} != 0",
+            // I file nel cestino Android li esclude già; detto esplicitamente, un brano buttato non torna mai.
+            if (Build.VERSION.SDK_INT >= 30) "${MediaStore.MediaColumns.IS_TRASHED} = 0" else null,
+            selection,
+        ).joinToString(" AND ") { "($it)" }
         val out = ArrayList<Row>()
         context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, where, args, null)?.use { c ->
             while (c.moveToNext()) {
