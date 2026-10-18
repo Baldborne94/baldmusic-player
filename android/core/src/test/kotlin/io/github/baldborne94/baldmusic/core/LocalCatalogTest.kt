@@ -141,14 +141,13 @@ class LocalCatalogTest {
 
     @Test
     fun `gli album con un solo brano non stanno tra gli album`() {
-        assertEquals(listOf("Anidride", "Innuendo", "Live Killers"), children(LocalCatalog.ALBUMS).titles())
+        assertEquals(listOf("Anidride", "Hits", "Innuendo", "Live Killers"), children(LocalCatalog.ALBUMS).titles())
         assertEquals(listOf("Singolo"), children(LocalCatalog.SINGLES).titles())
     }
 
     @Test
-    fun `un album di piu artisti senza artista dell'album e una raccolta`() {
-        val hits = children(LocalCatalog.COMPILATIONS).single()
-        assertEquals("Hits", hits.title)
+    fun `un album di piu artisti senza artista dell'album e di Artisti vari`() {
+        val hits = children(LocalCatalog.ALBUMS).single { it.title == "Hits" }
         assertEquals("Artisti vari", hits.subtitle)
         assertEquals(null, hits.artist)
     }
@@ -293,9 +292,8 @@ class LocalCatalogTest {
     }
 
     @Test
-    fun `le raccolte di artisti vari stanno tra le raccolte, non tra gli artisti`() {
-        assertEquals(listOf("Disney Hits"), children(LocalCatalog.COMPILATIONS, all = Picard.all).titles())
-        assertTrue(children(LocalCatalog.ALBUMS, all = Picard.all).none { it.title == "Disney Hits" })
+    fun `i dischi di artisti vari stanno tra gli album, non tra gli artisti`() {
+        assertEquals("Artisti vari", children(LocalCatalog.ALBUMS, all = Picard.all).single { it.title == "Disney Hits" }.subtitle)
         assertTrue(children(LocalCatalog.ARTISTS, all = Picard.all).none { it.title == "Various Artists" })
         assertEquals(listOf("Compare in"), artistPage("Lorena Brancucci", Picard.all).titles())
     }
@@ -341,6 +339,32 @@ class LocalCatalogTest {
         assertEquals("3:20", d["Durata"])
         assertEquals("no", Plain.all.first().details(tagsRead = false).toMap()["Riconosciuto da MusicBrainz"])
         assertTrue(Plain.all.first().details(tagsRead = false).toMap()["Tag letti dal file"]!!.startsWith("non ancora"))
+    }
+
+    @Test
+    fun `l'elenco artisti si carica anche se l'artista dell'album non canta nessun brano`() {
+        val now = t(
+            "Now We Are Free", "Hans Zimmer & Lisa Gerrard", 800, "Gladiator", 801,
+            tags = FileTags(title = "Now We Are Free", artist = "Hans Zimmer & Lisa Gerrard", album = "Gladiator", albumArtist = "Hans Zimmer"),
+        )
+        val artists = catalog.children(MediaId(LocalCatalog.KEY, LocalCatalog.ARTISTS), listOf(now))
+        assertTrue(artists.isNotEmpty())
+        assertTrue(artists.all { it.subtitle != null })
+    }
+
+    @Test
+    fun `ogni cartella dentro quella principale e una raccolta, nell'ordine di arrivo`() {
+        val a = t("Secondo arrivato", "X", 1, "A", 1, added = 20, folder = "Music/Disney Italia")
+        val b = t("Primo arrivato", "Y", 2, "B", 2, added = 10, folder = "Music/Disney Italia")
+        val c = t("Nel CD2", "Z", 3, "C", 3, added = 5, folder = "Music/Movie Soundtracks/CD2")
+        val loose = t("Sciolto", "W", 4, "D", 4, folder = "Music")
+        val system = t("Nota", "V", 5, "E", 5, folder = "Android/media/app")
+        val collections = LocalCatalog.folderCollections(listOf(a, b, c, loose, system))
+        assertEquals(listOf("Disney Italia", "Movie Soundtracks"), collections.map { it.name })
+        assertEquals(listOf("Primo arrivato", "Secondo arrivato"), collections[0].tracks.map { it.title })
+        assertEquals("Music/Movie Soundtracks", collections[1].folder)
+        assertEquals("local/track/${a.id}", collections[0].tracks[1].id)
+        assertEquals("local/${a.albumId}", collections[0].tracks[1].artwork)
     }
 
     @Test

@@ -103,8 +103,8 @@ data class LocalTrack(
  * - Un **album** è la pubblicazione MusicBrainz (edizioni diverse dello stesso disco
  *   diventano una scheda sola), altrimenti artista dell'album + titolo, e per i file
  *   senza artista dell'album il raggruppamento di Android. Appartiene al suo artista
- *   dell'album; se è di artisti vari è una **raccolta**.
- * - Tra album e raccolte vanno solo i dischi di cui hai almeno due brani e che non sono
+ *   dell'album; se è di artisti vari si mostra come "Artisti vari".
+ * - Tra gli album vanno solo i dischi di cui hai almeno due brani e che non sono
  *   singoli: gli altri brani stanno in "Singoli e brani sparsi".
  */
 class LocalCatalog(
@@ -124,7 +124,6 @@ class LocalCatalog(
     fun sections(): List<LibraryNode> = listOf(
         section(RECENT, "Aggiunti di recente", grid = true),
         section(ALBUMS, "Album", grid = true),
-        section(COMPILATIONS, "Raccolte", grid = true),
         section(SINGLES, "Singoli e brani sparsi"),
         section(ARTISTS, "Artisti"),
         section(SONGS, "Tutti i brani"),
@@ -143,8 +142,8 @@ class LocalCatalog(
                 val newest = ix.shownAlbums.sortedByDescending { a -> a.tracks.maxOf { it.dateAdded } }.take(30)
                 newest.map { albumNode(ix, it) } + ix.loose.sortedByDescending { it.dateAdded }.take(30).map { node(ix, it, MediaId(KEY, RECENT)) }
             }
-            ALBUMS -> ix.shownAlbums.filterNot { it.various }.sortedBy { it.title.lowercase() }.map { albumNode(ix, it) }
-            COMPILATIONS -> ix.shownAlbums.filter { it.various }.sortedBy { it.title.lowercase() }.map { albumNode(ix, it) }
+            // Anche i dischi di artisti vari: "Raccolte" sono le cartelle (vedi folderCollections).
+            ALBUMS -> ix.shownAlbums.sortedBy { it.title.lowercase() }.map { albumNode(ix, it) }
             SINGLES -> ix.loose.sortedWith(compareBy({ it.artist?.lowercase() }, { it.shownYear }, { it.title.lowercase() })).map { node(ix, it, id.copy(parent = null)) }
             DECADES -> all.filter { it.shownYear > 0 }.groupBy { it.shownYear / 10 * 10 }.toSortedMap(compareByDescending { it }).map { (decade, tracks) ->
                 LibraryNode(MediaId(KEY, DECADE, "$decade").toString(), decadeName(decade), Kind.SECTION, subtitle = count(tracks.size))
@@ -263,8 +262,9 @@ class LocalCatalog(
         year = a.tracks.maxOf { it.shownYear }.takeIf { it > 0 },
     )
 
-    private fun artists(ix: Index, keys: Collection<String>): List<LibraryNode> = keys.map { key ->
+    private fun artists(ix: Index, keys: Collection<String>): List<LibraryNode> = keys.mapNotNull { key ->
         val page = ix.page(key)
+        val first = page.albums.firstOrNull()?.tracks?.first() ?: page.loose.firstOrNull() ?: page.appearsOn.firstOrNull() ?: return@mapNotNull null
         val songs = page.songs
         LibraryNode(
             mediaId = MediaId(KEY, ARTIST, key).toString(),
@@ -274,7 +274,7 @@ class LocalCatalog(
                 page.albums.size.takeIf { it > 0 }?.let { if (it == 1) "1 album" else "$it album" },
                 count(songs),
             ).joinToString(" · "),
-            artwork = "$KEY/${(page.albums.firstOrNull()?.tracks?.first() ?: page.loose.firstOrNull() ?: page.appearsOn.first()).albumId}",
+            artwork = "$KEY/${first.albumId}",
             gridChildren = true,
         )
     }.sortedBy { it.title.lowercase() }
@@ -391,7 +391,7 @@ class LocalCatalog(
 
         val shownAlbums: List<Album> = albums.values.filter { it.shown }
 
-        /** I brani che non stanno in un album o in una raccolta mostrati. */
+        /** I brani che non stanno in un album mostrato. */
         val loose: List<LocalTrack> = tracks.filter { t -> albumKeys[t.id]?.let { albums[it]?.shown } != true }
 
         private val pages = HashMap<String, ArtistPage>()
@@ -430,7 +430,9 @@ class LocalCatalog(
         fun page(key: String): ArtistPage = pages.getOrPut(key) {
             val own = shownAlbums.filter { it.owner == key }.sortedByDescending { a -> a.tracks.maxOf { it.shownYear } }
             val inOwn = own.flatMapTo(HashSet()) { a -> a.tracks.map { it.id } }
-            val credited = tracks.filter { key in credits(it) && it.id !in inOwn }
+            // I brani in cui canta, più quelli dei dischi di cui è artista dell'album anche se
+            // non canta (Hans Zimmer artista di "Gladiator", brano di "Hans Zimmer & Lisa Gerrard").
+            val credited = tracks.filter { t -> t.id !in inOwn && (key in credits(t) || albumKeys[t.id]?.let { albums[it]?.owner } == key) }
             val (mine, others) = credited.partition { t ->
                 val album = albumKeys[t.id]?.let { albums[it] }
                 // Suo se l'album è suo, o se non sta in un album mostrato di altri ed è lui il primo artista.
@@ -451,7 +453,6 @@ class LocalCatalog(
         const val RADIO = "radio"
         const val ARTIST_MIX = "artistmix"
         const val ALBUMS = "albums"
-        const val COMPILATIONS = "compilations"
         const val ARTISTS = "artists"
         const val SONGS = "songs"
         const val SHUFFLE = "shuffle"
@@ -480,6 +481,37 @@ class LocalCatalog(
         }
 
         private const val EPOCH_YEAR = 1970
+
+        /**
+         * Le cartelle del telefono come raccolte: la prima cartella dentro quella principale
+         * ("Music/Movie Soundtracks", anche per i file in "Music/Movie Soundtracks/CD1"), con
+         * i brani nell'ordine in cui sono arrivati sul telefono, che per una playlist
+         * scaricata è di solito il suo. I file sciolti in "Music" o "Download" non fanno raccolta.
+         */
+        fun folderCollections(tracks: List<LocalTrack>): List<FolderCollection> =
+            tracks.mapNotNull { t -> collectionFolder(t.folder)?.let { it to t } }
+                .groupBy({ it.first }, { it.second })
+                .map { (folder, list) ->
+                    val ordered = list.sortedWith(compareBy({ it.dateAdded }, { it.folder }, { it.disc }, { it.track }, { it.title.lowercase() }))
+                    FolderCollection(folder, folder.substringAfterLast('/'), ordered.map(::ref))
+                }
+                .sortedBy { it.name.lowercase() }
+
+        /** "Music/Disney/CD1" → "Music/Disney"; null per i file sciolti e per la cartella di sistema Android. */
+        private fun collectionFolder(folder: String): String? {
+            val parts = folder.split('/').filter { it.isNotEmpty() }
+            return if (parts.size >= 2 && parts[0] != "Android") "${parts[0]}/${parts[1]}" else null
+        }
+
+        /** Il brano come lo ricordano playlist e raccolte. */
+        fun ref(t: LocalTrack) = TrackRef(
+            id = MediaId.track(KEY, "${t.id}", null).toString(),
+            title = t.title,
+            artist = t.artist,
+            album = t.album,
+            artwork = "$KEY/${t.albumId}",
+            durationMs = t.durationMs,
+        )
 
         private fun decadeName(decade: Int) = if (decade >= 2000) "Anni $decade" else "Anni ${decade % 100}"
     }

@@ -45,7 +45,7 @@ import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 
-private enum class Filter(val label: String) { PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti"), FOLDER("Cartelle") }
+private enum class Filter(val label: String) { COLLECTION("Raccolte"), PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti") }
 
 @Composable
 fun LibraryScreen(vm: PlayerViewModel) {
@@ -58,19 +58,18 @@ fun LibraryScreen(vm: PlayerViewModel) {
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
     val (playlists) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}", lib.playlists)
+    val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
     val (albums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
-    val (compilations) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.COMPILATIONS}")
     val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
-    val (folders) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.FOLDERS}")
     val (serverPlaylists) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.PLAYLISTS}") else (null to null)
 
     val items: List<MediaItem> = when (filter) {
-        null -> (playlists.orEmpty() + recent.orEmpty()).distinctBy { it.mediaId }
+        null -> (collections.orEmpty() + playlists.orEmpty() + recent.orEmpty()).distinctBy { it.mediaId }
+        Filter.COLLECTION -> collections.orEmpty()
         Filter.PLAYLIST -> playlists.orEmpty() + serverPlaylists.orEmpty()
-        Filter.ALBUM -> albums.orEmpty() + compilations.orEmpty()
+        Filter.ALBUM -> albums.orEmpty()
         Filter.ARTIST -> artists.orEmpty()
-        Filter.FOLDER -> folders.orEmpty()
     }.let { if (alphabetical) it.sortedBy { i -> i.title().lowercase() } else it }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {

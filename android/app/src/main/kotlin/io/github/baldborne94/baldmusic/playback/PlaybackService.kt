@@ -94,6 +94,7 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             app.userData.state.drop(1).collect {
                 listOf(PersonalSource.KEY, "${PersonalSource.KEY}/${PersonalSource.LIKED}", "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}",
+                    "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}",
                     "${PersonalSource.KEY}/${PersonalSource.RECENT}", "${PersonalSource.KEY}/${PersonalSource.TOP}").forEach { id ->
                     session.notifyChildrenChanged(id, Int.MAX_VALUE, null)
                 }

@@ -28,9 +28,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * album, artisti e mix lo decide [LocalCatalog], in `:core` e testato.
  *
  * [onTagsRead] viene chiamato quando la lettura dei tag ha cambiato qualcosa:
- * la libreria va ricaricata (nell'app e in Android Auto).
+ * la libreria va ricaricata (nell'app e in Android Auto). [onSongs] riceve l'elenco
+ * aggiornato dei brani ogni volta che si rilegge (serve alle raccolte dalle cartelle).
  */
-class LocalSource(private val context: Context, private val onTagsRead: () -> Unit) : MusicSource {
+class LocalSource(
+    private val context: Context,
+    private val onTagsRead: () -> Unit,
+    private val onSongs: (List<LocalTrack>) -> Unit = {},
+) : MusicSource {
 
     override val key = LocalCatalog.KEY
     override val title = "Telefono"
@@ -92,6 +97,8 @@ class LocalSource(private val context: Context, private val onTagsRead: () -> Un
         val rows = rows(null, null)
         val list = LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))
         cached = System.currentTimeMillis() to list
+        // Un elenco vuoto può voler dire permesso tolto o memoria non montata: non si tocca niente.
+        if (list.isNotEmpty()) onSongs(list)
         if (scanner.index.stale(rows.map { it.stamp }).isNotEmpty() || scanner.index.size() > rows.size) scan(rows.map { it.stamp })
         return list
     }

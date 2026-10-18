@@ -90,6 +90,7 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
     val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.plays.size)
     val (liked) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.LIKED}", lib.liked.size)
+    val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)
     val (localSections) = rememberChildren(vm, LocalCatalog.KEY)
     val (recentAdded) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.RECENT}")
     val newAlbums = recentAdded?.filter { it.kind != Kind.TRACK }
@@ -137,6 +138,8 @@ fun HomeScreen(vm: PlayerViewModel) {
         val quick = buildList {
             liked?.let { if (it.isNotEmpty()) add(QuickTile.Liked(it.size)) }
             recent.orEmpty().take(if (isEmpty()) 6 else 5).forEach { add(QuickTile.Item(it)) }
+            // Le raccolte prima di tutto il resto: sono le cartelle con cui organizzi la musica.
+            if (size < 6) collections.orEmpty().filter { c -> none { it is QuickTile.Item && it.item.mediaId == c.mediaId } }.take(6 - size).forEach { add(QuickTile.Item(it)) }
             if (size < 6) rediscover.orEmpty().take(6 - size).forEach { add(QuickTile.Item(it)) }
         }
         if (quick.isNotEmpty()) {
@@ -150,6 +153,11 @@ fun HomeScreen(vm: PlayerViewModel) {
                     }
                 }
             }
+        }
+
+        if (!collections.isNullOrEmpty()) {
+            item { SectionHeader("Le tue raccolte", "Mostra tutto") { ui.open("${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", "Raccolte") } }
+            item { Carousel(collections.orEmpty(), 140.dp) { ui.open(it.mediaId, it.title()) } }
         }
 
         if (!recent.isNullOrEmpty()) {

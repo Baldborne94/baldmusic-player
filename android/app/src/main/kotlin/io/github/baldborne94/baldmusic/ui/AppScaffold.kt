@@ -179,6 +179,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onGoAlbum = item.albumId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.albumTitle?.toString().orEmpty())) } },
                     onGoArtist = item.artistId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.artist?.toString().orEmpty())) } },
                     onRemoveFromPlaylist = playlistId?.let { pl -> { vm.removeFromPlaylist(pl, item) } },
+                    removeLabel = if (lib.playlists.firstOrNull { it.id == playlistId }?.isCollection == true) "Togli da questa raccolta" else "Rimuovi da questa playlist",
                     onRadio = if (vm.canStartRadio(item)) ({ vm.startRadio(item) }) else null,
                     onShare = { shareTrack(context, item) },
                     // Solo per i brani del telefono: i tag del server li legge Navidrome.

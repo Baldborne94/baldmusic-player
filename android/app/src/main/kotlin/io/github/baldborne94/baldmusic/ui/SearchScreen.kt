@@ -80,9 +80,9 @@ fun SearchScreen(vm: PlayerViewModel) {
     val (decades) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.DECADES}")
     val (roots) = rememberChildren(vm, "root")
     val tiles = buildList {
+        add(BrowseTile("Raccolte", "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}"))
         add(BrowseTile("Brani che ti piacciono", "${PersonalSource.KEY}/${PersonalSource.LIKED}"))
         add(BrowseTile("Album", "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}"))
-        add(BrowseTile("Raccolte", "${LocalCatalog.KEY}/${LocalCatalog.COMPILATIONS}"))
         add(BrowseTile("Singoli e brani sparsi", "${LocalCatalog.KEY}/${LocalCatalog.SINGLES}"))
         add(BrowseTile("Artisti", "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}"))
         add(BrowseTile("Tutti i brani", "${LocalCatalog.KEY}/${LocalCatalog.SONGS}"))
