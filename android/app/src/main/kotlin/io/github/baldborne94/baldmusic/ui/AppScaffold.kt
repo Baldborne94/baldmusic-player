@@ -70,6 +70,8 @@ sealed interface Screen {
     data object Root : Screen
     data class Detail(val mediaId: String, val title: String) : Screen
     data object Settings : Screen
+    data object Stats : Screen
+    data object Audio : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -79,6 +81,7 @@ class Ui(
     val addToPlaylist: (items: List<MediaItem>) -> Unit,
     val settings: () -> Unit,
     val back: () -> Unit,
+    val push: (Screen) -> Unit,
 )
 
 val LocalUi = staticCompositionLocalOf<Ui> { error("Ui non fornita") }
@@ -93,6 +96,7 @@ fun AppScaffold(vm: PlayerViewModel) {
     var menuFor by remember { mutableStateOf<Pair<MediaItem, String?>?>(null) }
     var addTo by remember { mutableStateOf<List<MediaItem>?>(null) }
     val lib by vm.library.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val ui = remember(tab) {
         Ui(
@@ -101,6 +105,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             addToPlaylist = { items -> addTo = items },
             settings = { stacks.getValue(tab).add(Screen.Settings) },
             back = { stacks.getValue(tab).let { if (it.size > 1) it.removeAt(it.lastIndex) } },
+            push = { stacks.getValue(tab).add(it) },
         )
     }
 
@@ -125,6 +130,8 @@ fun AppScaffold(vm: PlayerViewModel) {
                         }
                         is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
                         Screen.Settings -> SettingsPage(vm)
+                        Screen.Stats -> StatsScreen(vm)
+                        Screen.Audio -> AudioScreen(vm)
                     }
                 }
                 MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
@@ -143,6 +150,10 @@ fun AppScaffold(vm: PlayerViewModel) {
                 NowPlayingScreen(
                     vm,
                     onClose = { nowPlaying = false },
+                    onOpenScreen = { screen ->
+                        nowPlaying = false
+                        stack.add(screen)
+                    },
                     onQueue = { queueOpen = true },
                     onNavigate = { id, title ->
                         nowPlaying = false
@@ -168,6 +179,8 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onGoAlbum = item.albumId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.albumTitle?.toString().orEmpty())) } },
                     onGoArtist = item.artistId?.let { id -> { nowPlaying = false; stack.add(Screen.Detail(id, item.mediaMetadata.artist?.toString().orEmpty())) } },
                     onRemoveFromPlaylist = playlistId?.let { pl -> { vm.removeFromPlaylist(pl, item) } },
+                    onRadio = if (vm.canStartRadio(item)) ({ vm.startRadio(item) }) else null,
+                    onShare = { shareTrack(context, item) },
                 )
             }
 
@@ -258,3 +271,13 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
 /** L'ID di una playlist tua da un ID di contenitore, se lo è. */
 fun personalPlaylistId(mediaId: String): String? =
     MediaId.parse(mediaId)?.takeIf { it.source == PersonalSource.KEY && it.kind == PersonalSource.PLAYLIST }?.id
+
+/** Condivide titolo e artista con le altre app (messaggi, social…). */
+fun shareTrack(context: android.content.Context, item: MediaItem) {
+    val text = listOfNotNull(item.title().takeIf { it.isNotBlank() }, item.mediaMetadata.artist?.toString()).joinToString(" – ")
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_TEXT, "🎵 $text")
+    }
+    context.startActivity(android.content.Intent.createChooser(send, "Condividi").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+}

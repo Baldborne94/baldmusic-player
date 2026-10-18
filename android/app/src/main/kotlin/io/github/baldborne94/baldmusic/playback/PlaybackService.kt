@@ -36,6 +36,7 @@ import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.ui.MainActivity
+import io.github.baldborne94.baldmusic.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -101,6 +102,16 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
 
+        // Equalizzatore, effetti, velocità: applicati appena cambiano nelle impostazioni.
+        app.audioEffects.attach(player.audioSessionId, app.settings.audio.value)
+        scope.launch {
+            app.settings.audio.collect { prefs ->
+                app.audioEffects.apply(prefs)
+                player.setPlaybackSpeed(prefs.speed)
+                player.skipSilenceEnabled = prefs.skipSilence
+            }
+        }
+
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
             app.settings.changes.drop(1).collect {
@@ -121,6 +132,7 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         saveLast()
         scope.cancel()
+        app.audioEffects.release()
         session.release()
         player.release()
         super.onDestroy()
@@ -141,6 +153,16 @@ class PlaybackService : MediaLibraryService() {
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK) {
                 player.pause()
                 app.sleepTimer.value = null
+            }
+        }
+
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            app.audioEffects.attach(audioSessionId, app.settings.audio.value)
+        }
+
+        override fun onEvents(player: Player, events: Player.Events) {
+            if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_METADATA_CHANGED)) {
+                updateWidget()
             }
         }
 
@@ -230,6 +252,27 @@ class PlaybackService : MediaLibraryService() {
             player.pause()
             player.volume = 1f
             app.sleepTimer.value = null
+        }
+    }
+
+    private var widgetJob: Job? = null
+    private var widgetArt: Pair<android.net.Uri?, android.graphics.Bitmap?> = null to null
+
+    /** Il widget segue il brano: la copertina si carica una volta per brano. */
+    private fun updateWidget() {
+        val item = player.currentMediaItem
+        val md = item?.mediaMetadata
+        val playing = player.isPlaying
+        widgetJob?.cancel()
+        widgetJob = scope.launch {
+            val uri = md?.artworkUri
+            if (widgetArt.first != uri) {
+                widgetArt = uri to kotlinx.coroutines.withContext(Dispatchers.IO) { PlayerWidget.loadArt(this@PlaybackService, uri) }
+            }
+            PlayerWidget.update(
+                this@PlaybackService,
+                PlayerWidget.State(md?.title?.toString(), md?.artist?.toString(), playing, widgetArt.second),
+            )
         }
     }
 

@@ -95,6 +95,16 @@ class LocalSource(private val context: Context) : MusicSource {
                     artwork = "$KEY/${tracks.first().albumId}",
                 )
             }
+            RADIO -> {
+                val seed = id.id?.toLongOrNull()?.let { sid -> all.firstOrNull { it.id == sid } } ?: return@withContext emptyList()
+                radios.getOrPut(seed.id) { radio(seed, all) }.map { it.node(id.copy(parent = null)) }
+            }
+            ARTIST_MIX -> {
+                val name = id.id ?: return@withContext emptyList()
+                val own = all.filter { it.artist.equals(name, ignoreCase = true) }
+                val seed = own.randomOrNull() ?: return@withContext emptyList()
+                radios.getOrPut(-name.lowercase().hashCode().toLong() - 1) { radio(seed, all).drop(1).shuffled() }.map { it.node(id.copy(parent = null)) }
+            }
             FOLDER -> all.filter { it.folder == id.id }
                 .sortedWith(compareBy({ it.album?.lowercase() }, { it.track / 1000 }, { it.track % 1000 }, { it.title.lowercase() }))
                 .map { it.node(id.copy(parent = null)) }
@@ -117,6 +127,34 @@ class LocalSource(private val context: Context) : MusicSource {
             }
             else -> emptyList()
         }
+    }
+
+    /** Le radio già pescate: riaprendole (o ricostruendo la coda) restano uguali. */
+    private val radios = java.util.concurrent.ConcurrentHashMap<Long, List<Song>>()
+
+    /**
+     * Una radio da un brano: lui per primo, poi un misto di brani dello stesso
+     * artista e di altri artisti dello stesso periodo (o della stessa cartella,
+     * che spesso vuol dire stesso genere), senza ripetere lo stesso album di fila.
+     */
+    private fun radio(seed: Song, all: List<Song>): List<Song> {
+        val sameArtist = all.filter { it.artistId == seed.artistId && it.id != seed.id }.shuffled().take(15)
+        val decade = seed.year / 10
+        val related = all.filter {
+            it.artistId != seed.artistId && (
+                (seed.year > 0 && it.year / 10 == decade) || it.folder.substringBeforeLast('/') == seed.folder.substringBeforeLast('/')
+                )
+        }.shuffled().take(35)
+        val pool = if (related.size < 10) related + all.filter { it.artistId != seed.artistId }.shuffled().take(30 - related.size) else related
+        // Alterna: due brani "simili", uno dell'artista.
+        val out = mutableListOf(seed)
+        val a = ArrayDeque(sameArtist)
+        val r = ArrayDeque(pool.distinctBy { it.id })
+        while (a.isNotEmpty() || r.isNotEmpty()) {
+            repeat(2) { r.removeFirstOrNull()?.let(out::add) }
+            a.removeFirstOrNull()?.let(out::add)
+        }
+        return out.distinctBy { it.id }.take(50)
     }
 
     override suspend fun track(id: MediaId): LibraryNode? = withContext(Dispatchers.IO) {
@@ -232,6 +270,8 @@ class LocalSource(private val context: Context) : MusicSource {
         const val DECADE = "decade"
         const val FOLDERS = "folders"
         const val FOLDER = "folder"
+        const val RADIO = "radio"
+        const val ARTIST_MIX = "artistmix"
         const val ALBUMS = "albums"
         const val ARTISTS = "artists"
         const val SONGS = "songs"

@@ -38,6 +38,10 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
@@ -91,7 +95,16 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowPlayingScreen(vm: PlayerViewModel, onClose: () -> Unit, onQueue: () -> Unit, onNavigate: (String, String) -> Unit) {
+fun NowPlayingScreen(
+    vm: PlayerViewModel,
+    onClose: () -> Unit,
+    onQueue: () -> Unit,
+    onNavigate: (String, String) -> Unit,
+    onOpenScreen: (Screen) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val audio by vm.audio.collectAsStateWithLifecycle()
+    var speedSheet by remember { mutableStateOf(false) }
     val item = vm.current ?: return
     val ui = LocalUi.current
     val lib by vm.library.collectAsStateWithLifecycle()
@@ -163,6 +176,23 @@ fun NowPlayingScreen(vm: PlayerViewModel, onClose: () -> Unit, onQueue: () -> Un
                                 onClick = { menu = false; onNavigate(id, item.mediaMetadata.artist?.toString().orEmpty()) },
                             )
                         }
+                        if (vm.canStartRadio(item)) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Avvia radio") },
+                                leadingIcon = { Icon(Icons.Rounded.Radio, null) },
+                                onClick = { menu = false; vm.startRadio(item) },
+                            )
+                        }
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Equalizzatore") },
+                            leadingIcon = { Icon(Icons.Rounded.GraphicEq, null) },
+                            onClick = { menu = false; onOpenScreen(Screen.Audio) },
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Condividi") },
+                            leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                            onClick = { menu = false; shareTrack(context, item) },
+                        )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Timer di spegnimento") },
                             leadingIcon = { Icon(Icons.Rounded.Timer, null) },
@@ -232,6 +262,13 @@ fun NowPlayingScreen(vm: PlayerViewModel, onClose: () -> Unit, onQueue: () -> Un
             // Riga in basso: timer, testo, coda.
             Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 SleepButton(sleepEnd) { sleepSheet = true }
+                // Velocità: compare evidenziata quando non è 1×.
+                Text(
+                    "${formatSpeed(audio.speed)}×",
+                    color = if (audio.speed != 1f) Accent else Color.White,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).clickable { speedSheet = true }.padding(horizontal = 10.dp, vertical = 8.dp),
+                )
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showLyrics = !showLyrics }) {
                     Icon(Icons.Rounded.Mic, "Testo", tint = if (showLyrics) Accent else Color.White)
@@ -240,6 +277,20 @@ fun NowPlayingScreen(vm: PlayerViewModel, onClose: () -> Unit, onQueue: () -> Un
             }
 
             vm.error?.let { Text(it, color = Color(0xFFFFB4B4), fontSize = 13.sp, modifier = Modifier.padding(bottom = 8.dp)) }
+        }
+    }
+
+    if (speedSheet) {
+        ModalBottomSheet(onDismissRequest = { speedSheet = false }, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
+            Column(Modifier.padding(bottom = 24.dp)) {
+                Text("Velocità di riproduzione", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                io.github.baldborne94.baldmusic.core.audio.AudioPrefs.SPEEDS.forEach { speed ->
+                    SheetAction(Icons.Rounded.Speed, "${formatSpeed(speed)}×" + if (speed == 1f) " (normale)" else "", tint = if (speed == audio.speed) Accent else Color.White) {
+                        vm.setSpeed(speed)
+                        speedSheet = false
+                    }
+                }
+            }
         }
     }
 
@@ -402,3 +453,6 @@ fun SleepTimerOptions(current: Long?, onPick: (Int?) -> Unit) {
         if (current != null) SheetAction(Icons.Rounded.Timer, "Spegni il timer", tint = Accent) { onPick(null) }
     }
 }
+
+fun formatSpeed(speed: Float): String =
+    if (speed == speed.toInt().toFloat()) "${speed.toInt()}" else "%.2f".format(speed).trimEnd('0').replace('.', ',')

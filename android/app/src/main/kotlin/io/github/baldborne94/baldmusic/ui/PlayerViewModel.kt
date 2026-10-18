@@ -73,6 +73,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     val library: StateFlow<UserLibrary> = app.userData.state
     val sleepTimer: StateFlow<Long?> = app.sleepTimer
+    val audio: StateFlow<io.github.baldborne94.baldmusic.core.audio.AudioPrefs> = app.settings.audio
+    val audioEffects get() = app.audioEffects.info
+
+    fun updateAudio(change: (io.github.baldborne94.baldmusic.core.audio.AudioPrefs) -> io.github.baldborne94.baldmusic.core.audio.AudioPrefs) =
+        app.settings.updateAudio(change)
+
+    fun setSpeed(speed: Float) = updateAudio { it.withSpeed(speed) }
+    fun presetLevels(preset: Int) = app.audioEffects.presetLevels(preset)
+
+    var lyricsOnline: Boolean
+        get() = app.settings.lyricsOnline
+        set(value) {
+            app.settings.lyricsOnline = value
+        }
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = sync(player)
@@ -256,5 +270,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         item.mediaMetadata.title?.toString().orEmpty(),
         item.mediaMetadata.albumTitle?.toString(),
         item.mediaMetadata.durationMs ?: duration.takeIf { it > 0 },
+        online = app.settings.lyricsOnline,
     )
+
+    /** Radio da un brano del telefono: lui e poi musica simile. */
+    fun startRadio(item: MediaItem) {
+        val id = io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId) ?: return
+        if (id.source != io.github.baldborne94.baldmusic.library.LocalSource.KEY || id.id == null) return
+        playAll("${id.source}/${io.github.baldborne94.baldmusic.library.LocalSource.RADIO}/${id.id}", shuffled = false, from = "Radio: ${item.title()}")
+    }
+
+    fun canStartRadio(item: MediaItem) =
+        io.github.baldborne94.baldmusic.core.library.MediaId.parse(item.mediaId)?.source == io.github.baldborne94.baldmusic.library.LocalSource.KEY
 }

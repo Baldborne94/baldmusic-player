@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material3.Button
@@ -112,6 +113,7 @@ fun HomeScreen(vm: PlayerViewModel) {
         item {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(header, style = androidx.compose.material3.MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                IconButton(onClick = { ui.push(Screen.Stats) }) { Icon(Icons.Outlined.Insights, "Le tue statistiche") }
                 IconButton(onClick = ui.settings) { Icon(Icons.Outlined.Settings, "Impostazioni") }
             }
         }
@@ -158,6 +160,15 @@ fun HomeScreen(vm: PlayerViewModel) {
             add(Mix("Mix casuale", "Tutta la tua musica, mescolata", "${LocalSource.KEY}/${LocalSource.SHUFFLE}"))
             if (!liked.isNullOrEmpty()) add(Mix("Preferiti in shuffle", "I brani che ti piacciono", "${PersonalSource.KEY}/${PersonalSource.LIKED}"))
             if (!top.isNullOrEmpty()) add(Mix("In loop", "Quelli che ascolti di più", "${PersonalSource.KEY}/${PersonalSource.TOP}"))
+            // Un mix per ognuno dei tuoi artisti più ascoltati (brani del telefono).
+            lib.plays.values.filter { it.track.id.startsWith("${LocalSource.KEY}/") }
+                .groupBy { it.track.artist }
+                .filterKeys { !it.isNullOrBlank() }
+                .entries.sortedByDescending { e -> e.value.sumOf { it.count } }
+                .take(4)
+                .forEach { (artist, _) ->
+                    add(Mix("Mix $artist", "$artist e musica simile", "${LocalSource.KEY}/${LocalSource.ARTIST_MIX}/${java.net.URLEncoder.encode(artist, "UTF-8")}"))
+                }
             decades.orEmpty().forEach { add(Mix("Mix ${it.title()}", it.subtitle().orEmpty(), it.mediaId)) }
         }
         item { SectionHeader("I tuoi mix") }
@@ -181,6 +192,7 @@ fun HomeScreen(vm: PlayerViewModel) {
                     liked = lib.isLiked(item.mediaId),
                     onClick = { vm.play(item, from = "I più ascoltati") },
                     onMenu = { ui.trackMenu(item, null) },
+                    onSwipeQueue = { vm.enqueue(item) },
                 )
             }
         }

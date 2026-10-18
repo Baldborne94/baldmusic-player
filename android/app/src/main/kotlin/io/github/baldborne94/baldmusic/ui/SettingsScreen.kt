@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Close
@@ -99,6 +101,23 @@ fun SettingsScreen(vm: PlayerViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val ui = LocalUi.current
+        var lyricsOnline by remember { mutableStateOf(vm.lyricsOnline) }
+        Text("Ascolto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        SettingsLink("Equalizzatore ed effetti", "Equalizzatore, bass boost, spazialità, volume uniforme, velocità") { ui.push(Screen.Audio) }
+        SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Testi da internet", fontWeight = FontWeight.SemiBold)
+                Text("Cerca i testi sincronizzati su LRCLIB. Spento: solo quelli già scaricati.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
+            androidx.compose.material3.Switch(
+                checked = lyricsOnline,
+                onCheckedChange = { lyricsOnline = it; vm.lyricsOnline = it },
+                colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds
         if (current != null) {
@@ -190,5 +209,19 @@ fun SettingsScreen(vm: PlayerViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+@Composable
+private fun SettingsLink(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Surface1).clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = TextMuted)
     }
 }

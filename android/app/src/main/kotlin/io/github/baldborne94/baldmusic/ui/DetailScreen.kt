@@ -155,6 +155,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                 number = if (numbered) item.mediaMetadata.trackNumber else null,
                 onClick = { vm.play(item, from = shownTitle) },
                 onMenu = { ui.trackMenu(item, playlistId) },
+                    onSwipeQueue = { vm.enqueue(item) },
             )
         }
 

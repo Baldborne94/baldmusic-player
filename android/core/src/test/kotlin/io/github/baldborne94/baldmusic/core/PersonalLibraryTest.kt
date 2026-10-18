@@ -107,3 +107,22 @@ class PersonalLibraryTest {
         assertEquals("local/7", node?.artwork)
     }
 }
+
+class ListeningStatsTest {
+    @Test
+    fun `classifiche e minuti dagli ascolti`() {
+        fun t(n: Int, artist: String, album: String) =
+            io.github.baldborne94.baldmusic.core.library.TrackRef("local/track/$n", "Brano $n", artist, album, "local/$album", 180_000)
+        var lib = UserLibrary()
+        repeat(3) { lib = lib.recordPlay(t(1, "Queen", "A Night"), null, it.toLong()) }
+        repeat(2) { lib = lib.recordPlay(t(2, "Muse", "Origin"), null, it.toLong()) }
+        lib = lib.recordPlay(t(3, "Queen", "Jazz"), null, 9)
+        val s = io.github.baldborne94.baldmusic.core.library.ListeningStats.from(lib)
+        assertEquals(6, s.totalPlays)
+        assertEquals(18, s.minutes)
+        assertEquals(2, s.artists)
+        assertEquals(listOf("Queen" to 4, "Muse" to 2), s.topArtists.map { it.name to it.plays })
+        assertEquals("Brano 1", s.topTracks.first().name)
+        assertEquals("A Night", s.topAlbums.first().name)
+    }
+}

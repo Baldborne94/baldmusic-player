@@ -156,6 +156,7 @@ fun SearchScreen(vm: PlayerViewModel) {
                             liked = lib.isLiked(item.mediaId),
                             onClick = { openResult(item) },
                             onMenu = { ui.trackMenu(item, null) },
+                    onSwipeQueue = { vm.enqueue(item) },
                         )
                     }
                 }

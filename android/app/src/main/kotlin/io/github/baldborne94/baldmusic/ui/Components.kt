@@ -34,6 +34,8 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.SkipNext
@@ -44,6 +46,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -193,13 +198,55 @@ fun GridCard(item: MediaItem, onClick: () -> Unit) {
 }
 
 /** Riga di un brano: copertina o numero, titolo, artista, cuore, menu. */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackRow(
     item: MediaItem,
     active: Boolean,
     liked: Boolean,
     number: Int? = null,
+    onClick: () -> Unit,
+    onMenu: () -> Unit,
+    onSwipeQueue: (() -> Unit)? = null,
+) {
+    if (onSwipeQueue == null) {
+        TrackRowContent(item, active, liked, number, onClick, onMenu)
+        return
+    }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    // Scorri verso destra per mettere in coda, come in Spotify: la riga poi torna al suo posto.
+    val state = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd) {
+                onSwipeQueue()
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                android.widget.Toast.makeText(context, "Aggiunto in coda", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            false
+        },
+        positionalThreshold = { it * 0.35f },
+    )
+    SwipeToDismissBox(
+        state = state,
+        enableDismissFromEndToStart = false,
+        backgroundContent = {
+            Box(Modifier.fillMaxSize().background(Color(0xFF1F8A4C)).padding(start = 24.dp), contentAlignment = Alignment.CenterStart) {
+                Icon(Icons.AutoMirrored.Rounded.QueueMusic, "In coda", tint = Color.White)
+            }
+        },
+    ) {
+        Box(Modifier.background(Background)) { TrackRowContent(item, active, liked, number, onClick, onMenu) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TrackRowContent(
+    item: MediaItem,
+    active: Boolean,
+    liked: Boolean,
+    number: Int?,
     onClick: () -> Unit,
     onMenu: () -> Unit,
 ) {
@@ -317,6 +364,8 @@ fun TrackActionsSheet(
     onGoAlbum: (() -> Unit)?,
     onGoArtist: (() -> Unit)?,
     onRemoveFromPlaylist: (() -> Unit)? = null,
+    onRadio: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -334,8 +383,10 @@ fun TrackActionsSheet(
         onRemoveFromPlaylist?.let { SheetAction(Icons.Rounded.RemoveCircleOutline, "Rimuovi da questa playlist", onClick = act(it)) }
         SheetAction(Icons.Rounded.SkipNext, "Riproduci dopo", onClick = act(onPlayNext))
         SheetAction(Icons.AutoMirrored.Rounded.QueueMusic, "Aggiungi in coda", onClick = act(onEnqueue))
+        onRadio?.let { SheetAction(Icons.Rounded.Radio, "Avvia radio", onClick = act(it)) }
         onGoAlbum?.let { SheetAction(Icons.Rounded.Album, "Vai all'album", onClick = act(it)) }
         onGoArtist?.let { SheetAction(Icons.Rounded.Person, "Vai all'artista", onClick = act(it)) }
+        onShare?.let { SheetAction(Icons.Rounded.Share, "Condividi", onClick = act(it)) }
         Spacer(Modifier.height(24.dp))
     }
 }

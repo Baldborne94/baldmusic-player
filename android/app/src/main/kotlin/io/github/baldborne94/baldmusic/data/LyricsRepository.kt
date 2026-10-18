@@ -21,7 +21,8 @@ class LyricsRepository(context: Context, http: OkHttpClient) {
     private val json = Json { ignoreUnknownKeys = true }
     private val memory = HashMap<String, Lyrics?>()
 
-    suspend fun get(artist: String?, title: String, album: String?, durationMs: Long?): Lyrics? {
+    /** [online] = false: solo testi già scaricati. */
+    suspend fun get(artist: String?, title: String, album: String?, durationMs: Long?, online: Boolean = true): Lyrics? {
         if (artist.isNullOrBlank() || title.isBlank()) return null
         val key = hash("$artist|$title")
         synchronized(memory) { if (memory.containsKey(key)) return memory[key] }
@@ -32,12 +33,13 @@ class LyricsRepository(context: Context, http: OkHttpClient) {
                 cached.exists() -> runCatching { json.decodeFromString(Lyrics.serializer(), cached.readText()) }.getOrNull()
                 // Un testo che non c'era si ricerca dopo una settimana: l'archivio cresce.
                 missing.exists() && System.currentTimeMillis() - missing.lastModified() < WEEK_MS -> null
+                !online -> return@withContext null
                 else -> client.find(artist, title, album, durationMs?.let { (it / 1000).toInt() }).also {
                     if (it != null) cached.writeText(json.encodeToString(Lyrics.serializer(), it)) else missing.writeText("")
                 }
             }
         }
-        synchronized(memory) { memory[key] = lyrics }
+        if (lyrics != null || online) synchronized(memory) { memory[key] = lyrics }
         return lyrics
     }
 

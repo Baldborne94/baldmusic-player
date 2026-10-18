@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BaldMusic</string>
+    <string name="widget_description">Il brano in riproduzione, con i comandi</string>
+    <string name="widget_idle">Tocca per iniziare ad ascoltare</string>
+    <string name="widget_play">Riproduci o metti in pausa</string>
+    <string name="widget_prev">Brano precedente</string>
+    <string name="widget_next">Brano successivo</string>
 </resources>
