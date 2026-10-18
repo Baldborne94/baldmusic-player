@@ -61,21 +61,21 @@ Prima di toccare artisti e ordinamenti, la logica deve diventare testabile.
 Il principio resta quello di `CLAUDE.md`: **la cura vera sono i tag**. Con i file già passati da Picard,
 l'app deve solo leggerli tutti, non inventare euristiche.
 
-- [ ] **Lettore di tag sul telefono**: alla prima scansione si leggono i tag completi di ogni file (MP3, FLAC, M4A, OGG/Opus) e si salvano in un indice; alle scansioni successive si rileggono solo i file nuovi o modificati. Campi: artista dell'album, artisti multipli, tipo di uscita, anno originale, nomi di ordinamento, ID MusicBrainz, titolo del disco, ReplayGain. Prima voce: scegliere il lettore (quello di Media3 già incluso, o una libreria dedicata) provandolo su file veri.
-- [ ] **Artisti riconosciuti per ID**: se c'è l'ID MusicBrainz dell'artista, quello decide chi è chi (due artisti omonimi restano due, lo stesso artista scritto in modi diversi resta uno). Senza ID: nome normalizzato (maiuscole, spazi, accenti).
-- [ ] **Artista dell'album**: un album appartiene al suo artista dell'album; i brani con ospiti restano dentro l'album e compaiono anche nella pagina dell'ospite, sotto "Compare in".
-- [ ] **Artisti multipli**: dai tag multi-valore di Picard (`ARTISTS`); nei vecchi tag a stringa unica si separa solo su separatori non ambigui (`;`, `/`, ` feat. `, ` ft. `). "Simon & Garfunkel" resta intero.
-- [ ] **Album = ID MusicBrainz della pubblicazione**, oppure artista dell'album + titolo: lo stesso album in due cartelle è una scheda, "Greatest Hits" di due artisti sono due schede.
-- [ ] **Tipo di uscita**: album, EP, singolo, raccolta, live presi dal tag. La regola "un brano solo = singolo" resta solo per i file senza quel tag.
-- [ ] **Raccolte**: album con il flag compilation o artista dell'album "Various Artists" in una sezione "Raccolte".
-- [ ] **Navidrome (PC)**: leggere i campi OpenSubsonic (`artists`, `albumArtists`, `displayArtist`, `sortName`, `releaseTypes`, `isCompilation`, `originalReleaseDate`, `replayGain`) nell'app web e nel telefono.
+- [x] **Lettore di tag sul telefono** (`TagScanner`, con gli estrattori di Media3 già inclusi): alla prima apertura si leggono i tag completi di ogni file (MP3, FLAC, M4A, Ogg/Opus) e si salvano in un indice; poi si rileggono solo i file nuovi o modificati. Campi: artista dell'album, artisti uno per uno, tipo di uscita, anno originale, ID MusicBrainz, titolo del disco, ReplayGain (salvato, si userà in fase 3).
+- [x] **Artisti riconosciuti per ID**: se c'è l'ID MusicBrainz dell'artista, quello decide chi è chi (due artisti omonimi restano due, lo stesso artista scritto in modi diversi resta uno). Senza ID: nome normalizzato (maiuscole, spazi, accenti).
+- [x] **Artista dell'album**: un album appartiene al suo artista dell'album; i brani con ospiti restano dentro l'album e compaiono anche nella pagina dell'ospite, sotto "Compare in".
+- [x] **Artisti multipli**: dai tag multi-valore di Picard (`ARTISTS`, anche in ID3 v2.3 dove sono uniti da "/": si separano solo se tornano col numero di ID); nei tag senza Picard si separa solo su separatori non ambigui (`;`, `/`, ` feat. `, ` ft. `) e sugli ospiti nel titolo ("(feat. X)"). "Simon & Garfunkel" e "AC/DC" restano interi.
+- [x] **Album = gruppo di pubblicazione MusicBrainz** (le edizioni diverse dello stesso disco si fondono), oppure artista dell'album + titolo: lo stesso album in due cartelle è una scheda, "Greatest Hits" di due artisti sono due schede.
+- [x] **Tipo di uscita**: un singolo resta tra i singoli anche con il lato B, sul telefono e da Navidrome. EP, live e raccolte dello stesso artista divisi in discografia: fase 2.
+- [x] **Raccolte**: album con il flag compilation, artista dell'album "Various Artists" o (senza tag) più artisti nello stesso disco, in una sezione "Raccolte"; i loro artisti li ritrovano in "Compare in".
+- [x] **Navidrome (PC)**: `releaseTypes` e `originalReleaseDate` di OpenSubsonic nell'app web e nel telefono (singoli fuori dagli album, anno originale in discografia). Gli artisti multipli li gestisce già Navidrome. Restano per le fasi successive `sortName` (fase 2) e `replayGain` (fase 3).
 
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).
 - [ ] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
 - [ ] **Ordine alfabetico come una persona**: prima i nomi di ordinamento di Picard ("Beatles, The"); senza, `Collator` italiano (gli accenti stanno con la loro lettera), articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"), numeri in ordine naturale. Lettere-indice laterali nell'elenco artisti.
-- [ ] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente, con l'**anno originale** (una ristampa 2011 di un disco del 1977 sta nel 1977, anche nei decenni).
+- [ ] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente. L'**anno originale** è già usato (fase 1) per album, decenni e ordine.
 - [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui, verificate con la stessa libreria di prova in JSON (casi difficili: feat., raccolte, accenti, articoli, dischi multipli, album omonimi) usata dai test Kotlin.
 
 ## Fase 3 — Ascoltare bene
@@ -108,7 +108,7 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 
 ## Fase 7 — Rifinitura
 
-- [ ] **Salute della libreria**: una pagina che segnala i file aggiunti dopo Picard con tag incompleti (senza artista dell'album, numeri di traccia mancanti o doppi, senza copertina).
+- [ ] **Salute della libreria**: una pagina che segnala i file aggiunti dopo Picard con tag incompleti (senza artista dell'album, numeri di traccia mancanti o doppi, senza copertina) e i **brani di 30 secondi**, che di solito sono anteprime scaricate al posto della canzone intera.
 - [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.
 - [ ] Note di versione nella release `apk-latest`: cosa è cambiato da un APK all'altro.
 - [ ] Accessibilità: TalkBack, contrasto, dimensione del testo.

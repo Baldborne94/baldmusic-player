@@ -51,7 +51,8 @@ class BaldMusicApp : Application() {
     override fun onCreate() {
         super.onCreate()
         settings = Settings(this)
-        local = LocalSource(this)
+        // Tag letti dai file: si ricarica la libreria, come quando cambiano le impostazioni.
+        local = LocalSource(this) { settings.touch() }
         userData = UserData(this)
         personal = PersonalSource { userData.value }
     }
