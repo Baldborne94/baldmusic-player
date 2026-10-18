@@ -59,6 +59,8 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
 
 ## Sviluppo
 
+Il piano di lavoro, fase per fase, è in [`ROADMAP.md`](ROADMAP.md).
+
 | | Requisiti | Comandi |
 |-|-----------|---------|
 | Web | Node 22 | `cd web && npm ci && npm run dev` · `npm test` · `npm run build` |
