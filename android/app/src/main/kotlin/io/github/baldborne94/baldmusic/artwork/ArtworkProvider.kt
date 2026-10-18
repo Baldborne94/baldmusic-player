@@ -14,6 +14,7 @@ import android.provider.MediaStore
 import android.util.Size
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
+import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import okhttp3.Request
 import java.io.File
@@ -38,27 +39,51 @@ class ArtworkProvider : ContentProvider() {
         val id = uri.pathSegments.getOrNull(1)
         if (source == null || id == null) throw FileNotFoundException(uri.toString())
 
+        val file = cached(ctx, source, id) ?: throw FileNotFoundException(uri.toString())
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+
+    /** La copertina nella cache, scaricata o composta se manca; null se non si trova. */
+    private fun cached(ctx: Context, source: String, id: String): File? {
         val dir = File(ctx.cacheDir, "artwork").apply { mkdirs() }
         val safeName = id.replace(Regex("[^A-Za-z0-9._-]"), "_")
         val file = File(dir, "$source-$safeName.jpg")
-        if (!file.exists() || file.length() == 0L) {
-            // Chi chiama è Android Auto (un'altra app): le letture verso MediaStore
-            // e la rete devono partire con l'identità di BaldMusic.
-            val token = Binder.clearCallingIdentity()
-            val ok = try {
-                when (source) {
-                    LocalCatalog.KEY -> fetchLocal(ctx, id, file)
-                    RemoteSource.KEY -> fetchRemote(ctx, id, file)
-                    else -> false
-                }
-            } catch (e: Exception) {
-                false
-            } finally {
-                Binder.restoreCallingIdentity(token)
+        if (file.exists() && file.length() > 0L) return file
+        // Chi chiama è Android Auto (un'altra app): le letture verso MediaStore
+        // e la rete devono partire con l'identità di BaldMusic.
+        val token = Binder.clearCallingIdentity()
+        val ok = try {
+            when (source) {
+                LocalCatalog.KEY -> fetchLocal(ctx, id, file)
+                RemoteSource.KEY -> fetchRemote(ctx, id, file)
+                PersonalSource.MOSAIC -> fetchMosaic(ctx, id, file)
+                else -> false
             }
-            if (!ok) throw FileNotFoundException(uri.toString())
+        } catch (e: Exception) {
+            false
+        } finally {
+            Binder.restoreCallingIdentity(token)
         }
-        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        return file.takeIf { ok }
+    }
+
+    /** Mosaico 2×2 per playlist e raccolte: "local/1,local/2,…" sono le quattro copertine. */
+    private fun fetchMosaic(ctx: Context, keys: String, out: File): Boolean {
+        val tiles = keys.split(',').take(4).mapNotNull { key ->
+            cached(ctx, key.substringBefore('/'), key.substringAfter('/'))?.let { android.graphics.BitmapFactory.decodeFile(it.path) }
+        }
+        if (tiles.isEmpty()) return false
+        val half = SIZE / 2
+        val mosaic = Bitmap.createBitmap(SIZE, SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(mosaic)
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+        // Se una copertina non si trova, al suo posto si ripete una delle altre.
+        (0 until 4).forEach { i ->
+            val x = (i % 2) * half
+            val y = (i / 2) * half
+            canvas.drawBitmap(tiles[i % tiles.size], null, android.graphics.Rect(x, y, x + half, y + half), paint)
+        }
+        return writeAtomically(out) { stream -> mosaic.compress(Bitmap.CompressFormat.JPEG, 90, stream) }
     }
 
     private fun fetchLocal(ctx: Context, albumId: String, out: File): Boolean {

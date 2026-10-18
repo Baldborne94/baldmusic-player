@@ -192,6 +192,33 @@ data class UserLibrary(
         )
     }
 
+    /**
+     * Il nuovo ordine dei brani di una playlist o raccolta ([orderedIds], come li ha
+     * lasciati chi li ha trascinati). Chi non è nell'elenco resta in fondo, nell'ordine di prima.
+     */
+    fun reorderPlaylist(id: String, orderedIds: List<String>) = copy(
+        playlists = playlists.map { pl ->
+            if (pl.id != id) pl
+            else {
+                val position = orderedIds.map(::baseId).withIndex().associate { (i, t) -> t to i }
+                pl.copy(tracks = pl.tracks.withIndex().sortedWith(compareBy({ position[it.value.id] ?: Int.MAX_VALUE }, { it.index })).map { it.value })
+            }
+        },
+    )
+
+    /** Ordina una volta per tutte i brani di una playlist o raccolta, per titolo o per artista. */
+    fun sortPlaylist(id: String, byArtist: Boolean) = copy(
+        playlists = playlists.map { pl ->
+            if (pl.id != id) pl
+            else pl.copy(
+                tracks = pl.tracks.sortedWith(
+                    if (byArtist) compareBy({ ArtistNames.key(it.artist.orEmpty()) }, { ArtistNames.key(it.title) })
+                    else compareBy { ArtistNames.key(it.title) },
+                ),
+            )
+        },
+    )
+
     fun addSearch(query: String): UserLibrary {
         val q = query.trim()
         if (q.length < 2) return this

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
@@ -210,9 +212,13 @@ fun TrackRow(
     onClick: () -> Unit,
     onMenu: () -> Unit,
     onSwipeQueue: (() -> Unit)? = null,
+    /** Non null in modalità selezione: la riga mostra il cerchio da spuntare al posto del menu. */
+    selected: Boolean? = null,
+    /** Pressione lunga; senza, apre il menu. */
+    onLongClick: (() -> Unit)? = null,
 ) {
-    if (onSwipeQueue == null) {
-        TrackRowContent(item, active, liked, number, onClick, onMenu)
+    if (onSwipeQueue == null || selected != null) {
+        TrackRowContent(item, active, liked, number, onClick, onMenu, selected, onLongClick)
         return
     }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -238,7 +244,7 @@ fun TrackRow(
             }
         },
     ) {
-        Box(Modifier.background(Background)) { TrackRowContent(item, active, liked, number, onClick, onMenu) }
+        Box(Modifier.background(Background)) { TrackRowContent(item, active, liked, number, onClick, onMenu, null, onLongClick) }
     }
 }
 
@@ -251,14 +257,25 @@ private fun TrackRowContent(
     number: Int?,
     onClick: () -> Unit,
     onMenu: () -> Unit,
+    selected: Boolean?,
+    onLongClick: (() -> Unit)?,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onMenu)
+            .background(if (selected == true) Surface2 else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick ?: onMenu)
             .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (selected != null) {
+            Icon(
+                if (selected) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                if (selected) "Selezionato" else "Non selezionato",
+                tint = if (selected) Accent else TextMuted,
+            )
+            Spacer(Modifier.width(12.dp))
+        }
         if (number != null) {
             Text(
                 "$number",
@@ -288,7 +305,7 @@ private fun TrackRowContent(
                 Text(item.subtitle().orEmpty(), color = TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp)
             }
         }
-        IconButton(onClick = onMenu) { Icon(Icons.Rounded.MoreVert, "Altre azioni", tint = TextMuted) }
+        if (selected == null) IconButton(onClick = onMenu) { Icon(Icons.Rounded.MoreVert, "Altre azioni", tint = TextMuted) }
     }
 }
 

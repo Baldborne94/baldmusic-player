@@ -84,6 +84,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Pulizia della libreria**: doppioni tra le cartelle (si tiene una copia, le raccolte non perdono il brano) e anteprime di 30 secondi, da buttare nel cestino.
 
+- [x] **Raccolte più comode**: riordinare trascinando, ordinare per titolo o artista, selezione multipla (aggiungi, togli, elimina), copertina a mosaico.
+
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).

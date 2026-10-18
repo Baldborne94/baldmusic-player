@@ -65,7 +65,7 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
         title = pl.name,
         kind = Kind.PLAYLIST,
         subtitle = "${if (pl.isCollection) "Raccolta" else "Playlist"} · ${count(pl.tracks.size)}",
-        artwork = pl.tracks.firstNotNullOfOrNull { it.artwork },
+        artwork = artworkOf(pl),
     )
 
     private fun containerNode(c: ContainerRef) = LibraryNode(
@@ -102,6 +102,18 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
         const val TOP = "top"
 
         fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
+
+        /** Prefisso delle copertine a mosaico: l'app le compone da quattro copertine. */
+        const val MOSAIC = "mosaic"
+
+        /**
+         * La copertina di una playlist o raccolta: con almeno quattro copertine diverse un
+         * mosaico 2×2 ("mosaic/local/1,local/2,…"), altrimenti quella del primo brano.
+         */
+        fun artworkOf(pl: UserPlaylist): String? {
+            val covers = pl.tracks.mapNotNull { it.artwork }.distinct()
+            return if (covers.size >= 4) "$MOSAIC/${covers.take(4).joinToString(",")}" else covers.firstOrNull()
+        }
         private fun playlists(n: Int) = if (n == 1) "1 playlist" else "$n playlist"
         private fun collections(n: Int) = if (n == 1) "1 raccolta" else "$n raccolte"
     }

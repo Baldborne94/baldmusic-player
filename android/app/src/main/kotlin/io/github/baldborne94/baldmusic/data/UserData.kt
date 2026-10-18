@@ -71,6 +71,9 @@ class UserData(context: Context) {
     fun mergeTracks(replacements: Map<String, TrackRef>) = update { it.mergeTracks(replacements) }
     fun addToPlaylist(id: String, tracks: List<TrackRef>) = update { it.addToPlaylist(id, tracks) }
     fun removeFromPlaylist(id: String, trackId: String) = update { it.removeFromPlaylist(id, trackId) }
+    fun removeFromPlaylist(id: String, trackIds: Collection<String>) = update { lib -> trackIds.fold(lib) { l, t -> l.removeFromPlaylist(id, t) } }
+    fun reorderPlaylist(id: String, orderedIds: List<String>) = update { it.reorderPlaylist(id, orderedIds) }
+    fun sortPlaylist(id: String, byArtist: Boolean) = update { it.sortPlaylist(id, byArtist) }
     fun syncFolders(folders: List<FolderCollection>, present: Set<String>) =
         update { it.syncFolders(folders, present, System.currentTimeMillis()) { UUID.randomUUID().toString().take(8) } }
 
