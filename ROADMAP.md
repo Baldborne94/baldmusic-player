@@ -82,6 +82,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Eliminare dal telefono**: un brano o una raccolta intera finiscono nel cestino di Android (recuperabili per 30 giorni), con doppia conferma; spariscono da raccolte, preferiti e playlist.
 
+- [x] **Pulizia della libreria**: doppioni tra le cartelle (si tiene una copia, le raccolte non perdono il brano) e anteprime di 30 secondi, da buttare nel cestino.
+
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).

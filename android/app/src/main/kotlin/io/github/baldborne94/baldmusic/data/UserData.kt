@@ -68,6 +68,7 @@ class UserData(context: Context) {
     fun renamePlaylist(id: String, name: String) = update { it.renamePlaylist(id, name) }
     fun deletePlaylist(id: String, ignoreFolder: Boolean = true) = update { it.deletePlaylist(id, ignoreFolder) }
     fun forgetTracks(trackIds: Collection<String>) = update { it.forgetTracks(trackIds) }
+    fun mergeTracks(replacements: Map<String, TrackRef>) = update { it.mergeTracks(replacements) }
     fun addToPlaylist(id: String, tracks: List<TrackRef>) = update { it.addToPlaylist(id, tracks) }
     fun removeFromPlaylist(id: String, trackId: String) = update { it.removeFromPlaylist(id, trackId) }
     fun syncFolders(folders: List<FolderCollection>, present: Set<String>) =

@@ -167,6 +167,31 @@ data class UserLibrary(
         )
     }
 
+    /**
+     * Doppioni buttati: ogni copia tolta ([replacements], dal suo ID alla copia tenuta)
+     * è sostituita da quella tenuta in preferiti, playlist e raccolte, senza doppioni e
+     * al suo posto; i suoi ascolti si sommano a quelli della copia tenuta. Così una
+     * raccolta che aveva la copia buttata continua ad avere il brano.
+     */
+    fun mergeTracks(replacements: Map<String, TrackRef>): UserLibrary {
+        val map = replacements.entries.associate { (from, to) -> baseId(from) to to.copy(id = baseId(to.id)) }
+        if (map.isEmpty()) return this
+        fun List<TrackRef>.merged() = map { map[it.id] ?: it }.distinctBy { it.id }
+        val plays = HashMap<String, PlayCount>()
+        this.plays.values.forEach { p ->
+            val target = map[p.track.id]
+            val id = target?.id ?: p.track.id
+            val previous = plays[id]
+            plays[id] = if (previous == null) p.copy(track = target ?: p.track)
+            else previous.copy(count = previous.count + p.count, lastPlayed = maxOf(previous.lastPlayed, p.lastPlayed))
+        }
+        return copy(
+            liked = liked.merged(),
+            playlists = playlists.map { pl -> if (pl.tracks.none { it.id in map }) pl else pl.copy(tracks = pl.tracks.merged()) },
+            plays = plays,
+        )
+    }
+
     fun addSearch(query: String): UserLibrary {
         val q = query.trim()
         if (q.length < 2) return this

@@ -72,6 +72,7 @@ sealed interface Screen {
     data class Detail(val mediaId: String, val title: String) : Screen
     data object Settings : Screen
     data object Stats : Screen
+    data object Cleanup : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -87,11 +88,11 @@ class Ui(
      * conferma; [onDone] solo se sono stati buttati davvero. Null dove non si può (prima
      * di Android 11 non c'è il cestino).
      */
-    val trash: ((items: List<MediaItem>, title: String, onDone: () -> Unit) -> Unit)?,
+    val trash: ((items: List<MediaItem>, title: String, note: String?, onDone: () -> Unit) -> Unit)?,
 )
 
-/** Una richiesta di cestino in attesa delle conferme. */
-private class TrashAsk(val items: List<MediaItem>, val title: String, val onDone: () -> Unit)
+/** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
+private class TrashAsk(val items: List<MediaItem>, val title: String, val note: String?, val onDone: () -> Unit)
 
 /** Il file di un brano del telefono, per MediaStore; null per gli altri brani. */
 fun localFileUri(item: MediaItem): android.net.Uri? =
@@ -121,8 +122,9 @@ fun AppScaffold(vm: PlayerViewModel) {
         val done = trashing
         trashing = null
         if (done != null && result.resultCode == android.app.Activity.RESULT_OK) {
-            vm.forgetTrashed(done.items)
+            // Prima chi ha chiesto (i doppioni passano alla copia tenuta), poi si dimentica il resto.
             done.onDone()
+            vm.forgetTrashed(done.items)
         }
     }
     val canTrash = android.os.Build.VERSION.SDK_INT >= 30
@@ -135,7 +137,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             settings = { stacks.getValue(tab).add(Screen.Settings) },
             back = { stacks.getValue(tab).let { if (it.size > 1) it.removeAt(it.lastIndex) } },
             push = { stacks.getValue(tab).add(it) },
-            trash = if (canTrash) { items, title, onDone -> trashAsk = TrashAsk(items.filter { localFileUri(it) != null }, title, onDone) } else null,
+            trash = if (canTrash) { items, title, note, onDone -> trashAsk = TrashAsk(items.filter { localFileUri(it) != null }, title, note, onDone) } else null,
         )
     }
 
@@ -161,6 +163,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                         is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
                         Screen.Settings -> SettingsPage(vm)
                         Screen.Stats -> StatsScreen(vm)
+                        Screen.Cleanup -> CleanupScreen(vm)
                     }
                 }
                 MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
@@ -213,7 +216,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onShare = { shareTrack(context, item) },
                     // Solo per i brani del telefono: i tag del server li legge Navidrome.
                     onTrash = ui.trash?.takeIf { localFileUri(item) != null }?.let { trash ->
-                        { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?") {} }
+                        { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
                     onInfo = MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
                         ?.let { id -> { infoFor = id to item.title() } },
@@ -228,7 +231,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     title = ask.title,
                     text = (if (n == 1) "Il file va nel cestino di Android" else "I $n file vanno nel cestino di Android") +
                         ": per 30 giorni li recuperi dall'app File (Cestino), poi vengono cancellati. " +
-                        "Spariscono da raccolte, preferiti e playlist.",
+                        (ask.note ?: "Spariscono da raccolte, preferiti e playlist."),
                     confirm = "Sposta nel cestino",
                     onDismiss = { trashAsk = null },
                 ) {

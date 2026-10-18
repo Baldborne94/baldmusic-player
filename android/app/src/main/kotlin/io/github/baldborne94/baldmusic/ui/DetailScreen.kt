@@ -111,7 +111,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                     onTrashAll = ui.trash?.takeIf { isCollection && playlistId != null && tracks.any { localFileUri(it) != null } }?.let { trash ->
                         {
                             val files = tracks.filter { localFileUri(it) != null }
-                            trash(files, "Eliminare “$shownTitle” e i suoi ${if (files.size == 1) "brano" else "${files.size} brani"}?") {
+                            trash(files, "Eliminare “$shownTitle” e i suoi ${if (files.size == 1) "brano" else "${files.size} brani"}?", null) {
                                 vm.deleteCollectionWithFiles(playlistId!!)
                                 ui.back()
                             }

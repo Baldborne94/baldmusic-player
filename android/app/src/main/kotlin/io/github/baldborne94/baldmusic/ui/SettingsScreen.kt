@@ -102,6 +102,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
         var lyricsOnline by remember { mutableStateOf(vm.lyricsOnline) }
         Text("Ascolto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
+        SettingsLink("Pulizia della libreria", "Doppioni e anteprime di 30 secondi da buttare") { ui.push(Screen.Cleanup) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Testi da internet", fontWeight = FontWeight.SemiBold)

@@ -7,7 +7,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
+import io.github.baldborne94.baldmusic.core.library.DuplicateGroup
 import io.github.baldborne94.baldmusic.core.library.FileStamp
+import io.github.baldborne94.baldmusic.core.library.LibraryCleanup
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
@@ -89,6 +91,13 @@ class LocalSource(
         val tags = scanner.index.tags(row.stamp)
         val shown = songs().firstOrNull { it.id == trackId } ?: withTags(row)
         shown.details(tagsRead = tags != null && !tags.isEmpty)
+    }
+
+    /** Doppioni e anteprime tra i brani del telefono, per la pagina "Pulizia della libreria". */
+    suspend fun cleanup(): Pair<List<DuplicateGroup>, List<LocalTrack>> = withContext(Dispatchers.IO) {
+        if (!hasPermission()) return@withContext emptyList<DuplicateGroup>() to emptyList()
+        val all = songs()
+        LibraryCleanup.duplicates(all) to LibraryCleanup.previews(all)
     }
 
     /** Tutti i brani, riletti al massimo ogni 30 secondi (Auto chiede le liste a pagine). */
