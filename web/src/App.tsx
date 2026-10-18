@@ -1,64 +1,60 @@
 import { useCallback, useEffect, useState } from "react";
-import { Icon, type IconName } from "./components/Icon";
+import { Icon } from "./components/Icon";
 import { Login } from "./components/Login";
-import { NowPlaying } from "./components/NowPlaying";
-import { PlayerBar } from "./components/PlayerBar";
+import { FullPlayer, QueueList, RightPanel } from "./components/Panels";
+import { PlayerBar, type Panel } from "./components/PlayerBar";
+import { refreshLibrary } from "./lib/library";
 import { getPlayerState, player, usePlayer } from "./lib/player";
 import { current } from "./lib/queue";
 import { href, navigate, useRoute, type Route } from "./lib/router";
 import { useClient } from "./lib/session";
-import { AlbumView } from "./views/AlbumView";
-import { Albums } from "./views/Albums";
-import { ArtistView } from "./views/ArtistView";
-import { Artists } from "./views/Artists";
-import { Favorites } from "./views/Favorites";
 import { Home } from "./views/Home";
-import { Playlists, PlaylistView } from "./views/Playlists";
-import { Queue } from "./views/Queue";
+import { LibraryPage, SidebarLibrary } from "./views/Library";
+import { AlbumPage, ArtistPage, DecadePage, GenrePage, LikedPage, PlaylistPage, Stats } from "./views/Pages";
 import { Search } from "./views/Search";
 import { Settings } from "./views/Settings";
-
-const NAV: { route: Route; label: string; icon: IconName; mobile: boolean }[] = [
-  { route: { name: "home" }, label: "Home", icon: "home", mobile: true },
-  { route: { name: "search", query: "" }, label: "Cerca", icon: "search", mobile: true },
-  { route: { name: "albums" }, label: "Album", icon: "album", mobile: true },
-  { route: { name: "artists" }, label: "Artisti", icon: "artist", mobile: true },
-  { route: { name: "playlists" }, label: "Playlist", icon: "playlist", mobile: true },
-  { route: { name: "favorites" }, label: "Preferiti", icon: "heart", mobile: false },
-  { route: { name: "queue" }, label: "Coda", icon: "queue", mobile: false },
-  { route: { name: "settings" }, label: "Impostazioni", icon: "settings", mobile: false },
-];
-
-const SECTION: Partial<Record<Route["name"], Route["name"]>> = { album: "albums", artist: "artists", playlist: "playlists" };
 
 function View({ route }: { route: Route }) {
   switch (route.name) {
     case "home":
       return <Home />;
-    case "albums":
-      return <Albums />;
-    case "album":
-      return <AlbumView id={route.id} />;
-    case "artists":
-      return <Artists />;
-    case "artist":
-      return <ArtistView id={route.id} />;
-    case "playlists":
-      return <Playlists />;
-    case "playlist":
-      return <PlaylistView id={route.id} />;
-    case "favorites":
-      return <Favorites />;
     case "search":
       return <Search query={route.query} />;
+    case "library":
+      return <LibraryPage initial={null} />;
+    case "albums":
+      return <LibraryPage initial="albums" />;
+    case "artists":
+      return <LibraryPage initial="artists" />;
+    case "playlists":
+      return <LibraryPage initial="playlists" />;
+    case "album":
+      return <AlbumPage id={route.id} />;
+    case "artist":
+      return <ArtistPage id={route.id} />;
+    case "playlist":
+      return <PlaylistPage id={route.id} />;
+    case "liked":
+      return <LikedPage />;
+    case "genre":
+      return <GenrePage id={route.id} />;
+    case "decade":
+      return <DecadePage id={route.id} />;
+    case "stats":
+      return <Stats />;
     case "queue":
-      return <Queue />;
+      return (
+        <div className="page">
+          <h1>Coda</h1>
+          <QueueList />
+        </div>
+      );
     case "settings":
       return <Settings />;
   }
 }
 
-function useShortcuts() {
+function useShortcuts(openFull: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
@@ -78,59 +74,105 @@ function useShortcuts() {
       } else if (e.key === "/") {
         e.preventDefault();
         navigate({ name: "search", query: "" });
+      } else if (e.key.toLowerCase() === "f") {
+        openFull();
+      } else if (e.key.toLowerCase() === "s") {
+        player.toggleShuffle();
+      } else if (e.key.toLowerCase() === "r") {
+        player.cycleRepeat();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openFull]);
 }
+
+const PANEL_KEY = "baldmusic.panel";
 
 export function App() {
   const client = useClient();
   const route = useRoute();
   const { queue } = usePlayer();
-  const [npOpen, setNpOpen] = useState(false);
-  const closeNp = useCallback(() => setNpOpen(false), []);
-  useShortcuts();
+  const [full, setFull] = useState(false);
+  const [panel, setPanelState] = useState<Panel>(() => {
+    try {
+      return (localStorage.getItem(PANEL_KEY) as Panel) || "now";
+    } catch {
+      return "now";
+    }
+  });
+  const setPanel = (p: Panel) => {
+    setPanelState(p);
+    try {
+      localStorage.setItem(PANEL_KEY, p ?? "");
+    } catch {
+      // ignorato
+    }
+  };
+  const openFull = useCallback(() => setFull(true), []);
+  const closeFull = useCallback(() => setFull(false), []);
+  useShortcuts(openFull);
+
+  useEffect(() => {
+    if (client) void refreshLibrary();
+  }, [client]);
 
   // Ogni cambio pagina riparte dall'alto, come in un'app nativa.
   useEffect(() => {
-    document.querySelector(".content")?.scrollTo(0, 0);
+    document.querySelector(".main")?.scrollTo(0, 0);
   }, [route.name, "id" in route ? route.id : null]);
 
   const song = current(queue);
   useEffect(() => {
-    document.title = song ? `${song.title} · ${song.artist ?? ""} — BaldMusic` : "BaldMusic";
+    document.title = song ? `${song.title} · ${song.artist ?? ""}` : "BaldMusic";
   }, [song]);
 
   if (!client) return <Login />;
 
-  const active = SECTION[route.name] ?? route.name;
+  const at = (name: Route["name"]) => route.name === name || (name === "library" && ["library", "albums", "artists", "playlists"].includes(route.name));
+  const showPanel = !!song && panel !== null;
+
   return (
-    <div className={`app ${song ? "app--playing" : ""}`}>
-      <nav className="side" aria-label="Sezioni">
-        <a className="brand" href="#/">
-          <img src="./icon.svg" alt="" width={32} height={32} /> BaldMusic
-        </a>
-        {NAV.map((n) => (
-          <a key={n.label} className={`side__link ${active === n.route.name ? "is-active" : ""}`} href={href(n.route)}>
-            <Icon name={n.icon} size={22} /> {n.label}
+    <div className={`app ${showPanel ? "app--panel" : ""}`}>
+      <nav className="side" aria-label="Navigazione">
+        <div className="side__box">
+          <a className="brand" href="#/">
+            <img src="./icon.svg" alt="" width={28} height={28} /> BaldMusic
           </a>
-        ))}
+          <a className={`side__link ${at("home") ? "is-active" : ""}`} href="#/">
+            <Icon name="home" /> Home
+          </a>
+          <a className={`side__link ${at("search") ? "is-active" : ""}`} href={href({ name: "search", query: "" })}>
+            <Icon name="search" /> Cerca
+          </a>
+        </div>
+        <div className="side__box side__box--grow">
+          <SidebarLibrary route={route} />
+        </div>
       </nav>
-      <main className="content">
+
+      <main className="main">
+        <div className="topbar">
+          <button className="round-btn" onClick={() => history.back()} aria-label="Indietro"><Icon name="back" size={20} /></button>
+          <button className="round-btn" onClick={() => history.forward()} aria-label="Avanti"><Icon name="back" size={20} className="flip" /></button>
+          <span className="topbar__space" />
+          <a className="round-btn" href={href({ name: "stats" })} title="Le tue statistiche"><Icon name="chart" size={20} /></a>
+          <a className="round-btn" href={href({ name: "settings" })} title="Impostazioni"><Icon name="settings" size={20} /></a>
+        </div>
         <View route={route} />
       </main>
-      <PlayerBar onOpen={() => setNpOpen(true)} />
+
+      {showPanel && <RightPanel panel={panel!} onClose={() => setPanel(null)} />}
+
+      <PlayerBar panel={panel} setPanel={setPanel} onExpand={openFull} />
+
       <nav className="tabs" aria-label="Sezioni">
-        {NAV.filter((n) => n.mobile).map((n) => (
-          <a key={n.label} className={`tabs__link ${active === n.route.name ? "is-active" : ""}`} href={href(n.route)}>
-            <Icon name={n.icon} size={24} />
-            <span>{n.label}</span>
-          </a>
-        ))}
+        <a className={`tabs__link ${at("home") ? "is-active" : ""}`} href="#/"><Icon name="home" /><span>Home</span></a>
+        <a className={`tabs__link ${at("search") ? "is-active" : ""}`} href={href({ name: "search", query: "" })}><Icon name="search" /><span>Cerca</span></a>
+        <a className={`tabs__link ${at("library") ? "is-active" : ""}`} href={href({ name: "library" })}><Icon name="library" /><span>La tua libreria</span></a>
       </nav>
-      {npOpen && <NowPlaying onClose={closeNp} />}
+
+      {full && <FullPlayer onClose={closeFull} />}
     </div>
   );
 }
