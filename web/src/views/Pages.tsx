@@ -3,6 +3,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, Hero, LikedArt, PlayButton, PlaylistPicker, startRadio, TrackTable, useCoverColor } from "../components/Ui";
+import { albumYear, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
 import { deletePlaylist, renamePlaylist, useLibrary } from "../lib/library";
@@ -115,10 +116,9 @@ export function ArtistPage({ id }: { id: string }) {
     const c = getClient()!;
     const artist = await c.artist(id);
     const top = await c.topSongs(artist.name, 10);
-    // Un "album" con un solo brano è quasi sempre un tag sbagliato o un singolo:
-    // non va in discografia, si elenca tra i brani sparsi.
-    const all = [...(artist.album ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-    const singlesAlbums = all.filter((a) => (a.songCount ?? 2) <= 1);
+    // Singoli e album di cui c'è un brano solo non vanno in discografia: si elencano tra i brani sparsi.
+    const all = [...(artist.album ?? [])].sort((a, b) => albumYear(b) - albumYear(a));
+    const singlesAlbums = all.filter((a) => !isRealAlbum(a));
     const singles = (await songsOf(singlesAlbums.map((a) => a.id))).sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.title.localeCompare(b.title));
     return { artist, top, singles };
   }, [id]);
@@ -127,8 +127,8 @@ export function ArtistPage({ id }: { id: string }) {
   if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorState message={error ?? "Artista non trovato"} onRetry={reload} />;
   const { artist, top, singles } = data;
-  const allAlbums = [...(artist.album ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-  const albums = allAlbums.filter((a) => (a.songCount ?? 2) > 1);
+  const allAlbums = [...(artist.album ?? [])].sort((a, b) => albumYear(b) - albumYear(a));
+  const albums = allAlbums.filter(isRealAlbum);
   const playAll = async (shuffle: boolean) => {
     const c = getClient()!;
     const full = await Promise.all(albums.map((a) => c.album(a.id)));

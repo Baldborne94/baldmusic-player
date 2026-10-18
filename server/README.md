@@ -94,5 +94,6 @@ In auto il telefono usa i dati mobili: lascia Tailscale attivo in background (*I
 | "Wrong username or password" | Credenziali diverse da quelle create su <http://localhost:4533> |
 | La libreria è vuota | Cartella sbagliata in `MusicFolder`, oppure la scansione non è ancora finita |
 | Tanti album da un brano solo, decenni sbagliati | Tag dei file: segui [Sistemare i tag una volta per tutte](#sistemare-i-tag-una-volta-per-tutte) |
+| Brani che durano 30 secondi esatti | Sono anteprime, non la canzone intera: chi li ha scaricati ha preso solo il pezzo di prova. Vanno riscaricati; Picard di solito non riesce ad abbinarli |
 | L'app web non si collega ma quella Android sì | L'app web vuole l'indirizzo `https://…ts.net` (o `http://localhost:4533` sul PC stesso), non `http://192.168…` |
 | Chrome chiede di "accedere ad altre app e servizi su questo dispositivo" | È la richiesta per raggiungere Navidrome su `localhost`: rispondi *Consenti* |

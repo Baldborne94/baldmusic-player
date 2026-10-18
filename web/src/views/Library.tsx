@@ -3,6 +3,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, LikedArt, PlaylistCards } from "../components/Ui";
+import { isRealAlbum } from "../lib/albums";
 import { createPlaylist, useLibrary } from "../lib/library";
 import { href, type Route } from "../lib/router";
 import { getClient } from "../lib/session";
@@ -105,8 +106,8 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
   const lib = useLibrary();
   const [filter, setFilter] = useState<Filter>(initial ?? "playlists");
   const [sort, setSort] = useState<AlbumListType>("alphabeticalByName");
-  // Un "album" con un solo brano è quasi sempre un tag sbagliato (o un singolo): sta sotto l'artista, non qui.
-  const albums = useLoad(async () => (filter === "albums" ? (await getClient()!.albumList(sort, 500)).filter((a) => (a.songCount ?? 2) > 1) : ([] as Album[])), [filter, sort]);
+  // Singoli e album di cui c'è un brano solo stanno sotto l'artista, non qui.
+  const albums = useLoad(async () => (filter === "albums" ? (await getClient()!.albumList(sort, 500)).filter(isRealAlbum) : ([] as Album[])), [filter, sort]);
   const artists = useLoad(() => (filter === "artists" ? getClient()!.artists() : Promise.resolve([])), [filter]);
   const likedAsPlaylist = useMemo(() => lib.likedSongs, [lib.likedSongs]);
 

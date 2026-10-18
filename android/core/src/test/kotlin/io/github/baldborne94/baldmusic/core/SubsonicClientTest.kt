@@ -85,6 +85,23 @@ class SubsonicClientTest {
     }
 
     @Test
+    fun `legge tipo di uscita e anno originale di Navidrome`() = runTest {
+        reply(
+            """{"subsonic-response":{"status":"ok","albumList2":{"album":[
+              {"id":"a1","name":"Blind","songCount":2,"year":2004,"releaseTypes":["Single"]},
+              {"id":"a2","name":"Issues","songCount":16,"year":2011,"releaseTypes":["Album"],"originalReleaseDate":{"year":1999}},
+              {"id":"a3","name":"Hits","songCount":1}
+            ]}}}""",
+        )
+        val (single, album, one) = client().albumList("newest", 3)
+        assertEquals(false, single.isReal)
+        assertEquals(true, album.isReal)
+        assertEquals(1999, album.shownYear)
+        assertEquals(false, one.isReal)
+        assertEquals(null, one.shownYear)
+    }
+
+    @Test
     fun `lo stream chiede sempre il file originale`() {
         val url = client().streamUrl("s1").toHttpUrl()
         assertEquals("raw", url.queryParameter("format"))

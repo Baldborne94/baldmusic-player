@@ -2,6 +2,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, PlayButton, PlaylistCards, Shelf, LikedArt } from "../components/Ui";
+import { isRealAlbum } from "../lib/albums";
 import { tileGradient } from "../lib/colors";
 import { useLibrary } from "../lib/library";
 import { player } from "../lib/player";
@@ -52,9 +53,8 @@ export function Home() {
       c.genres().catch(() => []),
       Promise.all(DECADES.map((y) => c.albumsByYear(y, y + 9, 1).then((a) => a.length > 0).catch(() => false))),
     ]);
-    // Un "album" con un solo brano è quasi sempre un tag sbagliato: nelle vetrine
-    // del catalogo si mostrano gli album veri; i brani sparsi si trovano sotto l'artista.
-    const real = (a: Album) => (a.songCount ?? 2) > 1;
+    // Nelle vetrine del catalogo si mostrano gli album veri; singoli e brani sparsi si trovano sotto l'artista.
+    const real = isRealAlbum;
     const decades = DECADES.filter((_, i) => decadeHits[i]);
     // I tuoi artisti: quelli degli album che ascolti di più.
     const artists = new Map<string, Artist>();

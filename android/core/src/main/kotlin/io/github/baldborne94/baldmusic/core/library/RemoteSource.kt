@@ -48,7 +48,7 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         }
         ALBUM -> client.album(requireNotNull(id.id)).song.map { songNode(it, id.copy(parent = null)) }
         ARTIST -> {
-            val (real, singles) = client.artist(requireNotNull(id.id)).album.sortedByDescending { it.year ?: 0 }.partition { it.isReal }
+            val (real, singles) = client.artist(requireNotNull(id.id)).album.sortedByDescending { it.shownYear ?: 0 }.partition { it.isReal }
             real.map(::albumNode) + listOfNotNull(
                 singles.takeIf { it.isNotEmpty() }?.let { s ->
                     LibraryNode(MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = s.first().coverArt?.let { "$KEY/$it" })
@@ -73,9 +73,6 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         return r.artist.map(::artistNode) + r.album.map(::albumNode) + r.song.map { songNode(it, null) }
     }
 
-    /** Album con almeno due brani; il resto sono singoli o tag sbagliati. */
-    private val Album.isReal get() = (songCount ?: 2) > 1
-
     /** I brani di tanti piccoli album, pochi alla volta per non intasare il server. */
     private suspend fun songsOf(albums: List<Album>): List<Song> = albums.chunked(6).flatMap { chunk ->
         coroutineScope { chunk.map { a -> async { runCatching { client.album(a.id).song }.getOrDefault(emptyList()) } }.awaitAll() }
@@ -93,7 +90,7 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         subtitle = a.artist,
         artist = a.artist,
         artwork = a.coverArt?.let { "$KEY/$it" },
-        year = a.year,
+        year = a.shownYear,
     )
 
     private fun artistNode(a: Artist) = LibraryNode(

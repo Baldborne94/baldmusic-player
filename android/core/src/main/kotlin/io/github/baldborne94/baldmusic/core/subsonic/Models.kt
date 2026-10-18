@@ -30,7 +30,22 @@ data class Album(
     val songCount: Int? = null,
     val year: Int? = null,
     val song: List<Song> = emptyList(),
-)
+    // OpenSubsonic (Navidrome): tipo di uscita e anno originale, dai tag di Picard.
+    val releaseTypes: List<String> = emptyList(),
+    val originalReleaseDate: ItemDate? = null,
+) {
+    /** L'anno della prima uscita, se Navidrome lo sa; altrimenti quello dell'edizione. */
+    val shownYear: Int? get() = originalReleaseDate?.year?.takeIf { it > 0 } ?: year
+
+    /**
+     * Un album vero, da mettere tra gli album: almeno due brani e non un singolo.
+     * Il resto (singoli, o un brano solo di un disco) sta tra i brani sparsi.
+     */
+    val isReal: Boolean get() = (songCount ?: 2) > 1 && releaseTypes.none { it.equals("single", ignoreCase = true) }
+}
+
+@Serializable
+data class ItemDate(val year: Int? = null, val month: Int? = null, val day: Int? = null)
 
 @Serializable
 data class Artist(

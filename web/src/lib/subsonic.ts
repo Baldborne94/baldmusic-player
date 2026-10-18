@@ -49,6 +49,10 @@ export interface Album {
   playCount?: number;
   created?: string;
   song?: Song[];
+  /** OpenSubsonic (Navidrome): tipo di uscita da MusicBrainz, es. ["Album"], ["Single"]. */
+  releaseTypes?: string[];
+  /** OpenSubsonic (Navidrome): data della prima uscita. */
+  originalReleaseDate?: { year?: number; month?: number; day?: number };
 }
 
 export interface Artist {
