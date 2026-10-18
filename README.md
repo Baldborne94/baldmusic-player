@@ -31,9 +31,21 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
    - **Su altri dispositivi** (tablet, un altro PC) usa l'indirizzo `https://…ts.net` di Tailscale.
    - **Per averla come programma**: in Chrome o Edge clicca l'icona *Installa* (⊕) nella barra degli indirizzi. BaldMusic si apre nella sua finestra, ha l'icona sulla barra delle applicazioni e risponde ai tasti multimediali della tastiera.
 
+## Cosa fa l'app Android
+
+- **Home** con accessi rapidi, ascoltati di recente, i tuoi mix (casuale, preferiti, per decennio, per artista), aggiunti di recente, più ascoltati.
+- **Brani che ti piacciono** e **playlist tue**, che valgono per la musica del telefono e del server.
+- **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci.
+- **Radio** da qualsiasi brano: lui e poi musica simile.
+- **Equalizzatore** con preset, bass boost, spazialità, volume uniforme; **velocità** e **salta i silenzi**.
+- **Timer di spegnimento** (con dissolvenza o a fine brano), **coda** riordinabile, scorri un brano a destra per metterlo in coda.
+- **Le tue statistiche**: minuti ascoltati, artisti, brani e album preferiti.
+- **Widget** per la schermata home, cartelle, decenni, condivisione.
+
 ## In macchina
 
-- Le schede **Telefono** e **Server** raccolgono album, artisti, playlist, preferiti e mix casuale.
+- Le schede **La tua musica**, **Telefono** e **Server** raccolgono preferiti, playlist, album, artisti e mix.
+- Il **cuore** accanto ai comandi aggiunge il brano a quelli che ti piacciono.
 - Toccando un brano parte il suo album (o la sua playlist) da quel punto.
 - La 🔍 cerca in tutte e due le librerie. Funzionano anche i comandi vocali: *"Ok Google, metti Lucio Dalla su BaldMusic"*.
 - Alla riaccensione dell'auto si può riprendere dall'ultimo brano ascoltato.
