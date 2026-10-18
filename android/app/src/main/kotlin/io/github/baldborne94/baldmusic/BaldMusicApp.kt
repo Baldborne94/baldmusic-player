@@ -4,10 +4,14 @@ import android.app.Application
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.library.LibraryTree
 import io.github.baldborne94.baldmusic.core.library.MusicSource
+import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
+import io.github.baldborne94.baldmusic.data.LyricsRepository
+import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.library.LocalSource
+import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -18,6 +22,10 @@ class BaldMusicApp : Application() {
         private set
     lateinit var local: LocalSource
         private set
+    lateinit var userData: UserData
+        private set
+    lateinit var personal: PersonalSource
+        private set
 
     val http: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -26,8 +34,16 @@ class BaldMusicApp : Application() {
             .build()
     }
 
+    val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
+
     /** Un solo albero: lo vedono identico l'app e Android Auto. */
     val tree: LibraryTree by lazy { LibraryTree(::sources) }
+
+    /**
+     * Fine del timer di spegnimento (millis), [SLEEP_END_OF_TRACK] per "a fine
+     * brano", null se spento. Lo gestisce il servizio, l'interfaccia lo mostra.
+     */
+    val sleepTimer = MutableStateFlow<Long?>(null)
 
     private var remote: RemoteSource? = null
     private var remoteCreds: Credentials? = null
@@ -36,9 +52,12 @@ class BaldMusicApp : Application() {
         super.onCreate()
         settings = Settings(this)
         local = LocalSource(this)
+        userData = UserData(this)
+        personal = PersonalSource { userData.value }
     }
 
-    fun sources(): List<MusicSource> = listOfNotNull(local, remoteSource())
+    /** La tua musica per prima: in Android Auto è la prima scheda. */
+    fun sources(): List<MusicSource> = listOfNotNull(personal, local, remoteSource())
 
     @Synchronized
     fun remoteSource(): RemoteSource? {
@@ -51,6 +70,10 @@ class BaldMusicApp : Application() {
     }
 
     fun subsonic(): SubsonicClient? = settings.credentials?.let { SubsonicClient(it, http) }
+
+    companion object {
+        const val SLEEP_END_OF_TRACK = -1L
+    }
 }
 
 val Context.app: BaldMusicApp get() = applicationContext as BaldMusicApp

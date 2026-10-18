@@ -15,17 +15,23 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
 import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSession.MediaItemsWithStartPosition
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
@@ -56,6 +62,8 @@ class PlaybackService : MediaLibraryService() {
     private val tree get() = app.tree
     private val searches = ConcurrentHashMap<String, List<LibraryNode>>()
     private var scrobbleJob: Job? = null
+    private var listenJob: Job? = null
+    private var sleepJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -80,6 +88,18 @@ class PlaybackService : MediaLibraryService() {
         session = MediaLibrarySession.Builder(this, player, LibraryCallback())
             .setSessionActivity(openApp)
             .build()
+
+        // Mi piace, playlist, cronologia: Android Auto rilegge "La tua musica" e il cuore si aggiorna.
+        scope.launch {
+            app.userData.state.drop(1).collect {
+                listOf(PersonalSource.KEY, "${PersonalSource.KEY}/${PersonalSource.LIKED}", "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}",
+                    "${PersonalSource.KEY}/${PersonalSource.RECENT}", "${PersonalSource.KEY}/${PersonalSource.TOP}").forEach { id ->
+                    session.notifyChildrenChanged(id, Int.MAX_VALUE, null)
+                }
+                updateLikeButton()
+            }
+        }
+        scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
 
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
@@ -115,6 +135,13 @@ class PlaybackService : MediaLibraryService() {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             saveLast()
             startScrobble(mediaItem)
+            startListen(mediaItem)
+            updateLikeButton()
+            // Timer "a fine brano": il brano è finito da solo, ci si ferma qui.
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK) {
+                player.pause()
+                app.sleepTimer.value = null
+            }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -146,6 +173,75 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
         }
+    }
+
+    /**
+     * Un ascolto conta dopo 20 secondi: chi salta un brano non lo vuole tra i
+     * "più ascoltati". Il contenitore (album, playlist…) va negli "ascoltati di recente".
+     */
+    private fun startListen(item: MediaItem?) {
+        listenJob?.cancel()
+        if (item == null) return
+        val id = MediaId.parse(item.mediaId) ?: return
+        if (!id.isTrack) return
+        listenJob = scope.launch {
+            var played = 0L
+            while (played < 20_000) {
+                delay(1000)
+                if (player.currentMediaItem?.mediaId != item.mediaId) return@launch
+                if (player.isPlaying) played += 1000
+            }
+            app.userData.recordPlay(item.toTrackRef(), containerOf(item, id.parent))
+        }
+    }
+
+    private suspend fun containerOf(item: MediaItem, parent: MediaId?): ContainerRef? {
+        parent ?: return null
+        if (parent.source == PersonalSource.KEY && parent.kind == PersonalSource.LIKED) {
+            return ContainerRef(parent.toString(), "Brani che ti piacciono", "Playlist", null, LibraryNode.Kind.PLAYLIST.name)
+        }
+        val node = runCatching { tree.node(parent.toString()) }.getOrNull()
+        if (node != null && node.title.isNotBlank() && node.kind != LibraryNode.Kind.SECTION) {
+            return ContainerRef(parent.toString(), node.title, node.subtitle, node.artwork, node.kind.name)
+        }
+        // Un album non ancora elencato: titolo e copertina li ha già il brano.
+        if (parent.kind == "album") {
+            val md = item.mediaMetadata
+            val title = md.albumTitle?.toString() ?: return null
+            return ContainerRef(parent.toString(), title, md.artist?.toString(), item.toTrackRef().artwork, LibraryNode.Kind.ALBUM.name)
+        }
+        return null
+    }
+
+    /** Timer di spegnimento: abbassa piano il volume nell'ultimo tratto, poi pausa. */
+    private fun scheduleSleep(end: Long?) {
+        sleepJob?.cancel()
+        player.volume = 1f
+        if (end == null || end == BaldMusicApp.SLEEP_END_OF_TRACK) return
+        sleepJob = scope.launch {
+            val fade = 10_000L
+            delay((end - System.currentTimeMillis() - fade).coerceAtLeast(0))
+            while (true) {
+                val left = end - System.currentTimeMillis()
+                if (left <= 0) break
+                player.volume = (left.toFloat() / fade).coerceIn(0f, 1f)
+                delay(250)
+            }
+            player.pause()
+            player.volume = 1f
+            app.sleepTimer.value = null
+        }
+    }
+
+    /** Il cuore accanto ai comandi: nella notifica e in Android Auto. */
+    private fun updateLikeButton() {
+        val item = player.currentMediaItem
+        val liked = item != null && app.userData.isLiked(item.mediaId)
+        val button = CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
+            .setDisplayName(if (liked) "Togli da Mi piace" else "Mi piace")
+            .setSessionCommand(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
+            .build()
+        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(button))
     }
 
     private fun rootItem(id: String) = MediaItem.Builder()
@@ -180,6 +276,28 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private inner class LibraryCallback : MediaLibrarySession.Callback {
+
+        override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+                .add(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(commands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            if (customCommand.customAction == CMD_TOGGLE_LIKE) {
+                player.currentMediaItem?.let { app.userData.toggleLike(it.toTrackRef()) }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            return super.onCustomCommand(session, controller, customCommand, args)
+        }
 
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
@@ -322,5 +440,6 @@ class PlaybackService : MediaLibraryService() {
 
     companion object {
         private const val RECENT_ROOT = "recent"
+        const val CMD_TOGGLE_LIKE = "io.github.baldborne94.baldmusic.TOGGLE_LIKE"
     }
 }

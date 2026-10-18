@@ -69,4 +69,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.10.2")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    // Colori delle copertine per sfondi e mini-player.
+    implementation("androidx.palette:palette-ktx:1.0.0")
 }

@@ -35,6 +35,10 @@ class LocalSource(private val context: Context) : MusicSource {
         /** MediaStore codifica disco e traccia insieme: 2005 = disco 2, traccia 5. */
         val track: Int,
         val year: Int,
+        /** Secondi dall'epoch in cui il file è arrivato sul telefono. */
+        val dateAdded: Long,
+        /** Cartella che contiene il file, es. "Music/Queen". */
+        val folder: String,
     )
 
     @Volatile private var cached: Pair<Long, List<Song>>? = null
@@ -51,10 +55,13 @@ class LocalSource(private val context: Context) : MusicSource {
             return listOf(LibraryNode("$KEY/permission", "Apri BaldMusic sul telefono e consenti l'accesso alla musica", Kind.MESSAGE))
         }
         return listOf(
+            section(RECENT, "Aggiunti di recente", grid = true),
             section(ALBUMS, "Album", grid = true),
             section(ARTISTS, "Artisti"),
             section(SONGS, "Tutti i brani"),
             section(SHUFFLE, "Mix casuale"),
+            section(DECADES, "Decenni"),
+            section(FOLDERS, "Cartelle"),
         )
     }
 
@@ -65,7 +72,32 @@ class LocalSource(private val context: Context) : MusicSource {
         if (!hasPermission()) return@withContext emptyList()
         val all = songs()
         when (id.kind) {
+            RECENT -> {
+                val newest = all.groupBy { it.albumId }.mapValues { (_, t) -> t.maxOf { it.dateAdded } }
+                albums(all).sortedByDescending { newest[MediaId.parse(it.mediaId)?.id?.toLongOrNull()] ?: 0 }.take(60)
+            }
             ALBUMS -> albums(all).sortedBy { it.title.lowercase() }
+            DECADES -> all.filter { it.year > 0 }.groupBy { it.year / 10 * 10 }.toSortedMap(compareByDescending { it }).map { (decade, tracks) ->
+                LibraryNode(MediaId(KEY, DECADE, "$decade").toString(), decadeName(decade), Kind.SECTION, subtitle = count(tracks.size))
+            }
+            DECADE -> {
+                val decade = id.id?.toIntOrNull() ?: return@withContext emptyList()
+                all.filter { it.year / 10 * 10 == decade }
+                    .sortedWith(compareBy({ it.artist?.lowercase() }, { it.year }, { it.album?.lowercase() }, { it.track }))
+                    .map { it.node(id.copy(parent = null)) }
+            }
+            FOLDERS -> all.groupBy { it.folder }.toSortedMap(String.CASE_INSENSITIVE_ORDER).map { (folder, tracks) ->
+                LibraryNode(
+                    MediaId(KEY, FOLDER, folder).toString(),
+                    folder.substringAfterLast('/').ifEmpty { folder },
+                    Kind.FOLDER,
+                    subtitle = "${folder.substringBeforeLast('/', "")}${if (folder.contains('/')) " · " else ""}${count(tracks.size)}",
+                    artwork = "$KEY/${tracks.first().albumId}",
+                )
+            }
+            FOLDER -> all.filter { it.folder == id.id }
+                .sortedWith(compareBy({ it.album?.lowercase() }, { it.track / 1000 }, { it.track % 1000 }, { it.title.lowercase() }))
+                .map { it.node(id.copy(parent = null)) }
             ARTISTS -> artists(all)
             SONGS -> all.sortedBy { it.title.lowercase() }.map { it.node(MediaId(KEY, SONGS)) }
             SHUFFLE -> {
@@ -144,6 +176,8 @@ class LocalSource(private val context: Context) : MusicSource {
         discNumber = (track / 1000).takeIf { it > 0 },
         year = year.takeIf { it > 0 },
         streamUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString(),
+        albumId = MediaId(KEY, ALBUM, "$albumId").toString(),
+        artistId = MediaId(KEY, ARTIST, "$artistId").toString(),
     )
 
     /** Tutti i brani, riletti al massimo ogni 30 secondi (Auto chiede le liste a pagine). */
@@ -165,6 +199,9 @@ class LocalSource(private val context: Context) : MusicSource {
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.TRACK,
             MediaStore.Audio.Media.YEAR,
+            MediaStore.Audio.Media.DATE_ADDED,
+            // Deprecato ma ancora leggibile: è l'unico modo, su ogni versione, per sapere la cartella.
+            MediaStore.Audio.Media.DATA,
         )
         val where = listOfNotNull("${MediaStore.Audio.Media.IS_MUSIC} != 0", selection).joinToString(" AND ") { "($it)" }
         val out = ArrayList<Song>()
@@ -180,6 +217,8 @@ class LocalSource(private val context: Context) : MusicSource {
                     durationMs = c.getLong(6),
                     track = c.getInt(7),
                     year = c.getInt(8),
+                    dateAdded = c.getLong(9),
+                    folder = folderOf(c.getString(10)),
                 )
             }
         }
@@ -188,12 +227,27 @@ class LocalSource(private val context: Context) : MusicSource {
 
     companion object {
         const val KEY = "local"
+        const val RECENT = "recent"
+        const val DECADES = "decades"
+        const val DECADE = "decade"
+        const val FOLDERS = "folders"
+        const val FOLDER = "folder"
         const val ALBUMS = "albums"
         const val ARTISTS = "artists"
         const val SONGS = "songs"
         const val SHUFFLE = "shuffle"
         const val ALBUM = "album"
         const val ARTIST = "artist"
+
+        private fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"
+
+        private fun decadeName(decade: Int) = if (decade >= 2000) "Anni $decade" else "Anni ${decade % 100}"
+
+        /** "/storage/emulated/0/Music/Queen/01.mp3" → "Music/Queen". */
+        private fun folderOf(path: String?): String {
+            val dir = path?.substringBeforeLast('/', "") ?: return "Sconosciuta"
+            return dir.replace(Regex("^/storage/(emulated/\\d+|[^/]+)/?"), "").ifEmpty { "Memoria interna" }
+        }
 
         /** Segnaposto che MediaStore usa quando il tag manca. */
         private const val UNKNOWN = "<unknown>"

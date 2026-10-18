@@ -18,8 +18,11 @@ data class LibraryNode(
     val streamUri: String? = null,
     /** Come mostrare i figli: a griglia (album) o a lista (brani). */
     val gridChildren: Boolean = false,
+    /** Per i brani: dove portano "Vai all'album" e "Vai all'artista". */
+    val albumId: String? = null,
+    val artistId: String? = null,
 ) {
-    enum class Kind { SOURCE, SECTION, ALBUM, ARTIST, PLAYLIST, TRACK, MESSAGE }
+    enum class Kind { SOURCE, SECTION, ALBUM, ARTIST, PLAYLIST, FOLDER, TRACK, MESSAGE }
 
     val playable get() = kind == Kind.TRACK
     val browsable get() = kind != Kind.TRACK && kind != Kind.MESSAGE
@@ -36,4 +39,13 @@ interface MusicSource {
     /** Un brano completo di streamUri, o null se non esiste più. */
     suspend fun track(id: MediaId): LibraryNode?
     suspend fun search(query: String): List<LibraryNode>
+
+    /** Un contenitore per ID, se la sorgente lo sa costruire senza elencare il genitore. */
+    suspend fun node(id: MediaId): LibraryNode? = null
+
+    /**
+     * false per le sorgenti i cui elenchi cambiano a ogni ascolto (preferiti,
+     * cronologia): leggerle costa niente e una cache le mostrerebbe vecchie.
+     */
+    val cacheable: Boolean get() = true
 }
