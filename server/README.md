@@ -51,7 +51,13 @@ Lo fa in automatico **[MusicBrainz Picard](https://picard.musicbrainz.org/)**, g
 3. In alto premi **Raggruppa** (Cluster), poi **Scansiona** (Scan): Picard ascolta i file e li abbina agli album giusti. Con molte canzoni ci vuole qualche minuto.
 4. Sulla destra compaiono gli album ricostruiti. Quelli **dorati** sono completi; apri a campione un paio di quelli con il punto rosso o arancione per controllare che l'abbinamento sia giusto (succede con i remix o le versioni live).
 5. Seleziona tutto e premi **Salva**. Picard riscrive i tag dentro ai file: la musica non si sposta e non si perde nulla.
-6. In Navidrome: in alto a destra, menu utente → **Attività → Scansione completa** (oppure aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
+6. In Navidrome: in alto a destra, l'icona *Attività* (la linea a zig-zag) → **Scansione completa** (oppure aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
+
+Due accorgimenti che evitano i casi più comuni:
+
+- **Niente raccolte né singoli.** In *Opzioni → Metadati → Pubblicazioni preferite* lascia solo *Album* tra i preferiti e metti *Raccolta*, *Singolo*, *Dal vivo* e *Remix* tra gli scoraggiati. Senza, un brano scaricato da solo finisce nel primo "Greatest Hits" che lo contiene.
+- **Mai *Cerca* su tutto.** *Cerca* abbina per titolo, non per audio, e con titoli generici sbaglia artista. Usalo solo dopo *Analizza*, sui file rimasti, con *Opzioni → Avanzate → Corrispondenze → Similarità minima per la ricerca dei file* almeno al 90%.
+- **Lo stesso album due volte.** Se in Navidrome un disco compare sdoppiato (due *Mezmerize* con la stessa copertina), Picard ha abbinato brani diversi a edizioni diverse. Aggiungi `GroupAlbumReleases = true` nella sezione `[Scanner]` di `navidrome.toml` (vedi l'esempio) e riavvia il servizio: le edizioni si fondono in una scheda sola.
 
 Se un brano resta non riconosciuto (cover amatoriali, registrazioni proprie), selezionalo e digita tu album e anno nel pannello in basso: anche quello si salva nel file.
 
