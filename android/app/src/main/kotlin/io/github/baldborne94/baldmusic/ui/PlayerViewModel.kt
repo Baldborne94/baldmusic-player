@@ -249,6 +249,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun removeFromPlaylist(playlistId: String, item: MediaItem) = app.userData.removeFromPlaylist(playlistId, item.mediaId)
     fun renamePlaylist(playlistId: String, name: String) = app.userData.renamePlaylist(playlistId, name)
     fun deletePlaylist(playlistId: String) = app.userData.deletePlaylist(playlistId)
+
+    /** Raccolta eliminata insieme ai suoi file: se la cartella si riempie di nuovo, torna. */
+    fun deleteCollectionWithFiles(playlistId: String) = app.userData.deletePlaylist(playlistId, ignoreFolder = false)
+
+    /** Dopo che i file sono finiti nel cestino: via dalla coda, dalla tua musica e dalla libreria. */
+    fun forgetTrashed(items: List<MediaItem>) {
+        val gone = items.mapTo(HashSet()) { UserLibrary.baseId(it.mediaId) }
+        queue.indices.reversed().filter { UserLibrary.baseId(queue[it].mediaId) in gone }.forEach { removeAt(it) }
+        app.userData.forgetTracks(gone)
+        app.local.invalidate()
+        app.settings.touch()
+    }
     fun addSearch(query: String) = app.userData.addSearch(query)
     fun clearSearches() = app.userData.clearSearches()
 

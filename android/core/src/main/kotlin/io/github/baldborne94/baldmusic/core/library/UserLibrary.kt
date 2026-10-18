@@ -121,9 +121,14 @@ data class UserLibrary(
     fun renamePlaylist(id: String, name: String) =
         copy(playlists = playlists.map { if (it.id == id && name.isNotBlank()) it.copy(name = name.trim()) else it })
 
-    fun deletePlaylist(id: String) = copy(
+    /**
+     * Toglie una playlist o una raccolta. Una raccolta eliminata non si ricrea dalla sua
+     * cartella, tranne con [ignoreFolder] = false: quando se ne sono buttati anche i file,
+     * la cartella resta vuota e, se un giorno si riempie, torna giusto che riappaia.
+     */
+    fun deletePlaylist(id: String, ignoreFolder: Boolean = true) = copy(
         playlists = playlists.filterNot { it.id == id },
-        ignoredFolders = ignoredFolders + listOfNotNull(playlists.firstOrNull { it.id == id }?.folder),
+        ignoredFolders = if (!ignoreFolder) ignoredFolders else ignoredFolders + listOfNotNull(playlists.firstOrNull { it.id == id }?.folder),
         recent = recent.filterNot { it.id == MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, id).toString() },
     )
 
@@ -150,6 +155,17 @@ data class UserLibrary(
             }
         },
     )
+
+    /** Brani i cui file sono stati buttati: spariscono da preferiti, playlist, raccolte e ascolti. */
+    fun forgetTracks(trackIds: Collection<String>): UserLibrary {
+        val gone = trackIds.mapTo(HashSet(), ::baseId)
+        if (gone.isEmpty()) return this
+        return copy(
+            liked = liked.filterNot { it.id in gone },
+            playlists = playlists.map { pl -> if (pl.tracks.none { it.id in gone }) pl else pl.copy(tracks = pl.tracks.filterNot { it.id in gone }) },
+            plays = plays.filterKeys { it !in gone },
+        )
+    }
 
     fun addSearch(query: String): UserLibrary {
         val q = query.trim()

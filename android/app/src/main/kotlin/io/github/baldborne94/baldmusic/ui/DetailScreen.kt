@@ -107,6 +107,16 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                     onAddAll = { ui.addToPlaylist(tracks) },
                     onRename = if (playlistId != null) ({ renaming = true }) else null,
                     onDelete = if (playlistId != null) ({ confirmDelete = true }) else null,
+                    // Solo le raccolte: buttare i file di una playlist (magari col server dentro) non avrebbe senso.
+                    onTrashAll = ui.trash?.takeIf { isCollection && playlistId != null && tracks.any { localFileUri(it) != null } }?.let { trash ->
+                        {
+                            val files = tracks.filter { localFileUri(it) != null }
+                            trash(files, "Eliminare “$shownTitle” e i suoi ${if (files.size == 1) "brano" else "${files.size} brani"}?") {
+                                vm.deleteCollectionWithFiles(playlistId!!)
+                                ui.back()
+                            }
+                        }
+                    },
                 )
             }
         } else {
@@ -208,6 +218,7 @@ private fun HeroHeader(
     onAddAll: () -> Unit,
     onRename: (() -> Unit)?,
     onDelete: (() -> Unit)?,
+    onTrashAll: (() -> Unit)? = null,
 ) {
     val ui = LocalUi.current
     val kind = node?.kind
@@ -247,12 +258,19 @@ private fun HeroHeader(
             if (tracks.isNotEmpty()) {
                 IconButton(onClick = onAddAll) { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi tutto a una playlist", tint = TextMuted) }
             }
-            if (onRename != null || onDelete != null) {
+            if (onRename != null || onDelete != null || onTrashAll != null) {
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Altro", tint = TextMuted) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         onRename?.let { DropdownMenuItem(text = { Text("Rinomina") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) }, onClick = { menu = false; it() }) }
                         onDelete?.let { DropdownMenuItem(text = { Text("Elimina") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) }, onClick = { menu = false; it() }) }
+                        onTrashAll?.let {
+                            DropdownMenuItem(
+                                text = { Text("Elimina raccolta e brani dal telefono", color = Danger) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = Danger) },
+                                onClick = { menu = false; it() },
+                            )
+                        }
                     }
                 }
             }

@@ -80,6 +80,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Raccolte dalle cartelle**: ogni cartella in cui hai organizzato la musica sul telefono è una raccolta modificabile (aggiungi, togli, rinomina, elimina), che si aggiorna da sola quando arrivano file nuovi.
 
+- [x] **Eliminare dal telefono**: un brano o una raccolta intera finiscono nel cestino di Android (recuperabili per 30 giorni), con doppia conferma; spariscono da raccolte, preferiti e playlist.
+
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).
