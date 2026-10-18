@@ -22,7 +22,8 @@ private class FakeSource : MusicSource {
         calls++
         return when (id.kind) {
             "albums" -> listOf(LibraryNode(album.toString(), "Disco", Kind.ALBUM))
-            "artist" -> listOf(LibraryNode(album.toString(), "Disco", Kind.ALBUM))
+            "artist" -> listOf(LibraryNode(album.toString(), "Disco", Kind.ALBUM), LibraryNode("local/artistsingles/1", "Singoli", Kind.SECTION))
+            "artistsingles" -> listOf(track(9, MediaId("local", "artistsingles", "1")))
             "album" -> (1..4).map { track(it, album) }
             else -> emptyList()
         }
@@ -56,9 +57,9 @@ class LibraryTreeTest {
     }
 
     @Test
-    fun `un artista si riproduce scendendo negli album`() = runTest {
+    fun `un artista si riproduce scendendo negli album e nei singoli`() = runTest {
         val (queue, _) = tree.queueFor("local/artist/1")
-        assertEquals(4, queue.size)
+        assertEquals(5, queue.size)
     }
 
     @Test

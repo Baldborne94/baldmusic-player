@@ -17,7 +17,7 @@ Servono tre passi, da fare una volta sola.
 
 Se oggi la musica è solo sul telefono, collega il telefono al PC col cavo USB e copia la cartella `Music` (o dove tieni i file) in una cartella del PC, ad esempio `C:\Users\<tuo-utente>\Music`.
 
-I tag (titolo, artista, album) e le copertine vengono letti dai file. Se un album appare con il nome sbagliato, il problema è nei tag del file. [MusicBrainz Picard](https://picard.musicbrainz.org/) li sistema in automatico.
+I tag (titolo, artista, album, anno) e le copertine vengono letti **dai file**: l'app mostra quello che c'è scritto dentro. Se i brani di un album compaiono come tanti album separati, o un brano del 2005 finisce negli "Anni 70", il problema è nei tag, non nell'app. Vedi [Sistemare i tag una volta per tutte](#sistemare-i-tag-una-volta-per-tutte): bastano dieci minuti e vale per telefono, PC e auto.
 
 ## 2. Installa Navidrome
 
@@ -39,6 +39,21 @@ Usa [`docker-compose.yml`](docker-compose.yml): cambia il percorso della musica 
 ### Conversione per la rete mobile (facoltativa)
 
 Se installi [ffmpeg](https://www.gyan.dev/ffmpeg/builds/) sul PC, Navidrome può convertire i brani al volo a un bitrate più basso. Nell'app Android lo scegli in *Impostazioni → Qualità in streaming* e consumi meno dati in macchina.
+
+## Sistemare i tag una volta per tutte
+
+Molti file scaricati da internet hanno il campo **album** uguale al titolo della canzone e un **anno** a caso. Il risultato è una libreria piena di "album" da un brano solo, con la copertina giusta ma il nome sbagliato, e decenni che non tornano. BaldMusic raccoglie questi brani sotto l'artista in *Singoli e brani sparsi*, ma il modo giusto per avere album completi, in ordine e con l'anno corretto è correggere i file.
+
+Lo fa in automatico **[MusicBrainz Picard](https://picard.musicbrainz.org/)**, gratuito e open source: riconosce ogni brano **dall'audio** (impronta acustica), non dal nome del file, e scrive nei tag artista, album, numero di traccia, anno e copertina presi dal database MusicBrainz.
+
+1. Installa Picard e aprilo. In *Opzioni → Opzioni → Copertine* spunta **Incorpora le copertine nei tag**.
+2. Trascina nella finestra la cartella della musica (la stessa di Navidrome).
+3. In alto premi **Raggruppa** (Cluster), poi **Scansiona** (Scan): Picard ascolta i file e li abbina agli album giusti. Con molte canzoni ci vuole qualche minuto.
+4. Sulla destra compaiono gli album ricostruiti. Quelli **dorati** sono completi; apri a campione un paio di quelli con il punto rosso o arancione per controllare che l'abbinamento sia giusto (succede con i remix o le versioni live).
+5. Seleziona tutto e premi **Salva**. Picard riscrive i tag dentro ai file: la musica non si sposta e non si perde nulla.
+6. In Navidrome: in alto a destra, menu utente → **Attività → Scansione completa** (oppure aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
+
+Se un brano resta non riconosciuto (cover amatoriali, registrazioni proprie), selezionalo e digita tu album e anno nel pannello in basso: anche quello si salva nel file.
 
 ## 3. Raggiungilo da fuori casa con Tailscale
 
@@ -76,6 +91,6 @@ In auto il telefono usa i dati mobili: lascia Tailscale attivo in background (*I
 | "Server non raggiungibile" | PC spento o in sospensione, oppure Tailscale spento sul telefono |
 | "Wrong username or password" | Credenziali diverse da quelle create su <http://localhost:4533> |
 | La libreria è vuota | Cartella sbagliata in `MusicFolder`, oppure la scansione non è ancora finita |
-| Album spezzati o senza copertina | Tag dei file incompleti: sistemali con MusicBrainz Picard |
+| Tanti album da un brano solo, decenni sbagliati | Tag dei file: segui [Sistemare i tag una volta per tutte](#sistemare-i-tag-una-volta-per-tutte) |
 | L'app web non si collega ma quella Android sì | L'app web vuole l'indirizzo `https://…ts.net` (o `http://localhost:4533` sul PC stesso), non `http://192.168…` |
 | Chrome chiede di "accedere ad altre app e servizi su questo dispositivo" | È la richiesta per raggiungere Navidrome su `localhost`: rispondi *Consenti* |

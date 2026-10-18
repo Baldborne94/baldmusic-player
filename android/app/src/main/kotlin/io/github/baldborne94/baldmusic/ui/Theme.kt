@@ -69,14 +69,25 @@ fun BaldMusicTheme(content: @Composable () -> Unit) {
 
 val SectionTitle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp)
 
-/** Colori fissi per mix e categorie, scelti da una stringa così restano stabili. */
+/**
+ * Le sfumature di mix e categorie: una tavolozza sola, intonata all'accento
+ * dell'app, scelta da una stringa così la stessa tessera ha sempre lo stesso colore.
+ * È la stessa dell'app web (web/src/lib/colors.ts).
+ */
 private val Tiles = listOf(
-    Color(0xFFE13300), Color(0xFF1E3264), Color(0xFF8D67AB), Color(0xFF148A08), Color(0xFFBA5D07),
-    Color(0xFF503750), Color(0xFF0D73EC), Color(0xFFDC148C), Color(0xFF477D95), Color(0xFF7358FF),
-    Color(0xFFE8115B), Color(0xFF27856A),
+    Color(0xFFFF7A59) to Color(0xFFE0245E),
+    Color(0xFF7C3AED) to Color(0xFFC026D3),
+    Color(0xFF0EA5E9) to Color(0xFF2563EB),
+    Color(0xFF10B981) to Color(0xFF0F766E),
+    Color(0xFFF59E0B) to Color(0xFFDC2626),
+    Color(0xFF6366F1) to Color(0xFF9333EA),
+    Color(0xFF14B8A6) to Color(0xFF0369A1),
+    Color(0xFFF43F5E) to Color(0xFF9F1239),
 )
 
-fun tileColor(key: String): Color = Tiles[(key.hashCode() and Int.MAX_VALUE) % Tiles.size]
+fun tileColors(key: String): Pair<Color, Color> = Tiles[(key.hashCode() and Int.MAX_VALUE) % Tiles.size]
+fun tileColor(key: String): Color = tileColors(key).first
+fun tileBrush(key: String): Brush = tileColors(key).let { (a, b) -> Brush.linearGradient(listOf(a, b)) }
 
 private val colorCache = HashMap<Uri, Color>()
 

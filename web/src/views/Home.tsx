@@ -2,7 +2,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, PlayButton, PlaylistCards, Shelf, LikedArt } from "../components/Ui";
-import { tileColor } from "../lib/colors";
+import { tileGradient } from "../lib/colors";
 import { useLibrary } from "../lib/library";
 import { player } from "../lib/player";
 import { href } from "../lib/router";
@@ -27,10 +27,9 @@ export interface Mix {
 const DECADES = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
 export function MixCard({ mix }: { mix: Mix }) {
-  const color = tileColor(mix.id);
   return (
     <div className="mix">
-      <div className="mix__art" style={{ background: `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 45%, black))` }}>
+      <div className="mix__art" style={{ background: tileGradient(mix.id) }}>
         <span className="mix__title">{mix.title}</span>
         <span className="mix__play">
           <PlayButton id={mix.id} size={46} onPlay={async () => player.play(await mix.load(), 0, false, { label: mix.title, id: mix.id })} />
@@ -45,19 +44,24 @@ export function Home() {
   const lib = useLibrary();
   const { data, error, loading, reload } = useLoad(async () => {
     const c = getClient()!;
-    const [recent, newest, frequent, random, genres] = await Promise.all([
+    const [recent, newest, frequent, random, genres, decadeHits] = await Promise.all([
       c.albumList("recent", 20),
-      c.albumList("newest", 20),
+      c.albumList("newest", 40),
       c.albumList("frequent", 30),
-      c.albumList("random", 20),
+      c.albumList("random", 40),
       c.genres().catch(() => []),
+      Promise.all(DECADES.map((y) => c.albumsByYear(y, y + 9, 1).then((a) => a.length > 0).catch(() => false))),
     ]);
+    // Un "album" con un solo brano è quasi sempre un tag sbagliato: nelle vetrine
+    // del catalogo si mostrano gli album veri; i brani sparsi si trovano sotto l'artista.
+    const real = (a: Album) => (a.songCount ?? 2) > 1;
+    const decades = DECADES.filter((_, i) => decadeHits[i]);
     // I tuoi artisti: quelli degli album che ascolti di più.
     const artists = new Map<string, Artist>();
     for (const a of frequent) {
       if (a.artistId && !artists.has(a.artistId)) artists.set(a.artistId, { id: a.artistId, name: a.artist ?? "", coverArt: `ar-${a.artistId}` });
     }
-    return { recent, newest, frequent, random, genres, artists: [...artists.values()].slice(0, 12) };
+    return { recent, newest: newest.filter(real).slice(0, 20), frequent, random: random.filter(real).slice(0, 20), genres, decades, artists: [...artists.values()].slice(0, 12) };
   }, []);
 
   if (loading && !data) return <Loading />;
@@ -70,7 +74,7 @@ export function Home() {
     { id: "mix/random", title: "Mix casuale", subtitle: "Tutta la tua musica, mescolata", load: () => c.randomSongs(80) },
     ...(lib.likedSongs.length ? [{ id: "mix/liked", title: "Preferiti in shuffle", subtitle: "I brani che ti piacciono", load: async () => [...lib.likedSongs].sort(() => Math.random() - 0.5) }] : []),
     ...d.genres.slice(0, 4).map((g) => ({ id: `mix/genre/${g.value}`, title: `Mix ${g.value}`, subtitle: `${g.songCount ?? ""} brani di ${g.value}`, load: () => c.randomSongs(60, { genre: g.value }) })),
-    ...DECADES.map((y) => ({ id: `mix/decade/${y}`, title: `Anni ${y >= 2000 ? y : y % 100}`, subtitle: `Musica dal ${y} al ${y + 9}`, load: () => c.randomSongs(60, { fromYear: y, toYear: y + 9 }) })),
+    ...d.decades.map((y) => ({ id: `mix/decade/${y}`, title: `Anni ${y >= 2000 ? y : y % 100}`, subtitle: `Musica dal ${y} al ${y + 9}`, load: () => c.randomSongs(60, { fromYear: y, toYear: y + 9 }) })),
   ];
 
   return (

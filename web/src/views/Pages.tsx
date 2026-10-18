@@ -99,28 +99,45 @@ export function AlbumPage({ id }: { id: string }) {
   );
 }
 
+/** I brani di tanti piccoli album, pochi alla volta per non intasare il server. */
+async function songsOf(albumIds: string[]): Promise<Song[]> {
+  const c = getClient()!;
+  const out: Song[] = [];
+  for (let i = 0; i < albumIds.length; i += 6) {
+    const chunk = await Promise.all(albumIds.slice(i, i + 6).map((aid) => c.album(aid).then((a) => a.song ?? []).catch(() => [] as Song[])));
+    out.push(...chunk.flat());
+  }
+  return out;
+}
+
 export function ArtistPage({ id }: { id: string }) {
   const { data, error, loading, reload } = useLoad(async () => {
     const c = getClient()!;
     const artist = await c.artist(id);
     const top = await c.topSongs(artist.name, 10);
-    return { artist, top };
+    // Un "album" con un solo brano è quasi sempre un tag sbagliato o un singolo:
+    // non va in discografia, si elenca tra i brani sparsi.
+    const all = [...(artist.album ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+    const singlesAlbums = all.filter((a) => (a.songCount ?? 2) <= 1);
+    const singles = (await songsOf(singlesAlbums.map((a) => a.id))).sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || a.title.localeCompare(b.title));
+    return { artist, top, singles };
   }, [id]);
   const color = useCoverColor(data?.artist.coverArt ?? `ar-${id}`, data?.artist.name ?? id);
   const [all, setAll] = useState(false);
   if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorState message={error ?? "Artista non trovato"} onRetry={reload} />;
-  const { artist, top } = data;
-  const albums = [...(artist.album ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+  const { artist, top, singles } = data;
+  const allAlbums = [...(artist.album ?? [])].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+  const albums = allAlbums.filter((a) => (a.songCount ?? 2) > 1);
   const playAll = async (shuffle: boolean) => {
     const c = getClient()!;
     const full = await Promise.all(albums.map((a) => c.album(a.id)));
-    const songs = full.flatMap((a) => a.song ?? []);
+    const songs = [...full.flatMap((a) => a.song ?? []), ...singles];
     player.play(songs, shuffle ? Math.floor(Math.random() * songs.length) : 0, shuffle, { label: artist.name, id: `artist/${artist.id}` });
   };
   return (
     <Gradient color={color}>
-      <Hero color={color} round art={<Cover id={artist.coverArt ?? `ar-${artist.id}`} size={600} round />} kind="Artista" title={artist.name} meta={plural(albums.length, "album", "album")} />
+      <Hero color={color} round art={<Cover id={artist.coverArt ?? `ar-${artist.id}`} size={600} round />} kind="Artista" title={artist.name} meta={[albums.length ? plural(albums.length, "album", "album") : null, singles.length ? plural(singles.length, "singolo", "singoli") : null].filter(Boolean).join(" • ") || "Artista"} />
       <div className="action-bar">
         <PlayButton id={`artist/${artist.id}`} onPlay={() => playAll(false)} />
         <button className="icon-btn icon-btn--lg" title="Casuale" onClick={() => playAll(true)}>
@@ -141,10 +158,18 @@ export function ArtistPage({ id }: { id: string }) {
           )}
         </section>
       )}
-      <section className="shelf">
-        <header className="shelf__head"><h2>Discografia</h2></header>
-        <AlbumCards albums={albums} />
-      </section>
+      {albums.length > 0 && (
+        <section className="shelf">
+          <header className="shelf__head"><h2>Discografia</h2></header>
+          <AlbumCards albums={albums} />
+        </section>
+      )}
+      {singles.length > 0 && (
+        <section className="shelf">
+          <header className="shelf__head"><h2>Singoli e brani sparsi</h2></header>
+          <TrackTable songs={singles} from={{ label: artist.name, id: `artist/${artist.id}` }} showAlbum={false} />
+        </section>
+      )}
     </Gradient>
   );
 }

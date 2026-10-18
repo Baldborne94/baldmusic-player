@@ -102,16 +102,6 @@ class PlaybackService : MediaLibraryService() {
         }
         scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
 
-        // Equalizzatore, effetti, velocità: applicati appena cambiano nelle impostazioni.
-        app.audioEffects.attach(player.audioSessionId, app.settings.audio.value)
-        scope.launch {
-            app.settings.audio.collect { prefs ->
-                app.audioEffects.apply(prefs)
-                player.setPlaybackSpeed(prefs.speed)
-                player.skipSilenceEnabled = prefs.skipSilence
-            }
-        }
-
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
             app.settings.changes.drop(1).collect {
@@ -132,7 +122,6 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         saveLast()
         scope.cancel()
-        app.audioEffects.release()
         session.release()
         player.release()
         super.onDestroy()
@@ -154,10 +143,6 @@ class PlaybackService : MediaLibraryService() {
                 player.pause()
                 app.sleepTimer.value = null
             }
-        }
-
-        override fun onAudioSessionIdChanged(audioSessionId: Int) {
-            app.audioEffects.attach(audioSessionId, app.settings.audio.value)
         }
 
         override fun onEvents(player: Player, events: Player.Events) {

@@ -73,8 +73,9 @@ class LibraryTree(
         val nodes = children(mediaId)
         val tracks = nodes.filter { it.playable }
         if (tracks.isNotEmpty()) return tracks.map { resolve(it) }.filterNotNull()
-        // Un artista contiene album: si scende di un livello.
-        return nodes.filter { it.kind == LibraryNode.Kind.ALBUM }
+        // Un artista contiene album e la sezione dei singoli: si scende di un livello.
+        val insideArtist = MediaId.parse(mediaId)?.kind == "artist"
+        return nodes.filter { it.kind == LibraryNode.Kind.ALBUM || (insideArtist && it.kind == LibraryNode.Kind.SECTION) }
             .flatMap { album -> children(album.mediaId).filter { it.playable } }
             .mapNotNull { resolve(it) }
     }

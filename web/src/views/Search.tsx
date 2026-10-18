@@ -3,7 +3,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, PlaylistCards, TrackTable } from "../components/Ui";
-import { tileColor } from "../lib/colors";
+import { tileGradient } from "../lib/colors";
 import { clearSearches, recentSearches, rememberSearch, useLibrary } from "../lib/library";
 import { player } from "../lib/player";
 import { href, navigate } from "../lib/router";
@@ -21,6 +21,12 @@ export function Search({ query }: { query: string }) {
   const [recent, setRecent] = useState(recentSearches);
   const lib = useLibrary();
   const genres = useLoad(() => getClient()!.genres(), []);
+  // Solo i decenni in cui c'è davvero qualcosa.
+  const decades = useLoad(async () => {
+    const c = getClient()!;
+    const hits = await Promise.all(DECADES.map((y) => c.albumsByYear(y, y + 9, 1).then((a) => a.length > 0).catch(() => false)));
+    return DECADES.filter((_, i) => hits[i]);
+  }, []);
 
   // Ricerca mentre scrivi, con una piccola pausa per non martellare il server.
   useEffect(() => {
@@ -97,7 +103,7 @@ export function Search({ query }: { query: string }) {
               <BrowseTile to={href({ name: "artists" })} title="Artisti" />
               <BrowseTile to={href({ name: "playlists" })} title="Playlist" />
               <BrowseTile to={href({ name: "stats" })} title="Le tue statistiche" />
-              {DECADES.map((y) => (
+              {(decades.data ?? []).map((y) => (
                 <BrowseTile key={y} to={href({ name: "decade", id: String(y) })} title={`Anni ${y >= 2000 ? y : y % 100}`} />
               ))}
               {(genres.data ?? []).map((g) => (
@@ -171,7 +177,7 @@ export function Search({ query }: { query: string }) {
 
 function BrowseTile({ to, title }: { to: string; title: string }) {
   return (
-    <a className="browse__tile" href={to} style={{ background: tileColor(title) }}>
+    <a className="browse__tile" href={to} style={{ background: tileGradient(title) }}>
       <span>{title}</span>
       <i />
     </a>

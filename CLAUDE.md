@@ -7,8 +7,11 @@ Player musicale open source personale. Tre pezzi, un'unica libreria:
 - `android/` — app **nativa Kotlin** (Compose + **Media3**). Due sorgenti: MediaStore (file sul telefono) e Navidrome. **Android Auto** arriva da `MediaLibraryService`: le app WebView/Capacitor non sono visibili ad Auto, per questo l'app è nativa.
 
 ## Architettura Android
-- `:core` (JVM puro, testabile senza SDK): `SubsonicClient`, `MediaId`, `LibraryTree`, `RemoteSource`, `UserLibrary` + `PersonalSource` (mi piace, playlist, cronologia), `ListeningStats`, testi (`parseLrc`, `LrcLibClient`), `AudioPrefs`.
-- `:app`: `LocalSource` (MediaStore: album, artisti, cartelle, decenni, radio, mix per artista), `PlaybackService` (ExoPlayer + MediaLibrarySession, cuore in Auto, timer, conteggio ascolti, widget), `AudioEffects` (equalizzatore & co.), `UserData` (JSON della tua musica), `LyricsRepository`, `ArtworkProvider`, `PlayerWidget`, UI Compose stile Spotify (`ui/`).
+- `:core` (JVM puro, testabile senza SDK): `SubsonicClient`, `MediaId`, `LibraryTree`, `RemoteSource`, `UserLibrary` + `PersonalSource` (mi piace, playlist, cronologia), `ListeningStats`, testi (`parseLrc`, `LrcLibClient`).
+- `:app`: `LocalSource` (MediaStore: album, singoli, artisti, cartelle, decenni, radio, mix per artista), `PlaybackService` (ExoPlayer + MediaLibrarySession, cuore in Auto, timer, conteggio ascolti, widget), `UserData` (JSON della tua musica), `LyricsRepository`, `ArtworkProvider`, `PlayerWidget`, UI Compose stile Spotify (`ui/`).
+- **Album veri vs singoli**: un "album" con un solo brano è quasi sempre un tag sbagliato (album = titolo). In entrambe le sorgenti e nell'app web non va tra gli album: finisce in "Singoli e brani sparsi" (sezione propria e sotto l'artista). La cura vera sono i tag (guida Picard in `server/README.md`), non euristiche più furbe.
+- **Niente equalizzatore, effetti, velocità o bitrate ridotto**: scelta dell'utente, si ascolta il file originale e basta. Non reintrodurli.
+- **Root della UI in una `Surface`** (MainActivity): senza, `LocalContentColor` resta nero e ogni `Text` senza colore sparisce sullo sfondo scuro.
 - **La tua musica** è una sorgente (`me/...`) come le altre: niente cache nell'albero (`cacheable = false`), i brani restano della loro sorgente e si risolvono lì. Le regole stanno in `UserLibrary` (pure, testate): l'app salva solo il JSON.
 - **Un solo albero** (`LibraryTree`) serve sia l'app sia Auto: la UI sfoglia con un `MediaBrowser` come farebbe l'auto. Non aggiungere percorsi paralleli alla libreria solo per la UI.
 - `MediaId` = `sorgente/tipo/id|contenitore`: un brano porta con sé il contenitore da cui è stato scelto, e `onSetMediaItems` ricostruisce la coda (album dal brano toccato in poi).
@@ -23,7 +26,6 @@ Player musicale open source personale. Tre pezzi, un'unica libreria:
 ## Regole
 - Testi dell'interfaccia e commenti in italiano.
 - Nei test Kotlin niente lettere accentate nei nomi con i backtick: il compilatore locale fallisce sul nome del file .class.
-- Gli effetti audio (`android.media.audiofx`) cambiano da produttore a produttore: ogni chiamata dentro `runCatching`, e un effetto assente non si mostra.
 - Credenziali Subsonic: solo `salt` + `token = md5(password + salt)`, mai la password in chiaro salvata.
 - Non mettere `toISOString()`/UTC dove serve l'ora locale; non introdurre un backend nostro se Navidrome lo fa già.
 - Nessun push diretto su `main`: branch + PR.

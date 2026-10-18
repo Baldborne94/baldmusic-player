@@ -4,12 +4,31 @@
 
 const cache = new Map<string, string>();
 
-const TILES = ["#e13300", "#1e3264", "#8d67ab", "#148a08", "#ba5d07", "#503750", "#0d73ec", "#dc148c", "#477d95", "#7358ff", "#e8115b", "#27856a"];
+/** Le sfumature di mix e categorie: una tavolozza sola, la stessa dell'app Android. */
+const TILES: [string, string][] = [
+  ["#ff7a59", "#e0245e"],
+  ["#7c3aed", "#c026d3"],
+  ["#0ea5e9", "#2563eb"],
+  ["#10b981", "#0f766e"],
+  ["#f59e0b", "#dc2626"],
+  ["#6366f1", "#9333ea"],
+  ["#14b8a6", "#0369a1"],
+  ["#f43f5e", "#9f1239"],
+];
 
-export function tileColor(key: string): string {
+export function tileColors(key: string): [string, string] {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
   return TILES[Math.abs(h) % TILES.length];
+}
+
+export function tileColor(key: string): string {
+  return tileColors(key)[0];
+}
+
+export function tileGradient(key: string): string {
+  const [a, b] = tileColors(key);
+  return `linear-gradient(135deg, ${a}, ${b})`;
 }
 
 function toHex(r: number, g: number, b: number) {
