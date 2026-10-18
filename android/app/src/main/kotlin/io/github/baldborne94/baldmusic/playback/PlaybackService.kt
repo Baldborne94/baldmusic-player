@@ -34,6 +34,8 @@ import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.MediaId
+import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
+import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
@@ -41,6 +43,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
@@ -121,16 +126,56 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
-        saveLast()
+        // Subito, non in sottofondo: un attimo dopo il servizio non c'è più.
+        saveLast(now = true)
         scope.cancel()
         session.release()
         player.release()
         super.onDestroy()
     }
 
-    private fun saveLast() {
+    private val queueFile by lazy { java.io.File(filesDir, "coda.json") }
+    private var queueSave: Job? = null
+
+    /**
+     * Salva l'ultimo brano e tutta la coda (ordine, punto, casuale, ripeti): alla
+     * riaccensione dell'auto, o dalla notifica dopo un riavvio, riparte tutto uguale.
+     */
+    private fun saveLast(now: Boolean = false) {
         val item = player.currentMediaItem ?: return
         app.settings.saveLast(item.mediaId, player.currentPosition)
+        val snapshot = QueueSnapshot.of(
+            ids = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId },
+            index = player.currentMediaItemIndex,
+            positionMs = player.currentPosition,
+            shuffle = player.shuffleModeEnabled,
+            repeat = player.repeatMode,
+        ) ?: return
+        queueSave?.cancel()
+        if (now) writeQueue(snapshot) else queueSave = scope.launch(Dispatchers.IO) { writeQueue(snapshot) }
+    }
+
+    private fun writeQueue(snapshot: QueueSnapshot) {
+        runCatching {
+            val tmp = java.io.File(queueFile.parentFile, "${queueFile.name}.tmp")
+            tmp.writeText(snapshot.toJson())
+            tmp.renameTo(queueFile)
+        }
+    }
+
+    /** La coda salvata, coi brani che si ritrovano ancora; null se non c'è niente da riprendere. */
+    private suspend fun savedQueue(): MediaItemsWithStartPosition? {
+        val snapshot = QueueSnapshot.fromJson(kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { queueFile.readText() }.getOrNull() }) ?: return null
+        // Pochi alla volta: i brani del server chiedono ognuno una chiamata.
+        val found = snapshot.ids.chunked(20).flatMap { chunk ->
+            coroutineScope { chunk.map { id -> async { runCatching { tree.resolve(id) }.getOrNull() } }.awaitAll() }
+        }.filterNotNull()
+        if (found.isEmpty()) return null
+        val index = snapshot.indexIn(found.map { it.mediaId })
+        val position = if (found[index].mediaId == snapshot.currentId) snapshot.positionMs else 0L
+        player.shuffleModeEnabled = snapshot.shuffle
+        player.repeatMode = snapshot.repeat
+        return MediaItemsWithStartPosition(found.toItems(), index, position)
     }
 
     private inner class PlayerEvents : Player.Listener {
@@ -154,6 +199,21 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (!isPlaying) saveLast()
+        }
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+            // Brani aggiunti, tolti o spostati nella coda.
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) saveLast()
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            updateLikeButton()
+            saveLast()
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            updateLikeButton()
+            saveLast()
         }
     }
 
@@ -262,15 +322,35 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    /** Il cuore accanto ai comandi: nella notifica e in Android Auto. */
+    /** Cuore, casuale e ripeti accanto ai comandi: nella notifica e in Android Auto. */
     private fun updateLikeButton() {
         val item = player.currentMediaItem
         val liked = item != null && app.userData.isLiked(item.mediaId)
-        val button = CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
+        val heart = CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(if (liked) "Togli da Mi piace" else "Mi piace")
             .setSessionCommand(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
             .build()
-        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(button))
+        val shuffle = CommandButton.Builder(if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
+            .setDisplayName(if (player.shuffleModeEnabled) "Casuale attivo" else "Casuale")
+            .setSessionCommand(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
+            .build()
+        val repeat = CommandButton.Builder(
+            when (player.repeatMode) {
+                Player.REPEAT_MODE_ONE -> CommandButton.ICON_REPEAT_ONE
+                Player.REPEAT_MODE_ALL -> CommandButton.ICON_REPEAT_ALL
+                else -> CommandButton.ICON_REPEAT_OFF
+            },
+        )
+            .setDisplayName(
+                when (player.repeatMode) {
+                    Player.REPEAT_MODE_ONE -> "Ripeti il brano"
+                    Player.REPEAT_MODE_ALL -> "Ripeti tutto"
+                    else -> "Ripeti"
+                },
+            )
+            .setSessionCommand(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
+            .build()
+        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(heart, shuffle, repeat))
     }
 
     private fun rootItem(id: String) = MediaItem.Builder()
@@ -309,6 +389,8 @@ class PlaybackService : MediaLibraryService() {
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
+                .add(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
+                .add(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -323,6 +405,19 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<SessionResult> {
             if (customCommand.customAction == CMD_TOGGLE_LIKE) {
                 player.currentMediaItem?.let { app.userData.toggleLike(it.toTrackRef()) }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == CMD_SHUFFLE) {
+                player.shuffleModeEnabled = !player.shuffleModeEnabled
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == CMD_REPEAT) {
+                // Spento → tutta la coda → il brano → spento.
+                player.repeatMode = when (player.repeatMode) {
+                    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                    else -> Player.REPEAT_MODE_OFF
+                }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -437,11 +532,15 @@ class PlaybackService : MediaLibraryService() {
             mediaItems.flatMap { resolve(it) }.toMutableList()
         }
 
-        /** Ripresa dal sistema o da Android Auto: l'ultimo brano, nel suo album, dove si era fermato. */
+        /**
+         * Ripresa dal sistema o da Android Auto: la coda salvata com'era; se non c'è più,
+         * l'ultimo brano nel suo album o raccolta, dove si era fermato.
+         */
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
+            savedQueue()?.let { return@future it }
             val (mediaId, position) = app.settings.last() ?: throw UnsupportedOperationException("Niente da riprendere")
             val (queue, index) = tree.queueFor(mediaId)
             if (queue.isEmpty()) throw UnsupportedOperationException("Brano non più disponibile")
@@ -456,19 +555,20 @@ class PlaybackService : MediaLibraryService() {
             val mix = tree.children(first.mediaId).firstOrNull { it.title.startsWith("Mix") } ?: return emptyList()
             return tree.playableIn(mix.mediaId).toItems()
         }
-        val results = tree.search(query)
+        val (words, _) = VoiceQuery.parse(query)
+        val results = tree.search(words)
+        // Una raccolta, un artista o un album detti per nome si suonano per intero.
+        VoiceQuery.pick(query, results)?.let { return tree.playableIn(it.mediaId).toItems() }
         val tracks = results.filter { it.playable }
-        // Se la richiesta corrisponde a un artista o un album, si suona quello per intero.
-        val container = results.firstOrNull { it.kind == LibraryNode.Kind.ARTIST || it.kind == LibraryNode.Kind.ALBUM }
-        if (container != null && container.title.equals(query.trim(), ignoreCase = true)) {
-            return tree.playableIn(container.mediaId).toItems()
-        }
         if (tracks.isNotEmpty()) return tracks.mapNotNull { tree.resolve(it) }.toItems()
+        val container = results.firstOrNull { it.kind == LibraryNode.Kind.PLAYLIST || it.kind == LibraryNode.Kind.ARTIST || it.kind == LibraryNode.Kind.ALBUM }
         return container?.let { tree.playableIn(it.mediaId).toItems() }.orEmpty()
     }
 
     companion object {
         private const val RECENT_ROOT = "recent"
         const val CMD_TOGGLE_LIKE = "io.github.baldborne94.baldmusic.TOGGLE_LIKE"
+        const val CMD_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
+        const val CMD_REPEAT = "io.github.baldborne94.baldmusic.REPEAT"
     }
 }

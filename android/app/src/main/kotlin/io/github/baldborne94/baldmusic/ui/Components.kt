@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Folder
@@ -345,7 +346,7 @@ fun SheetAction(icon: ImageVector, label: String, tint: Color = MaterialTheme.co
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = if (tint == Accent) Accent else TextMuted)
+        Icon(icon, null, tint = if (tint == Accent || tint == Danger) tint else TextMuted)
         Spacer(Modifier.width(18.dp))
         Text(label, fontSize = 16.sp, color = tint)
     }
@@ -369,6 +370,7 @@ fun TrackActionsSheet(
     onRadio: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
     onInfo: (() -> Unit)? = null,
+    onTrash: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -391,6 +393,7 @@ fun TrackActionsSheet(
         onGoArtist?.let { SheetAction(Icons.Rounded.Person, "Vai all'artista", onClick = act(it)) }
         onShare?.let { SheetAction(Icons.Rounded.Share, "Condividi", onClick = act(it)) }
         onInfo?.let { SheetAction(Icons.Rounded.Info, "Informazioni sul brano", onClick = act(it)) }
+        onTrash?.let { SheetAction(Icons.Rounded.Delete, "Elimina dal telefono", tint = Danger, onClick = act(it)) }
         Spacer(Modifier.height(24.dp))
     }
 }

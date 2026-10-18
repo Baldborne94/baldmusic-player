@@ -72,6 +72,7 @@ sealed interface Screen {
     data class Detail(val mediaId: String, val title: String) : Screen
     data object Settings : Screen
     data object Stats : Screen
+    data object Cleanup : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -82,7 +83,21 @@ class Ui(
     val settings: () -> Unit,
     val back: () -> Unit,
     val push: (Screen) -> Unit,
+    /**
+     * Sposta nel cestino di Android i file dei brani del telefono tra [items], dopo una
+     * conferma; [onDone] solo se sono stati buttati davvero. Null dove non si può (prima
+     * di Android 11 non c'è il cestino).
+     */
+    val trash: ((items: List<MediaItem>, title: String, note: String?, onDone: () -> Unit) -> Unit)?,
 )
+
+/** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
+private class TrashAsk(val items: List<MediaItem>, val title: String, val note: String?, val onDone: () -> Unit)
+
+/** Il file di un brano del telefono, per MediaStore; null per gli altri brani. */
+fun localFileUri(item: MediaItem): android.net.Uri? =
+    MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
+        ?.let { android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
 
 val LocalUi = staticCompositionLocalOf<Ui> { error("Ui non fornita") }
 
@@ -96,8 +111,23 @@ fun AppScaffold(vm: PlayerViewModel) {
     var menuFor by remember { mutableStateOf<Pair<MediaItem, String?>?>(null) }
     var addTo by remember { mutableStateOf<List<MediaItem>?>(null) }
     var infoFor by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    var trashAsk by remember { mutableStateOf<TrashAsk?>(null) }
+    var trashing by remember { mutableStateOf<TrashAsk?>(null) }
     val lib by vm.library.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    // La finestra di Android "Spostare nel cestino?": l'app non può buttare file da sola.
+    val trashLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val done = trashing
+        trashing = null
+        if (done != null && result.resultCode == android.app.Activity.RESULT_OK) {
+            // Prima chi ha chiesto (i doppioni passano alla copia tenuta), poi si dimentica il resto.
+            done.onDone()
+            vm.forgetTrashed(done.items)
+        }
+    }
+    val canTrash = android.os.Build.VERSION.SDK_INT >= 30
 
     val ui = remember(tab) {
         Ui(
@@ -107,6 +137,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             settings = { stacks.getValue(tab).add(Screen.Settings) },
             back = { stacks.getValue(tab).let { if (it.size > 1) it.removeAt(it.lastIndex) } },
             push = { stacks.getValue(tab).add(it) },
+            trash = if (canTrash) { items, title, note, onDone -> trashAsk = TrashAsk(items.filter { localFileUri(it) != null }, title, note, onDone) } else null,
         )
     }
 
@@ -132,6 +163,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                         is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
                         Screen.Settings -> SettingsPage(vm)
                         Screen.Stats -> StatsScreen(vm)
+                        Screen.Cleanup -> CleanupScreen(vm)
                     }
                 }
                 MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
@@ -183,12 +215,35 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onRadio = if (vm.canStartRadio(item)) ({ vm.startRadio(item) }) else null,
                     onShare = { shareTrack(context, item) },
                     // Solo per i brani del telefono: i tag del server li legge Navidrome.
+                    onTrash = ui.trash?.takeIf { localFileUri(item) != null }?.let { trash ->
+                        { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
+                    },
                     onInfo = MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
                         ?.let { id -> { infoFor = id to item.title() } },
                 )
             }
 
             infoFor?.let { (id, title) -> TrackInfoDialog(id, title, onDismiss = { infoFor = null }) }
+
+            trashAsk?.let { ask ->
+                val n = ask.items.size
+                ConfirmDialog(
+                    title = ask.title,
+                    text = (if (n == 1) "Il file va nel cestino di Android" else "I $n file vanno nel cestino di Android") +
+                        ": per 30 giorni li recuperi dall'app File (Cestino), poi vengono cancellati. " +
+                        (ask.note ?: "Spariscono da raccolte, preferiti e playlist."),
+                    confirm = "Sposta nel cestino",
+                    onDismiss = { trashAsk = null },
+                ) {
+                    trashAsk = null
+                    val uris = ask.items.mapNotNull(::localFileUri)
+                    if (uris.isNotEmpty() && android.os.Build.VERSION.SDK_INT >= 30) {
+                        val request = android.provider.MediaStore.createTrashRequest(context.contentResolver, uris, true)
+                        trashing = ask
+                        trashLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(request.intentSender).build())
+                    }
+                }
+            }
 
             addTo?.let { items ->
                 AddToPlaylistSheet(lib, onDismiss = { addTo = null }, onCreate = { name -> vm.createPlaylist(name, items) }, onPick = { id -> vm.addToPlaylist(id, items) })

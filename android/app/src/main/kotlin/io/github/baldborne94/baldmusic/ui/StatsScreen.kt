@@ -46,7 +46,8 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-private fun PageHeader(title: String) {
+/** Titolo di pagina col tasto indietro. */
+fun PageHeader(title: String) {
     val ui = LocalUi.current
     Row(Modifier.fillMaxWidth().statusBarsPadding(), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = ui.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Indietro") }

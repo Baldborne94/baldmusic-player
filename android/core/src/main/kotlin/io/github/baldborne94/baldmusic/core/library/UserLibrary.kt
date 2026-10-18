@@ -121,9 +121,14 @@ data class UserLibrary(
     fun renamePlaylist(id: String, name: String) =
         copy(playlists = playlists.map { if (it.id == id && name.isNotBlank()) it.copy(name = name.trim()) else it })
 
-    fun deletePlaylist(id: String) = copy(
+    /**
+     * Toglie una playlist o una raccolta. Una raccolta eliminata non si ricrea dalla sua
+     * cartella, tranne con [ignoreFolder] = false: quando se ne sono buttati anche i file,
+     * la cartella resta vuota e, se un giorno si riempie, torna giusto che riappaia.
+     */
+    fun deletePlaylist(id: String, ignoreFolder: Boolean = true) = copy(
         playlists = playlists.filterNot { it.id == id },
-        ignoredFolders = ignoredFolders + listOfNotNull(playlists.firstOrNull { it.id == id }?.folder),
+        ignoredFolders = if (!ignoreFolder) ignoredFolders else ignoredFolders + listOfNotNull(playlists.firstOrNull { it.id == id }?.folder),
         recent = recent.filterNot { it.id == MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, id).toString() },
     )
 
@@ -150,6 +155,42 @@ data class UserLibrary(
             }
         },
     )
+
+    /** Brani i cui file sono stati buttati: spariscono da preferiti, playlist, raccolte e ascolti. */
+    fun forgetTracks(trackIds: Collection<String>): UserLibrary {
+        val gone = trackIds.mapTo(HashSet(), ::baseId)
+        if (gone.isEmpty()) return this
+        return copy(
+            liked = liked.filterNot { it.id in gone },
+            playlists = playlists.map { pl -> if (pl.tracks.none { it.id in gone }) pl else pl.copy(tracks = pl.tracks.filterNot { it.id in gone }) },
+            plays = plays.filterKeys { it !in gone },
+        )
+    }
+
+    /**
+     * Doppioni buttati: ogni copia tolta ([replacements], dal suo ID alla copia tenuta)
+     * è sostituita da quella tenuta in preferiti, playlist e raccolte, senza doppioni e
+     * al suo posto; i suoi ascolti si sommano a quelli della copia tenuta. Così una
+     * raccolta che aveva la copia buttata continua ad avere il brano.
+     */
+    fun mergeTracks(replacements: Map<String, TrackRef>): UserLibrary {
+        val map = replacements.entries.associate { (from, to) -> baseId(from) to to.copy(id = baseId(to.id)) }
+        if (map.isEmpty()) return this
+        fun List<TrackRef>.merged() = map { map[it.id] ?: it }.distinctBy { it.id }
+        val plays = HashMap<String, PlayCount>()
+        this.plays.values.forEach { p ->
+            val target = map[p.track.id]
+            val id = target?.id ?: p.track.id
+            val previous = plays[id]
+            plays[id] = if (previous == null) p.copy(track = target ?: p.track)
+            else previous.copy(count = previous.count + p.count, lastPlayed = maxOf(previous.lastPlayed, p.lastPlayed))
+        }
+        return copy(
+            liked = liked.merged(),
+            playlists = playlists.map { pl -> if (pl.tracks.none { it.id in map }) pl else pl.copy(tracks = pl.tracks.merged()) },
+            plays = plays,
+        )
+    }
 
     fun addSearch(query: String): UserLibrary {
         val q = query.trim()

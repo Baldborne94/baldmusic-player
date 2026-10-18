@@ -187,7 +187,7 @@ fun ConfirmDialog(title: String, text: String, confirm: String, onDismiss: () ->
         containerColor = Surface1,
         title = { Text(title) },
         text = { Text(text, color = TextMuted) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = Color(0xFFFF5C6C), fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = Danger, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annulla", color = TextMuted) } },
     )
 }

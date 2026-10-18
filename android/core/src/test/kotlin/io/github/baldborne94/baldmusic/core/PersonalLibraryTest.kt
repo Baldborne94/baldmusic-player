@@ -192,4 +192,25 @@ class ListeningStatsTest {
         assertEquals(listOf("Mia"), src.children(MediaId(PersonalSource.KEY, PersonalSource.PLAYLISTS)).map { it.title })
         assertEquals("Raccolta · 1 brano", src.children(MediaId(PersonalSource.KEY, PersonalSource.COLLECTIONS)).single().subtitle)
     }
+
+    @Test
+    fun `i brani buttati spariscono da preferiti, playlist, raccolte e ascolti`() {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/A", "A", listOf(local(1), local(2)))))
+        lib = lib.toggleLike(local(1)).createPlaylist("p", "Mia", now = 2, first = listOf(local(1), local(3)))
+            .recordPlay(local(1), null, now = 3)
+        lib = lib.forgetTracks(listOf("local/track/1|me/collections"))
+        assertFalse(lib.isLiked("local/track/1"))
+        assertEquals(listOf("local/track/2"), lib.collections.single().tracks.map { it.id })
+        assertEquals(listOf("local/track/3"), lib.playlists.first { !it.isCollection }.tracks.map { it.id })
+        assertTrue(lib.plays.isEmpty())
+    }
+
+    @Test
+    fun `una raccolta eliminata insieme ai file torna se la cartella si riempie`() {
+        var lib = sync(UserLibrary(), listOf(FolderCollection("Music/A", "A", listOf(local(1)))))
+        lib = lib.deletePlaylist(lib.collections.single().id, ignoreFolder = false)
+        assertTrue(lib.collections.isEmpty())
+        lib = sync(lib, listOf(FolderCollection("Music/A", "A", listOf(local(5)))))
+        assertEquals(listOf("local/track/5"), lib.collections.single().tracks.map { it.id })
+    }
 }

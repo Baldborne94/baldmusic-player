@@ -80,6 +80,10 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Raccolte dalle cartelle**: ogni cartella in cui hai organizzato la musica sul telefono è una raccolta modificabile (aggiungi, togli, rinomina, elimina), che si aggiorna da sola quando arrivano file nuovi.
 
+- [x] **Eliminare dal telefono**: un brano o una raccolta intera finiscono nel cestino di Android (recuperabili per 30 giorni), con doppia conferma; spariscono da raccolte, preferiti e playlist.
+
+- [x] **Pulizia della libreria**: doppioni tra le cartelle (si tiene una copia, le raccolte non perdono il brano) e anteprime di 30 secondi, da buttare nel cestino.
+
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).
@@ -91,14 +95,15 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 ## Fase 3 — Ascoltare bene
 
 - [ ] **ReplayGain**: impostazione *Album* (predefinita: dentro un disco le differenze volute restano), *Brano* (per mix e casuale) o *Spento*. Sul telefono dai tag letti in fase 1, nel web dal campo `replayGain` di Navidrome. Senza tag il brano suona com'è. Si abbassa e basta, mai oltre il picco: niente distorsione.
-- [ ] **Coda salvata per intero**: riaprendo l'app o riaccendendo l'auto riparte la stessa coda, dallo stesso punto.
+- [x] **Coda salvata per intero**: riaccendendo l'auto (o dalla notifica dopo un riavvio) riparte la stessa coda, dallo stesso punto, con casuale e ripeti.
 - [ ] **Senza pause tra i brani** (gapless) negli album dal vivo e nei concept: verificare con MP3, AAC e FLAC.
 
 ## Fase 4 — Android Auto fatto bene
 
+- [x] **Comandi vocali per le raccolte**: "Ok Google, metti (la raccolta) Movie Soundtracks su BaldMusic".
 - [ ] Prova completa con il **Desktop Head Unit** (l'emulatore di Android Auto) e in macchina, con una checklist: avvio a freddo, ripresa, ricerca vocale ("metti *artista*", "metti *album*", "metti *playlist*"), cuore, timer, telefono senza rete.
 - [ ] Elenchi lunghi: Auto mostra pochi elementi per volta; artisti e album raggruppati per lettera, "Più ascoltati" e "Ascoltati di recente" in cima.
-- [ ] Tasti **casuale** e **ripeti** accanto al cuore.
+- [x] Tasti **casuale** e **ripeti** accanto al cuore.
 - [ ] Discografia divisa per tipo (fase 2) anche in Auto.
 
 ## Fase 5 — Tablet e PC

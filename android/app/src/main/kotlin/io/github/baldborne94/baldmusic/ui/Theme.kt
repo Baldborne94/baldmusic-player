@@ -28,6 +28,8 @@ val Accent2 = Color(0xFFC026D3)
 val AccentBrush = Brush.linearGradient(listOf(Accent, Accent2))
 val Background = Color(0xFF0B0B0F)
 val Surface1 = Color(0xFF16171D)
+/** Per le azioni che cancellano qualcosa. */
+val Danger = Color(0xFFFF5C6C)
 val Surface2 = Color(0xFF22242C)
 val TextMuted = Color(0xFFA7ABB8)
 
@@ -49,7 +51,7 @@ private val colors = darkColorScheme(
     surfaceContainerHighest = Color(0xFF2C2F38),
     surfaceContainerLow = Color(0xFF121318),
     outline = Color(0xFF34374A),
-    error = Color(0xFFFF5C6C),
+    error = Danger,
 )
 
 private val typography = Typography().run {

@@ -17,6 +17,7 @@ import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.playback.EXTRA_SHUFFLE
@@ -249,6 +250,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun removeFromPlaylist(playlistId: String, item: MediaItem) = app.userData.removeFromPlaylist(playlistId, item.mediaId)
     fun renamePlaylist(playlistId: String, name: String) = app.userData.renamePlaylist(playlistId, name)
     fun deletePlaylist(playlistId: String) = app.userData.deletePlaylist(playlistId)
+
+    /** Raccolta eliminata insieme ai suoi file: se la cartella si riempie di nuovo, torna. */
+    fun deleteCollectionWithFiles(playlistId: String) = app.userData.deletePlaylist(playlistId, ignoreFolder = false)
+
+    /** Doppioni buttati: preferiti, playlist e raccolte passano alla copia tenuta. */
+    fun mergeDuplicates(groups: List<io.github.baldborne94.baldmusic.core.library.DuplicateGroup>) {
+        val keep = groups.flatMap { g -> g.others.map { LocalCatalog.ref(it).id to LocalCatalog.ref(g.keep) } }.toMap()
+        app.userData.mergeTracks(keep)
+    }
+
+    /** Dopo che i file sono finiti nel cestino: via dalla coda, dalla tua musica e dalla libreria. */
+    fun forgetTrashed(items: List<MediaItem>) {
+        val gone = items.mapTo(HashSet()) { UserLibrary.baseId(it.mediaId) }
+        queue.indices.reversed().filter { UserLibrary.baseId(queue[it].mediaId) in gone }.forEach { removeAt(it) }
+        app.userData.forgetTracks(gone)
+        app.local.invalidate()
+        app.settings.touch()
+    }
     fun addSearch(query: String) = app.userData.addSearch(query)
     fun clearSearches() = app.userData.clearSearches()
 
