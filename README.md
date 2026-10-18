@@ -26,7 +26,10 @@ Il mio player musicale open source. Ascolto la mia musica dal **telefono**, dal 
    2. tocca 10 volte **Versione** per sbloccare le impostazioni sviluppatore;
    3. dal menu ⋮ apri **Impostazioni sviluppatore** e attiva **Origini sconosciute**;
    4. ricollega il telefono all'auto. BaldMusic compare tra le app musicali.
-4. **App web:** apri <https://baldborne94.github.io/baldmusic-player/> e accedi con l'indirizzo `https://…ts.net` del server. Da Chrome o Edge puoi anche installarla (icona ⊕ nella barra degli indirizzi).
+4. **App web (PC e tablet):** apri <https://baldborne94.github.io/baldmusic-player/>.
+   - **Sul PC dove gira Navidrome** accedi con `http://localhost:4533` e le credenziali di Navidrome.
+   - **Su altri dispositivi** (tablet, un altro PC) usa l'indirizzo `https://…ts.net` di Tailscale.
+   - **Per averla come programma**: in Chrome o Edge clicca l'icona *Installa* (⊕) nella barra degli indirizzi. BaldMusic si apre nella sua finestra, ha l'icona sulla barra delle applicazioni e risponde ai tasti multimediali della tastiera.
 
 ## In macchina
 

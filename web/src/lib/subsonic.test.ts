@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicError } from "./subsonic";
+import { blockedAsMixedContent, buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicError } from "./subsonic";
 
 describe("normalizeServerUrl", () => {
   it("aggiunge https e toglie gli slash finali", () => {
@@ -54,5 +54,19 @@ describe("parseResponse", () => {
 
   it("rifiuta risposte che non vengono da Subsonic", () => {
     expect(() => parseResponse({ hello: 1 })).toThrow(/non sembra/);
+  });
+});
+
+describe("blockedAsMixedContent", () => {
+  it("da https blocca l'http in rete, non il PC stesso", () => {
+    expect(blockedAsMixedContent("https:", "http://192.168.1.20:4533")).toBe(true);
+    expect(blockedAsMixedContent("https:", "http://100.64.1.2:4533")).toBe(true);
+    expect(blockedAsMixedContent("https:", "http://localhost:4533")).toBe(false);
+    expect(blockedAsMixedContent("https:", "http://127.0.0.1:4533")).toBe(false);
+    expect(blockedAsMixedContent("https:", "https://pc.tail1.ts.net")).toBe(false);
+  });
+
+  it("da una pagina http non blocca niente", () => {
+    expect(blockedAsMixedContent("http:", "http://192.168.1.20:4533")).toBe(false);
   });
 });

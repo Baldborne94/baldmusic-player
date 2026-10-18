@@ -59,8 +59,9 @@ Quale indirizzo usare:
 
 | Dove | App Android | App web (browser) |
 |------|-------------|-------------------|
+| Sul PC dove gira Navidrome | — | `http://localhost:4533` |
 | Ovunque, con Tailscale attivo | `https://nome-pc.tail1234.ts.net` | `https://nome-pc.tail1234.ts.net` |
-| Solo a casa, senza Tailscale | `http://192.168.x.x:4533` | — (il browser blocca l'http da una pagina https) |
+| Solo a casa, senza Tailscale | `http://192.168.x.x:4533` | — (il browser blocca l'http da una pagina https, tranne `localhost`) |
 
 In auto il telefono usa i dati mobili: lascia Tailscale attivo in background (*Impostazioni → VPN → sempre attiva*) e la musica arriva anche lì.
 
@@ -76,4 +77,5 @@ In auto il telefono usa i dati mobili: lascia Tailscale attivo in background (*I
 | "Wrong username or password" | Credenziali diverse da quelle create su <http://localhost:4533> |
 | La libreria è vuota | Cartella sbagliata in `MusicFolder`, oppure la scansione non è ancora finita |
 | Album spezzati o senza copertina | Tag dei file incompleti: sistemali con MusicBrainz Picard |
-| L'app web non si collega ma quella Android sì | L'app web vuole l'indirizzo `https://…ts.net`, non `http://` |
+| L'app web non si collega ma quella Android sì | L'app web vuole l'indirizzo `https://…ts.net` (o `http://localhost:4533` sul PC stesso), non `http://192.168…` |
+| Chrome chiede di "accedere ad altre app e servizi su questo dispositivo" | È la richiesta per raggiungere Navidrome su `localhost`: rispondi *Consenti* |
