@@ -109,8 +109,14 @@ data class FileTags(
         /** "3/12" → 3, "03" → 3; 0 se manca. */
         private fun number(s: String?) = s?.substringBefore('/')?.trim()?.toIntOrNull()?.takeIf { it > 0 } ?: 0
 
-        /** "1999-05-01", "1999" → 1999; 0 se manca. */
-        private fun year(s: String?) = s?.let { Regex("\\d{4}").find(it)?.value?.toIntOrNull() } ?: 0
+        /**
+         * "1999-05-01", "1999" → 1999; 0 se manca. "1970-01-01" è la data zero dei
+         * computer, che certi programmi scrivono quando non sanno la data: non è un anno.
+         */
+        private fun year(s: String?): Int {
+            if (s == null || s.trim().startsWith("1970-01-01")) return 0
+            return Regex("\\d{4}").find(s)?.value?.toIntOrNull() ?: 0
+        }
 
         private fun db(s: String?) = s?.replace(Regex("(?i)\\s*db\\s*$"), "")?.replace(',', '.')?.trim()?.toFloatOrNull()
 

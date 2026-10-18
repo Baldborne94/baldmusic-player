@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.playback.albumId
@@ -94,6 +95,7 @@ fun AppScaffold(vm: PlayerViewModel) {
     var queueOpen by rememberSaveable { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<Pair<MediaItem, String?>?>(null) }
     var addTo by remember { mutableStateOf<List<MediaItem>?>(null) }
+    var infoFor by remember { mutableStateOf<Pair<Long, String>?>(null) }
     val lib by vm.library.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -179,8 +181,13 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onRemoveFromPlaylist = playlistId?.let { pl -> { vm.removeFromPlaylist(pl, item) } },
                     onRadio = if (vm.canStartRadio(item)) ({ vm.startRadio(item) }) else null,
                     onShare = { shareTrack(context, item) },
+                    // Solo per i brani del telefono: i tag del server li legge Navidrome.
+                    onInfo = MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
+                        ?.let { id -> { infoFor = id to item.title() } },
                 )
             }
+
+            infoFor?.let { (id, title) -> TrackInfoDialog(id, title, onDismiss = { infoFor = null }) }
 
             addTo?.let { items ->
                 AddToPlaylistSheet(lib, onDismiss = { addTo = null }, onCreate = { name -> vm.createPlaylist(name, items) }, onPick = { id -> vm.addToPlaylist(id, items) })

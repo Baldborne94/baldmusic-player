@@ -17,7 +17,8 @@ class TagIndex private constructor(private val entries: MutableMap<Long, Entry>)
     data class Entry(val modified: Long, val size: Long, val tags: FileTags)
 
     @Serializable
-    private data class Stored(val version: Int = VERSION, val entries: Map<Long, Entry> = emptyMap())
+    // La versione senza valore predefinito: così si scrive sempre, e un file che non ce l'ha non vale.
+    private data class Stored(val version: Int, val entries: Map<Long, Entry> = emptyMap())
 
     constructor() : this(HashMap())
 
@@ -41,11 +42,12 @@ class TagIndex private constructor(private val entries: MutableMap<Long, Entry>)
     fun size() = entries.size
 
     @Synchronized
-    fun toJson(): String = json.encodeToString(Stored.serializer(), Stored(entries = HashMap(entries)))
+    fun toJson(): String = json.encodeToString(Stored.serializer(), Stored(VERSION, HashMap(entries)))
 
     companion object {
         /** Da aumentare quando cambia cosa si legge dai file: l'indice si rifà da capo. */
-        const val VERSION = 1
+        // 2: la data "1970-01-01" non vale più come anno.
+        const val VERSION = 2
 
         private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 

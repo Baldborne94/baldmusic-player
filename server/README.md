@@ -57,6 +57,16 @@ Due accorgimenti che evitano i casi più comuni:
 
 Se un brano resta non riconosciuto (cover amatoriali, registrazioni proprie), selezionalo e digita tu album e anno nel pannello in basso: anche quello si salva nel file.
 
+### La musica scaricata sul telefono
+
+I file scaricati direttamente sul telefono hanno i tag del programma da cui vengono: spesso l'album cambia da un brano all'altro dello stesso disco, manca l'artista dell'album e l'anno è il 1970 (la "data zero" dei computer). BaldMusic li mostra lo stesso, ma senza album completi né decenni giusti. Per sistemarli:
+
+1. Collega il telefono al PC col cavo e copia la cartella della musica (di solito `Music` o `Download`) sul PC.
+2. Passala in Picard come sopra e salva.
+3. Ricopia i file sul telefono al posto dei vecchi (o cancella i vecchi e copia i nuovi).
+
+Al riavvio BaldMusic rilegge solo i file cambiati e la libreria si riordina. Per vedere come l'app legge un brano: menu ⋮ → **Informazioni sul brano**.
+
 ## 3. Raggiungilo da fuori casa con Tailscale
 
 A casa, sulla stessa Wi-Fi, il server risponde su `http://<IP-del-PC>:4533` (es. `http://192.168.1.20:4533`). Fuori casa usiamo **[Tailscale](https://tailscale.com)**: una rete privata gratuita tra i tuoi dispositivi. Non si aprono porte sul router e nessun altro può vedere il server.

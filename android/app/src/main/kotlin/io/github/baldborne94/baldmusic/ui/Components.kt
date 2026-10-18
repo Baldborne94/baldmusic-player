@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
@@ -366,6 +367,7 @@ fun TrackActionsSheet(
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onRadio: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null,
+    onInfo: (() -> Unit)? = null,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -387,6 +389,7 @@ fun TrackActionsSheet(
         onGoAlbum?.let { SheetAction(Icons.Rounded.Album, "Vai all'album", onClick = act(it)) }
         onGoArtist?.let { SheetAction(Icons.Rounded.Person, "Vai all'artista", onClick = act(it)) }
         onShare?.let { SheetAction(Icons.Rounded.Share, "Condividi", onClick = act(it)) }
+        onInfo?.let { SheetAction(Icons.Rounded.Info, "Informazioni sul brano", onClick = act(it)) }
         Spacer(Modifier.height(24.dp))
     }
 }
