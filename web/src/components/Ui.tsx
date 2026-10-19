@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { dominantColor, tileColor } from "../lib/colors";
 import { formatDuration } from "../lib/format";
 import { addToPlaylist, createPlaylist, isCollection, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
@@ -134,9 +134,13 @@ export function PlaylistCards({ playlists, scroll = false, bare = false }: { pla
 export function SongMenu({ song, x, y, playlistId, index, onClose }: { song: Song; x: number; y: number; playlistId?: string; index?: number; onClose: () => void }) {
   const { liked } = useLibrary();
   const [picker, setPicker] = useState(false);
+  const [info, setInfo] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // Con le informazioni aperte, i clic fuori dal menu non lo chiudono: li gestisce la finestra.
+  const infoOpen = useRef(false);
+  infoOpen.current = info;
   useEffect(() => {
-    const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && onClose();
+    const close = (e: MouseEvent) => !infoOpen.current && !ref.current?.contains(e.target as Node) && onClose();
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     setTimeout(() => window.addEventListener("mousedown", close), 0);
     window.addEventListener("keydown", esc);
@@ -153,6 +157,8 @@ export function SongMenu({ song, x, y, playlistId, index, onClose }: { song: Son
     onClose();
   };
   const isLiked = liked.has(song.id);
+
+  if (info) return <SongInfo song={song} onClose={onClose} />;
 
   return (
     <div className="ctx" ref={ref} style={{ left, top }}>
@@ -195,8 +201,54 @@ export function SongMenu({ song, x, y, playlistId, index, onClose }: { song: Son
           <button onClick={act(() => void navigator.clipboard?.writeText(`${song.title} – ${song.artist ?? ""}`))}>
             <Icon name="share" size={18} /> Copia titolo e artista
           </button>
+          <button onClick={() => setInfo(true)}>
+            <Icon name="music" size={18} /> Informazioni sul brano
+          </button>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * "Informazioni sul brano": i tag come li vede Navidrome. È il primo strumento per
+ * capire perché un brano è finito tra gli sparsi o è senza volume uguale.
+ */
+export function SongInfo({ song, onClose }: { song: Song; onClose: () => void }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [onClose]);
+  const rg = song.replayGain;
+  const db = (v: number | undefined) => (v === undefined || v === null ? undefined : `${v > 0 ? "+" : ""}${v.toFixed(1)} dB`);
+  const rows: [string, string | number | undefined][] = [
+    ["Titolo", song.title],
+    ["Artista", song.artist],
+    ["Album", song.album],
+    ["Anno", song.year || undefined],
+    ["Traccia", song.track ? `${song.discNumber ? `${song.discNumber}-` : ""}${song.track}` : undefined],
+    ["Genere", song.genre],
+    ["Durata", formatDuration(song.duration)],
+    ["Formato", [song.suffix?.toUpperCase(), song.bitRate ? `${song.bitRate} kbps` : undefined].filter(Boolean).join(" · ") || undefined],
+    ["ReplayGain", [db(rg?.trackGain) && `brano ${db(rg?.trackGain)}`, db(rg?.albumGain) && `album ${db(rg?.albumGain)}`].filter(Boolean).join(" · ") || "nessuno: suona com'è"],
+    ["MusicBrainz", song.musicBrainzId ? "riconosciuto" : "no (non passato da Picard?)"],
+    ["File", song.path],
+  ];
+  return (
+    <div className="modal" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal__box" role="dialog" aria-label="Informazioni sul brano">
+        <h2>Informazioni sul brano</h2>
+        <dl className="info-list">
+          {rows.filter(([, v]) => v !== undefined && v !== "").map(([k, v]) => (
+            <Fragment key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </Fragment>
+          ))}
+        </dl>
+        <button className="btn" onClick={onClose}>Chiudi</button>
+      </div>
     </div>
   );
 }
@@ -261,11 +313,38 @@ export async function startRadio(song: Song): Promise<void> {
 }
 
 /** Tabella dei brani, come nelle pagine di Spotify sul PC. */
-export function TrackTable({ songs, from, showAlbum = true, showCover = true, numbered = false, playlistId }: { songs: Song[]; from: { label: string; id: string }; showAlbum?: boolean; showCover?: boolean; numbered?: boolean; playlistId?: string }) {
+/** Selezione di più brani: casella al posto del numero, Maiuscolo + clic per un intervallo. */
+export interface TrackSelection {
+  selected: Set<number>;
+  toggle: (index: number, shift: boolean) => void;
+}
+
+export function TrackTable({
+  songs,
+  from,
+  showAlbum = true,
+  showCover = true,
+  numbered = false,
+  playlistId,
+  selection,
+  onMove,
+}: {
+  songs: Song[];
+  from: { label: string; id: string };
+  showAlbum?: boolean;
+  showCover?: boolean;
+  numbered?: boolean;
+  playlistId?: string;
+  selection?: TrackSelection;
+  /** Riordino: si trascina la maniglia ≡ e al rilascio il brano va in quella posizione. */
+  onMove?: (from: number, to: number) => void;
+}) {
   const { queue, playing } = usePlayer();
   const { liked } = useLibrary();
   const now = current(queue);
   const [menu, setMenu] = useState<{ song: Song; index: number; x: number; y: number } | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   if (songs.length === 0) return <p className="muted pad">Nessun brano.</p>;
   return (
     <div className={`tracks ${showAlbum ? "" : "tracks--noalbum"}`}>
@@ -285,20 +364,55 @@ export function TrackTable({ songs, from, showAlbum = true, showCover = true, nu
         return (
           <div
             key={`${s.id}-${i}`}
-            className={`trow ${active ? "trow--active" : ""}`}
-            onDoubleClick={() => player.play(songs, i, false, from)}
+            className={`trow ${active ? "trow--active" : ""} ${selection?.selected.has(i) ? "trow--selected" : ""} ${dragOver === i && dragFrom !== i ? "trow--drop" : ""}`}
+            draggable={!!onMove}
+            onDragStart={(e) => {
+              if (!onMove) return;
+              setDragFrom(i);
+              e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragOver={(e) => {
+              if (!onMove || dragFrom === null) return;
+              e.preventDefault();
+              setDragOver(i);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (onMove && dragFrom !== null && dragFrom !== i) onMove(dragFrom, i);
+              setDragFrom(null);
+              setDragOver(null);
+            }}
+            onDragEnd={() => {
+              setDragFrom(null);
+              setDragOver(null);
+            }}
+            onClick={(e) => {
+              // Cuore, menu e link fanno il loro lavoro anche mentre si seleziona.
+              if (!selection || (e.target as HTMLElement).closest("button, a")) return;
+              e.preventDefault();
+              selection.toggle(i, e.shiftKey);
+            }}
+            onDoubleClick={() => !selection && !onMove && player.play(songs, i, false, from)}
             onContextMenu={(e) => {
               e.preventDefault();
               setMenu({ song: s, index: i, x: e.clientX, y: e.clientY });
             }}
           >
+            {selection ? (
+              <span className="trow__num trow__num--check">
+                <input type="checkbox" checked={selection.selected.has(i)} readOnly aria-label={`Seleziona ${s.title}`} />
+              </span>
+            ) : onMove ? (
+              <span className="trow__num trow__num--handle" title="Trascina per spostare">≡</span>
+            ) : (
             <span className="trow__num">
               <span className="trow__index">{active && playing ? <span className="eq"><i /><i /><i /></span> : numbered ? s.track ?? i + 1 : i + 1}</span>
               <button className="trow__playbtn" onClick={() => (active ? player.toggle() : player.play(songs, i, false, from))} aria-label="Riproduci">
                 <Icon name={active && playing ? "pause" : "play"} size={16} />
               </button>
             </span>
-            <span className="trow__main" onClick={() => player.play(songs, i, false, from)}>
+            )}
+            <span className="trow__main" onClick={() => !selection && !onMove && player.play(songs, i, false, from)}>
               {showCover && <Cover id={s.coverArt} size={96} className="trow__cover" />}
               <span className="trow__text">
                 <span className="trow__title">{s.title}</span>
