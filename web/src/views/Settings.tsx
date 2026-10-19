@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { syncCollections, useLibrary } from "../lib/library";
 import { player, usePlayer } from "../lib/player";
+import { CROSSFADE_CHOICES } from "../lib/crossfade";
 import type { ReplayGainMode } from "../lib/replaygain";
 import { href } from "../lib/router";
 import { CollectionsHint } from "./Library";
@@ -15,7 +16,7 @@ const RG_MODES: [ReplayGainMode, string][] = [
 
 export function Settings() {
   const client = useClient();
-  const { replayGain: rg } = usePlayer();
+  const { replayGain: rg, crossfade } = usePlayer();
   const lib = useLibrary();
   const [status, setStatus] = useState<string | null>(null);
   if (!client) return null;
@@ -71,6 +72,20 @@ export function Settings() {
           {RG_MODES.map(([mode, label]) => (
             <button key={mode} className={`chip ${rg === mode ? "is-on" : ""}`} onClick={() => player.setReplayGain(mode)}>
               {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <h2>Dissolvenza tra i brani</h2>
+        <p className="muted">
+          Come i DJ: negli ultimi secondi il brano che finisce si abbassa mentre il successivo parte e sale. Mai tra due brani dello stesso
+          album (dal vivo e colonne sonore continue restano attaccati) e solo quando un brano finisce da solo.
+        </p>
+        <div className="chips">
+          {CROSSFADE_CHOICES.map((sec) => (
+            <button key={sec} className={`chip ${crossfade === sec ? "is-on" : ""}`} onClick={() => player.setCrossfade(sec)}>
+              {sec === 0 ? "Spenta" : `${sec} s`}
             </button>
           ))}
         </div>
