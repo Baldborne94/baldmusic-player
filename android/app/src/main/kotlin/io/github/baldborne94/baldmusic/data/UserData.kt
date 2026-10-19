@@ -79,6 +79,9 @@ class UserData(context: Context) {
     fun syncFolders(folders: List<FolderCollection>, present: Set<String>) =
         update { it.syncFolders(folders, present, System.currentTimeMillis()) { UUID.randomUUID().toString().take(8) } }
 
+    /** Ripristino da un backup: tutta la tua musica cambia. */
+    fun replaceAll(library: UserLibrary) = update { library }
+
     fun addSearch(query: String) = update { it.addSearch(query) }
     fun clearSearches() = update { it.clearSearches() }
 }

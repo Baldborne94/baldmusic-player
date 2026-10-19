@@ -49,11 +49,10 @@ aggiornamenti dall'app con le novità. I punti ancora aperti:
 
 | Area | Oggi | Cosa manca |
 |------|------|------------|
-| **Tag sul telefono** | L'app li legge tutti, ma quelli dei file scaricati sono poveri | Per sistemarli serve passare da Picard sul PC (guida in `server/README.md`); una pagina "Salute della libreria" che dica quali file sistemare (fase 7) |
+| **Tag sul telefono** | L'app li legge tutti, e "Salute della libreria" dice quali file hanno i tag da sistemare | Sistemarli: passare le cartelle da Picard sul PC (guida in `server/README.md`), o riconoscerli dall'app con AcoustID |
 | **Android Auto** | Raccolte, lettere, voce, cuore/casuale/ripeti | Prova completa in macchina e col Desktop Head Unit (fase 4) |
 | **Senza pause tra i brani** | ExoPlayer è gapless; sul PC il brano dopo si carica in anticipo | Da sentire a orecchio sul telefono con album dal vivo (fase 3) |
 | **Telefono e PC** | Preferiti e playlist separati: sul telefono in un file dell'app, sul PC su Navidrome | Unirli quando il telefono raggiunge il server (fase 6) |
-| **Backup** | La tua musica del telefono (preferiti, playlist, raccolte, ascolti) sta solo nell'app | Esporta/importa, e un backup che sopravvive alla disinstallazione |
 
 ## Fase 0 — Fondamenta
 
@@ -133,7 +132,8 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 
 ## Fase 7 — Rifinitura
 
-- [ ] **Salute della libreria**: una pagina che segnala i file con tag incompleti (senza album o artista dell'album, anno 1970, numeri di traccia mancanti o doppi, senza copertina), cartella per cartella. I **brani di 30 secondi** li trova già la Pulizia.
+- [x] **Salute della libreria**: cartella per cartella, i file con tag da sistemare (album diverso per ogni brano, senza album, unico brano del disco, numero di traccia mancante o doppio, anno mancante o 1970) e perché un brano è tra gli sparsi; quanti non sono mai passati da Picard. I **brani di 30 secondi** li trova la Pulizia.
+- [x] **Backup della tua musica**: preferiti, playlist, raccolte e ascolti in un file (a mano, o in automatico in Download/BaldMusic, che resta dopo la disinstallazione); su un telefono nuovo i brani si ritrovano per cartella, titolo e durata.
 - [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.
 - [x] **Note di versione e aggiornamenti dall'app**: ogni APK pubblica in `apk-latest` anche `version.json` con le novità (i titoli delle PR unite); l'app avvisa in Home, scarica e installa sopra con la conferma di Android, e dopo l'aggiornamento mostra cosa c'è di nuovo.
 - [ ] Accessibilità: TalkBack, contrasto, dimensione del testo.

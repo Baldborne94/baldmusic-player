@@ -79,6 +79,7 @@ sealed interface Screen {
     data object Stats : Screen
     data object Cleanup : Screen
     data object Trash : Screen
+    data object Health : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -304,6 +305,7 @@ private fun ScreenContent(vm: PlayerViewModel, tab: Tab, screen: Screen) {
         Screen.Stats -> StatsScreen(vm)
         Screen.Cleanup -> CleanupScreen(vm)
         Screen.Trash -> TrashScreen(vm)
+        Screen.Health -> HealthScreen(vm)
     }
 }
 

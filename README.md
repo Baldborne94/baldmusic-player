@@ -45,7 +45,8 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 - **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci.
 - **Radio** da qualsiasi brano, **timer di spegnimento**, **coda** riordinabile che si salva per intero e riparte da dov'era.
 - **Pulizia della libreria**: doppioni tra le cartelle e anteprime di 30 secondi nel cestino di Android (recuperabili per 30 giorni da *Brani nel cestino*), senza perdere il brano nelle raccolte.
-- **Informazioni sul brano** (menu ⋮): i tag come li legge l'app, per capire perché un brano è finito tra gli sparsi.
+- **Informazioni sul brano** (menu ⋮) e **Salute della libreria** (Impostazioni): i tag come li legge l'app, e cartella per cartella quali file hanno i tag da sistemare e perché un brano è finito tra gli sparsi.
+- **Backup della tua musica**: preferiti, playlist, raccolte e ascolti si salvano da soli in `Download/BaldMusic` (restano anche se disinstalli l'app) o dove vuoi tu; su un telefono nuovo *Impostazioni → Ripristina…* li rimette, ritrovando i brani per cartella e titolo.
 - **Tablet**: schede a sinistra; in orizzontale libreria e dettaglio affiancati, coda o testo fissi a destra.
 - **Le tue statistiche**, **widget**, condivisione, **aggiornamenti dall'app** con le novità.
 

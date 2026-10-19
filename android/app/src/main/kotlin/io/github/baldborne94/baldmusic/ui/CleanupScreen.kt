@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.HealthAndSafety
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -67,6 +68,12 @@ fun CleanupScreen(vm: PlayerViewModel) {
                     Icon(Icons.Rounded.Restore, null, tint = Accent)
                     Text("  Brani nel cestino: ripescali e rimettili al loro posto", color = Accent)
                 }
+            }
+        }
+        item {
+            androidx.compose.material3.TextButton(onClick = { ui.push(Screen.Health) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                Icon(Icons.Rounded.HealthAndSafety, null, tint = Accent)
+                Text("  Salute della libreria: quali tag sistemare, cartella per cartella", color = Accent)
             }
         }
         val (duplicates, previews) = report ?: run {
