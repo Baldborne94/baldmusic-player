@@ -3,7 +3,7 @@ import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, Hero, LikedArt, PlayButton, PlaylistPicker, startRadio, TrackTable, useCoverColor } from "../components/Ui";
-import { albumYear, isRealAlbum } from "../lib/albums";
+import { albumYear, discography, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
 import { isWindowsPath, TRASH_SCRIPT_NAME, trashScript } from "../lib/cleanup";
@@ -85,7 +85,10 @@ export function AlbumPage({ id }: { id: string }) {
       {discs.length > 1 ? (
         discs.map((d) => (
           <div key={d}>
-            <h3 className="disc"><Icon name="album" size={18} /> Disco {d}</h3>
+            <h3 className="disc">
+              <Icon name="album" size={18} /> Disco {d}
+              {album.discTitles?.find((t) => t.disc === d)?.title ? ` · ${album.discTitles.find((t) => t.disc === d)!.title}` : ""}
+            </h3>
             <TrackTable songs={songs.filter((s) => (s.discNumber ?? 1) === d)} from={{ label: album.name, id: `album/${album.id}` }} showAlbum={false} showCover={false} numbered />
           </div>
         ))
@@ -161,12 +164,13 @@ export function ArtistPage({ id }: { id: string }) {
           )}
         </section>
       )}
-      {albums.length > 0 && (
-        <section className="shelf">
-          <header className="shelf__head"><h2>Discografia</h2></header>
-          <AlbumCards albums={albums} />
+      {/* Discografia per tipo, come sul telefono: Album, EP, Dal vivo, Colonne sonore, Compilation, Altro. */}
+      {discography(albums).map((g) => (
+        <section className="shelf" key={g.kind}>
+          <header className="shelf__head"><h2>{g.kind}</h2></header>
+          <AlbumCards albums={g.albums} />
         </section>
-      )}
+      ))}
       {singles.length > 0 && (
         <section className="shelf">
           <header className="shelf__head"><h2>Singoli e brani sparsi</h2></header>

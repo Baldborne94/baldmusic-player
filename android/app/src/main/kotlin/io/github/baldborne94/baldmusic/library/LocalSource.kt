@@ -37,14 +37,17 @@ class LocalSource(
     private val context: Context,
     private val onTagsRead: () -> Unit,
     private val onSongs: (List<LocalTrack>) -> Unit = {},
+    /** Ascolti per brano (ID di TrackRef): gli artisti più ascoltati vanno in cima. */
+    private val plays: () -> Map<String, Int> = { emptyMap() },
 ) : MusicSource {
 
     override val key = LocalCatalog.KEY
     override val title = "Telefono"
 
-    private val catalog = LocalCatalog(streamUri = { id ->
-        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
-    })
+    private val catalog = LocalCatalog(
+        streamUri = { id -> ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString() },
+        plays = { plays() },
+    )
 
     @Volatile private var cached: Pair<Long, List<LocalTrack>>? = null
 

@@ -62,6 +62,8 @@ export interface Album {
   releaseTypes?: string[];
   /** OpenSubsonic (Navidrome): data della prima uscita. */
   originalReleaseDate?: { year?: number; month?: number; day?: number };
+  /** OpenSubsonic: i titoli dei dischi ("Disco 2: The Two Towers"). */
+  discTitles?: { disc: number; title: string }[];
 }
 
 export interface Artist {
