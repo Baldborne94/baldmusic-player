@@ -99,3 +99,45 @@ describe("modifiche alla coda", () => {
     expect(q.entries).toHaveLength(1);
   });
 });
+
+describe("casi limite della coda", () => {
+  it("ripeti gira off → tutto → uno → off", () => {
+    let q = Q.emptyQueue;
+    const seen = [];
+    for (let i = 0; i < 3; i++) seen.push((q = Q.cycleRepeat(q)).repeat);
+    expect(seen).toEqual(["all", "one", "off"]);
+  });
+
+  it("indici fuori dalla coda non cambiano niente", () => {
+    const q = Q.playList(Q.emptyQueue, songs(3));
+    expect(Q.jumpTo(q, 5)).toBe(q);
+    expect(Q.jumpTo(q, -1)).toBe(q);
+    expect(Q.removeAt(q, 3)).toBe(q);
+    expect(Q.move(q, 0, 3)).toBe(q);
+    expect(Q.nextIndex(Q.emptyQueue, true)).toBeNull();
+  });
+
+  it("riproduci dopo su coda vuota fa da coda", () => {
+    const q = Q.playNext(Q.emptyQueue, songs(2));
+    expect(ids(q)).toEqual(["s0", "s1"]);
+    expect(q.index).toBe(0);
+  });
+
+  it("togliere il brano in ascolto (l'ultimo) passa a quello prima", () => {
+    const q = Q.removeAt(Q.jumpTo(Q.playList(Q.emptyQueue, songs(3)), 2), 2);
+    expect(Q.current(q)?.id).toBe("s1");
+  });
+
+  it("con lo shuffle acceso, togliere e aggiungere tiene allineato l'ordine originale", () => {
+    const on = Q.toggleShuffle(Q.playList(Q.emptyQueue, songs(4)), seeded(3));
+    const removed = Q.removeAt(on, on.entries.findIndex((e) => e.song.id === "s2"));
+    const next = Q.playNext(removed, [{ id: "x", title: "X" }]);
+    expect(Q.toggleShuffle(next).entries.map((e) => e.song.id)).toEqual(["s0", "s1", "s3", "x"]);
+  });
+
+  it("lo shuffle su una coda vuota non rompe niente", () => {
+    const on = Q.toggleShuffle(Q.emptyQueue);
+    expect(on.entries).toEqual([]);
+    expect(Q.toggleShuffle(on).index).toBe(-1);
+  });
+});

@@ -1,7 +1,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { dominantColor, tileColor } from "../lib/colors";
 import { formatDuration } from "../lib/format";
-import { addToPlaylist, createPlaylist, isCollection, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
+import { addToPlaylist, createPlaylist, isCollection, isMine, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
 import { player, usePlayer, usePlayerSelect } from "../lib/player";
 import { current } from "../lib/queue";
 import { href, navigate } from "../lib/router";
@@ -273,7 +273,8 @@ export function PlaylistPicker({ songs, onDone }: { songs: Song[]; onDone: () =>
         </button>
       </form>
       <div className="picker__list">
-        {playlists.map((p) => (
+        {/* Solo le proprie: in quelle degli altri Navidrome non lascia aggiungere. */}
+        {playlists.filter(isMine).map((p) => (
           <button
             key={p.id}
             onClick={async () => {

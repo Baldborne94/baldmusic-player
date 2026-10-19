@@ -164,7 +164,8 @@ export function blockedAsMixedContent(pageProtocol: string, serverUrl: string): 
   }
   if (url.protocol !== "http:") return false;
   const host = url.hostname;
-  const loopback = host === "localhost" || host.endsWith(".localhost") || /^127\./.test(host) || host === "[::1]";
+  // Solo l'indirizzo IP 127.x.x.x: un nome come 127.0.0.1.nip.io è un server in rete.
+  const loopback = host === "localhost" || host.endsWith(".localhost") || /^127(\.\d{1,3}){3}$/.test(host) || host === "[::1]";
   return !loopback;
 }
 

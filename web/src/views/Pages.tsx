@@ -7,7 +7,7 @@ import { albumYear, discography, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
 import { isWindowsPath, TRASH_SCRIPT_NAME, trashScript } from "../lib/cleanup";
-import { deletePlaylist, isCollection, rememberTrashed, removeManyFromPlaylist, renamePlaylist, rewritePlaylist, useLibrary } from "../lib/library";
+import { deletePlaylist, isCollection, isMine, rememberTrashed, removeManyFromPlaylist, renamePlaylist, rewritePlaylist, useLibrary } from "../lib/library";
 import { moveItem, range, sortSongs } from "../lib/playlistEdit";
 import { player, usePlayer } from "../lib/player";
 import { href, navigate } from "../lib/router";
@@ -207,7 +207,8 @@ export function PlaylistPage({ id }: { id: string }) {
   if (loading && !playlist) return <Loading />;
   if (error || !playlist) return <ErrorState message={error ?? "Playlist non trovata"} onRetry={reload} />;
   const songs = order ?? playlist.entry ?? [];
-  const mine = lib.playlists.some((p) => p.id === id);
+  // Navidrome elenca anche le playlist pubbliche degli altri: si modificano solo le proprie.
+  const mine = lib.playlists.some((p) => p.id === id) && isMine(playlist);
   const collection = isCollection(playlist);
   const chosen = songs.filter((_, i) => selected.has(i));
   const what = collection ? "raccolta" : "playlist";
@@ -241,9 +242,10 @@ export function PlaylistPage({ id }: { id: string }) {
   const trashChosen = async () => {
     const files = chosen.filter((s) => s.path && isWindowsPath(s.path));
     if (files.length === 0) return alert("Per buttare i file serve che Navidrome mostri i percorsi veri (Impostazioni → Raccolte dalle cartelle).");
-    if (!confirm(`Spostare ${plural(files.length, "file", "file")} nel Cestino di Windows? Si prepara lo script, come nella Pulizia, e i brani escono da questa ${what}.`)) return;
+    if (!confirm(`Spostare ${plural(files.length, "file", "file")} nel Cestino di Windows? Si prepara lo script, come nella Pulizia${mine ? `, e i brani escono da questa ${what}` : ""}.`)) return;
     const indexes = songs.map((s, i) => (files.includes(s) ? i : -1)).filter((i) => i >= 0);
-    await removeManyFromPlaylist(id, indexes);
+    // La playlist di un altro non si tocca (Navidrome rifiuterebbe): i file vanno nel Cestino lo stesso.
+    if (mine) await removeManyFromPlaylist(id, indexes);
     rememberTrashed(files);
     download(TRASH_SCRIPT_NAME, trashScript(files.map((s) => s.path!)));
     setTrashed(files.length);

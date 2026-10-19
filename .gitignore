@@ -5,3 +5,7 @@ dist/
 
 # Copie di lavoro temporanee degli aiutanti di Claude Code
 .claude/worktrees/
+
+# Prove nel browser (Playwright)
+test-results/
+playwright-report/

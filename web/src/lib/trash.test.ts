@@ -53,3 +53,25 @@ describe("restoreScript", () => {
     expect(s.indexOf("Test-Path -LiteralPath $f")).toBeLessThan(s.indexOf("[IO.File]::Move"));
   });
 });
+
+describe("casi limite del cestino", () => {
+  it("lo stesso file due volte nello stesso giro si ricorda una volta sola", () => {
+    // Una playlist con lo stesso brano due volte, selezionati entrambi e buttati.
+    const list = addRecords([], [rec("a", { at: 2 }), rec("a", { at: 2 })]);
+    expect(list.map((r) => r.path)).toEqual(["a"]);
+  });
+
+  it("un file già segnato nel Cestino resta così finché non torna", () => {
+    const { records, restored } = reconcile([rec("a", { gone: true })], new Set());
+    expect(records).toEqual([rec("a", { gone: true })]);
+    expect(restored).toEqual([]);
+  });
+
+  it("lo script di ripristino elenca tutti i file e non sovrascrive", () => {
+    const s = restoreScript(["C:\\Music\\a.mp3", "D:\\Altro\\b.mp3"]);
+    expect(s).toContain("'C:\\Music\\a.mp3'");
+    expect(s).toContain("'D:\\Altro\\b.mp3'");
+    expect(s).toContain("Già al suo posto");
+    expect(s).not.toMatch(/-Force\s+-Destination|Copy-Item|Remove-Item/);
+  });
+});

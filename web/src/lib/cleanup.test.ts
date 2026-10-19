@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duplicates, folderName, nameKey, previews, replaceCopies, trashScript } from "./cleanup";
+import { duplicates, folderName, isWindowsPath, nameKey, previews, psQuote, replaceCopies, trashScript } from "./cleanup";
 import type { Song } from "./subsonic";
 
 const song = (id: string, title: string, artist: string, duration: number, extra: Partial<Song> = {}): Song => ({
@@ -65,5 +65,64 @@ describe("trashScript", () => {
   it("dice in che cartella sta il file", () => {
     expect(folderName("C:\\Users\\B\\Music\\Disney Italia\\01.mp3")).toBe("Disney Italia");
     expect(folderName("/music/Sum 41/x.mp3")).toBe("Sum 41");
+  });
+});
+
+describe("casi limite della pulizia", () => {
+  it("anteprime da 25 a 35 secondi compresi, in ordine di cartella e titolo", () => {
+    const list = previews([
+      song("c", "B", "X", 35, { path: "C:\\Music\\Rock\\B.mp3" }),
+      song("a", "A", "X", 25, { path: "C:\\Music\\Rock\\A.mp3" }),
+      song("b", "Z", "X", 30, { path: "C:\\Music\\Disney\\Z.mp3" }),
+      song("lungo", "L", "X", 35.5),
+      song("corto", "C", "X", 24.9),
+      { id: "senza", title: "Senza durata" },
+    ]);
+    expect(list.map((s) => s.id)).toEqual(["b", "a", "c"]);
+  });
+
+  it("una versione lunga non si fonde con quella corta, anche con una catena di durate vicine", () => {
+    const groups = duplicates([song("a", "T", "X", 200), song("b", "T", "X", 202), song("c", "T", "X", 204), song("d", "T", "X", 206)]);
+    // Ogni gruppo sta entro 3 secondi dal primo: 200-202 e 204-206.
+    expect(groups.map((g) => [g.keep.id, ...g.others.map((o) => o.id)])).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+  });
+
+  it("si tiene la copia con l'anno vero, poi quella arrivata prima", () => {
+    const [g] = duplicates([
+      song("1970", "T", "X", 200, { album: "A", year: 1970, created: "2024-01-01" }),
+      song("vero", "T", "X", 200, { album: "A", year: 2001, created: "2025-01-01" }),
+    ]);
+    expect(g.keep.id).toBe("vero");
+    const [h] = duplicates([song("dopo", "T", "X", 200, { created: "2025-01-01" }), song("prima", "T", "X", 200, { created: "2024-01-01" })]);
+    expect(h.keep.id).toBe("prima");
+  });
+
+  it("brani senza durata non sono doppioni", () => {
+    expect(duplicates([{ id: "a", title: "T", artist: "X" }, { id: "b", title: "T", artist: "X" }])).toEqual([]);
+  });
+
+  it("due copie buttate dello stesso brano nella stessa playlist diventano una sola tenuta", () => {
+    const kept = new Map([
+      ["c1", "k"],
+      ["c2", "k"],
+    ]);
+    expect(replaceCopies(["x", "c1", "y", "c2"], kept)).toEqual(["x", "k", "y"]);
+  });
+
+  it("percorsi di Windows e apici per PowerShell", () => {
+    expect(isWindowsPath("C:\\Music\\a.mp3")).toBe(true);
+    expect(isWindowsPath("/music/a.mp3")).toBe(false);
+    expect(isWindowsPath("C:/Music/a.mp3")).toBe(false);
+    expect(psQuote("L'isola d'Elba")).toBe("'L''isola d''Elba'");
+  });
+
+  it("lo script ha le righe di Windows e non cancella mai per sempre", () => {
+    const s = trashScript(["C:\\Music\\a.mp3", "C:\\Music\\b.mp3"]);
+    expect(s.split("\r\n").length).toBeGreaterThan(10);
+    expect(s).not.toMatch(/Remove-Item|\bdel\b|DeletePermanently/i);
+    expect(s).toContain("'C:\\Music\\a.mp3',\r\n  'C:\\Music\\b.mp3'");
   });
 });

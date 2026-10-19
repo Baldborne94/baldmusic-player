@@ -25,8 +25,10 @@ export const RESTORE_SCRIPT_NAME = "baldmusic-ripristina.cmd";
 
 /** Aggiunge i file appena buttati: i più recenti in cima, un file una volta sola. */
 export function addRecords(records: TrashRecord[], added: TrashRecord[]): TrashRecord[] {
-  const paths = new Set(added.map((r) => r.path));
-  return [...added, ...records.filter((r) => !paths.has(r.path))].slice(0, MAX_RECORDS);
+  // Anche dentro [added]: una playlist può avere lo stesso brano due volte.
+  const paths = new Set<string>();
+  const fresh = added.filter((r) => !paths.has(r.path) && paths.add(r.path));
+  return [...fresh, ...records.filter((r) => !paths.has(r.path))].slice(0, MAX_RECORDS);
 }
 
 /**
