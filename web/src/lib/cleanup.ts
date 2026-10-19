@@ -113,14 +113,19 @@ export const isWindowsPath = (path: string) => /^[A-Za-z]:\\/.test(path);
 /** Il nome del file da scaricare: un .cmd parte col doppio clic, un .ps1 no. */
 export const TRASH_SCRIPT_NAME = "baldmusic-pulizia.cmd";
 
+/** Un percorso tra apici per PowerShell: l'apice dentro si raddoppia. */
+export const psQuote = (p: string) => `'${p.replace(/'/g, "''")}'`;
+
+/** L'elenco dei file come array di PowerShell. */
+export const psArray = (paths: string[]) => ["$files = @(", paths.map((p) => `  ${psQuote(p)}`).join(",\r\n"), ")"];
+
 /**
- * Script che sposta i file nel Cestino di Windows. È un .cmd che contiene PowerShell:
- * col doppio clic Windows lo apre, la parte per il prompt dei comandi lancia PowerShell
- * su questo stesso file (letto come UTF-8, così i percorsi con le lettere accentate
- * restano giusti) e la parte per PowerShell, dentro un commento per il prompt, fa il lavoro.
+ * Uno script per Windows che parte col doppio clic: è un .cmd che contiene PowerShell.
+ * La parte per il prompt dei comandi lancia PowerShell su questo stesso file (letto come
+ * UTF-8, così i percorsi con le lettere accentate restano giusti) e la parte per
+ * PowerShell, dentro un commento per il prompt, fa il lavoro.
  */
-export function trashScript(paths: string[]): string {
-  const quoted = paths.map((p) => `  '${p.replace(/'/g, "''")}'`).join(",\r\n");
+export function cmdScript(lines: string[]): string {
   return [
     "<# : prompt dei comandi",
     "@echo off",
@@ -128,12 +133,19 @@ export function trashScript(paths: string[]): string {
     "if errorlevel 1 pause",
     "goto :EOF",
     ": da qui PowerShell #>",
+    ...lines,
+    'Read-Host "Premi Invio per chiudere"',
+    "",
+  ].join("\r\n");
+}
+
+/** Script che sposta i file nel Cestino di Windows (si ripristinano da lì o dall'app). */
+export function trashScript(paths: string[]): string {
+  return cmdScript([
     "# BaldMusic - pulizia della libreria",
     "# Sposta questi file nel Cestino di Windows: se serve, si ripristinano da li'.",
     "Add-Type -AssemblyName Microsoft.VisualBasic",
-    "$files = @(",
-    quoted,
-    ")",
+    ...psArray(paths),
     "$ok = 0",
     "foreach ($f in $files) {",
     "  if (Test-Path -LiteralPath $f) {",
@@ -144,7 +156,5 @@ export function trashScript(paths: string[]): string {
     "  }",
     "}",
     'Write-Host "$ok file spostati nel Cestino."',
-    'Read-Host "Premi Invio per chiudere"',
-    "",
-  ].join("\r\n");
+  ]);
 }

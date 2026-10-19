@@ -3,6 +3,7 @@ import { replaceCopies, type DuplicateGroup } from "./cleanup";
 import { collectionComment, collectionFolders, folderOf, isRealPath, planSync, type CollectionsState } from "./collections";
 import { getClient } from "./session";
 import type { Playlist, Song, SubsonicClient } from "./subsonic";
+import { addRecords, putBack, reconcile, type TrashRecord } from "./trash";
 
 // La "tua musica" sul server: brani preferiti (star di Navidrome) e playlist.
 // Stanno su Navidrome, quindi sono le stesse su PC, tablet e (col server) telefono.
@@ -85,6 +86,41 @@ export async function addToPlaylist(id: string, songs: Song[]): Promise<void> {
   await refreshLibrary();
 }
 
+/**
+ * Brani trascinati su una playlist: in fondo, solo quelli che non ha già. Dice quanti
+ * sono entrati davvero.
+ */
+export async function addNewToPlaylist(id: string, songs: Song[]): Promise<number> {
+  const c = getClient();
+  if (!c) return 0;
+  const have = new Set(((await c.playlist(id)).entry ?? []).map((s) => s.id));
+  const fresh = [...new Set(songs.map((s) => s.id))].filter((x) => !have.has(x));
+  await addInChunks(c, id, fresh);
+  await refreshLibrary();
+  return fresh.length;
+}
+
+/** Brani trascinati su "Brani che ti piacciono". Dice quanti non c'erano. */
+export async function likeAll(songs: Song[]): Promise<number> {
+  const c = getClient();
+  if (!c) return 0;
+  const fresh = songs.filter((s, i) => !state.liked.has(s.id) && songs.findIndex((x) => x.id === s.id) === i);
+  if (fresh.length === 0) return 0;
+  set({ liked: new Set([...state.liked, ...fresh.map((s) => s.id)]), likedSongs: [...fresh, ...state.likedSongs] });
+  try {
+    for (const s of fresh) await c.setStar(s.id, true);
+  } finally {
+    await refreshLibrary();
+  }
+  return fresh.length;
+}
+
+/** Le playlist che si possono modificare: le proprie (quelle degli altri sono solo da ascoltare). */
+export function isMine(p: Playlist): boolean {
+  const user = getClient()?.creds.user.toLowerCase();
+  return !p.owner || p.owner.toLowerCase() === user;
+}
+
 export async function removeFromPlaylist(id: string, index: number): Promise<void> {
   await getClient()?.updatePlaylist(id, { removeIndexes: [index] });
   await refreshLibrary();
@@ -117,6 +153,8 @@ export const isCollection = (p: Playlist) => folderOf(p) !== null;
 
 // Le cartelle viste all'ultimo allineamento, per creare a mano quelle che mancano.
 let lastFolders = new Map<string, string[]>();
+// I file che Navidrome vedeva all'ultimo allineamento, per "Brani nel cestino".
+let lastPaths: Set<string> | null = null;
 let syncing: Promise<void> | null = null;
 
 /** Allinea le raccolte alle cartelle della musica sul server. Una sola volta per volta. */
@@ -131,9 +169,12 @@ async function doSync(): Promise<void> {
   const c = getClient();
   if (!c) return;
   set({ collections: { ...state.collections, state: "syncing" } });
+  lastPaths = null;
   try {
     const [songs, playlists] = await Promise.all([c.allSongs(), c.playlists()]);
     lastFolders = collectionFolders(songs);
+    lastPaths = new Set(songs.flatMap((s) => (s.path ? [s.path] : [])));
+    await restoreIntoCollections(c, songs, playlists);
     if (lastFolders.size === 0) {
       const fake = songs.length > 0 && !songs.some((s) => s.path && isRealPath(s.path));
       set({ collections: { state: fake ? "noRealPath" : "ready", missing: [] } });
@@ -205,7 +246,7 @@ export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
   if (!c) return;
   const keptFor = new Map(groups.flatMap((g) => g.others.map((o) => [o.id, g.keep.id] as const)));
   if (keptFor.size === 0) return;
-  const mine = state.playlists.filter((p) => !p.owner || p.owner.toLowerCase() === c.creds.user.toLowerCase());
+  const mine = state.playlists.filter(isMine);
   for (const p of mine) {
     const ids = ((await c.playlist(p.id)).entry ?? []).map((s) => s.id);
     if (ids.some((id) => keptFor.has(id))) await c.replacePlaylistSongs(p.id, replaceCopies(ids, keptFor));
@@ -214,6 +255,82 @@ export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
     if (state.liked.has(copy) && !state.liked.has(kept)) await c.setStar(kept, true);
   }
   await refreshLibrary();
+}
+
+// File mandati nel Cestino di Windows da questo browser, per server e utente.
+const trashKey = (c: SubsonicClient) => `baldmusic.cestino.${c.creds.url}|${c.creds.user}`;
+
+function loadTrashed(c: SubsonicClient): TrashRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem(trashKey(c)) ?? "[]") as TrashRecord[];
+  } catch {
+    return [];
+  }
+}
+
+function saveTrashed(c: SubsonicClient, list: TrashRecord[]): void {
+  try {
+    localStorage.setItem(trashKey(c), JSON.stringify(list));
+  } catch {
+    // ignorato: si perde solo l'elenco, i file restano nel Cestino di Windows
+  }
+}
+
+/** I file mandati nel Cestino da questo browser, i più recenti in cima. */
+export function trashedFiles(): TrashRecord[] {
+  const c = getClient();
+  return c ? loadTrashed(c) : [];
+}
+
+/** Ricorda i file dello script per il Cestino; [keptFor] = la copia tenuta di ogni doppione. */
+export function rememberTrashed(songs: Song[], keptFor: Map<string, string> = new Map()): void {
+  const c = getClient();
+  if (!c) return;
+  const at = Date.now();
+  const added = songs.flatMap((s) => (s.path ? [{ path: s.path, title: s.title, artist: s.artist, keptId: keptFor.get(s.id), at }] : []));
+  saveTrashed(c, addRecords(loadTrashed(c), added));
+}
+
+/** Toglie dall'elenco (i file restano dove sono). [gone] = segna solo come già nel Cestino. */
+export function forgetTrashed(paths: string[], gone = false): void {
+  const c = getClient();
+  if (!c) return;
+  const which = new Set(paths);
+  const list = loadTrashed(c);
+  saveTrashed(c, gone ? list.map((r) => (which.has(r.path) ? { ...r, gone: true } : r)) : list.filter((r) => !which.has(r.path)));
+}
+
+/**
+ * Allinea e dice quali file Navidrome vede adesso: chi è tornato rientra nella sua raccolta,
+ * gli altri sono ancora nel Cestino (o lo script non è ancora partito).
+ */
+export async function checkTrash(): Promise<Set<string>> {
+  await syncCollections();
+  if (lastPaths) return lastPaths;
+  const songs = (await getClient()?.allSongs()) ?? [];
+  return new Set(songs.flatMap((s) => (s.path ? [s.path] : [])));
+}
+
+/**
+ * I file ripristinati (dall'app o a mano dal Cestino di Windows) tornano nella raccolta
+ * della loro cartella al posto della copia che li aveva sostituiti, come restoreInto sul
+ * telefono. Gli altri brani tornati rientrano con l'allineamento delle cartelle.
+ */
+async function restoreIntoCollections(c: SubsonicClient, songs: Song[], playlists: Playlist[]): Promise<void> {
+  const saved = loadTrashed(c);
+  if (saved.length === 0) return;
+  const idOf = new Map(songs.flatMap((s) => (s.path ? [[s.path, s.id] as const] : [])));
+  const { records, restored } = reconcile(saved, new Set(idOf.keys()));
+  for (const r of restored) {
+    const id = idOf.get(r.path)!;
+    const folder = [...lastFolders].find(([, ids]) => ids.includes(id))?.[0];
+    const pl = folder === undefined ? undefined : playlists.find((p) => folderOf(p) === folder);
+    if (!pl || !r.keptId) continue;
+    const ids = ((await c.playlist(pl.id)).entry ?? []).map((s) => s.id);
+    const next = putBack(ids, id, r.keptId, lastFolders.get(folder!)!);
+    if (next) await c.replacePlaylistSongs(pl.id, next);
+  }
+  saveTrashed(c, records);
 }
 
 /** Ricerche recenti, solo su questo dispositivo. */

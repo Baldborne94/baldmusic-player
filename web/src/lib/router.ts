@@ -12,6 +12,7 @@ export type Route =
   | { name: "playlists" }
   | { name: "collections" }
   | { name: "cleanup" }
+  | { name: "trash" }
   | { name: "album"; id: string }
   | { name: "artist"; id: string }
   | { name: "playlist"; id: string }
@@ -23,7 +24,7 @@ export type Route =
   | { name: "settings" };
 
 const WITH_ID = new Set(["album", "artist", "playlist", "genre", "decade"]);
-const SIMPLE = new Set(["library", "albums", "artists", "playlists", "collections", "cleanup", "liked", "stats", "queue", "settings"]);
+const SIMPLE = new Set(["library", "albums", "artists", "playlists", "collections", "cleanup", "trash", "liked", "stats", "queue", "settings"]);
 
 export function parseRoute(hash: string): Route {
   const [path, qs = ""] = hash.replace(/^#\/?/, "").split("?");

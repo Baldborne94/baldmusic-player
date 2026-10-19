@@ -4,9 +4,9 @@ import { ErrorState, Loading } from "../components/States";
 import { duplicates, folderName, isWindowsPath, previews, TRASH_SCRIPT_NAME, trashScript, type DuplicateGroup } from "../lib/cleanup";
 import { isRealPath } from "../lib/collections";
 import { formatDuration, plural } from "../lib/format";
-import { mergeDuplicates } from "../lib/library";
+import { mergeDuplicates, rememberTrashed } from "../lib/library";
+import { href } from "../lib/router";
 import { getClient } from "../lib/session";
-import type { Song } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
 import { CollectionsHint } from "./Library";
 
@@ -58,6 +58,7 @@ export function CleanupPage() {
     setBusy(true);
     try {
       await mergeDuplicates(groups);
+      rememberTrashed(files, new Map(groups.flatMap((g) => g.others.map((o) => [o.id, g.keep.id] as const))));
       download(TRASH_SCRIPT_NAME, trashScript(files.map((s) => s.path!)));
       setDone(files.map((s) => s.path!));
     } finally {
@@ -69,6 +70,11 @@ export function CleanupPage() {
     <div className="page cleanup">
       <header className="page-head">
         <h1>Pulizia della libreria</h1>
+        <span className="page-head__actions">
+          <a className="btn" href={href({ name: "trash" })}>
+            <Icon name="restore" size={18} /> Brani nel cestino
+          </a>
+        </span>
       </header>
       <p className="muted pad">
         Come sul telefono: brani scaricati male (anteprime di 30 secondi) e lo stesso brano in più cartelle. I file non si cancellano
@@ -107,7 +113,7 @@ export function CleanupPage() {
               key={s.id}
               checked={!skip.has(s.id)}
               onClick={(shift) => click("prev", prevIds, i, shift)}
-              song={s}
+              title={s.title}
               lines={[`${s.artist ?? ""} · ${formatDuration(s.duration)} · ${folderName(s.path)}`]}
             />
           ))}
@@ -127,7 +133,7 @@ export function CleanupPage() {
               key={g.keep.id}
               checked={!skip.has(g.keep.id)}
               onClick={(shift) => click("dup", dupIds, i, shift)}
-              song={g.keep}
+              title={g.keep.title}
               lines={[`${g.keep.artist ?? ""} · ${formatDuration(g.keep.duration)}`, `Resta in: ${folderName(g.keep.path)}`, `Da buttare: ${g.others.map((o) => folderName(o.path)).join(", ")}`]}
             />
           ))}
@@ -146,7 +152,7 @@ export function CleanupPage() {
 }
 
 /** "Seleziona tutti": spunta piena, vuota o a metà se solo alcuni sono scelti. */
-function SelectAll({ ids, skip, onChange }: { ids: string[]; skip: Set<string>; onChange: (on: boolean) => void }) {
+export function SelectAll({ ids, skip, onChange }: { ids: string[]; skip: Set<string>; onChange: (on: boolean) => void }) {
   const chosen = ids.filter((id) => !skip.has(id)).length;
   const all = chosen === ids.length;
   return (
@@ -169,19 +175,19 @@ function SelectAll({ ids, skip, onChange }: { ids: string[]; skip: Set<string>; 
   );
 }
 
-function Row({ song, lines, checked, onClick }: { song: Song; lines: string[]; checked: boolean; onClick: (shift: boolean) => void }) {
+export function Row({ title, lines, checked, disabled, onClick }: { title: string; lines: string[]; checked: boolean; disabled?: boolean; onClick: (shift: boolean) => void }) {
   return (
     <label
-      className="clean-row"
+      className={`clean-row ${disabled ? "is-disabled" : ""}`}
       onClick={(e) => {
         // Il clic lo gestiamo noi (serve sapere se c'è Maiuscolo): niente secondo clic sulla casella.
         e.preventDefault();
-        onClick(e.shiftKey);
+        if (!disabled) onClick(e.shiftKey);
       }}
     >
-      <input type="checkbox" checked={checked} readOnly />
+      <input type="checkbox" checked={checked} disabled={disabled} readOnly />
       <span className="clean-row__text">
-        <strong>{song.title}</strong>
+        <strong>{title}</strong>
         {lines.map((l, i) => (
           <span key={i} className="muted">{l}</span>
         ))}
@@ -194,7 +200,7 @@ function Row({ song, lines, checked, onClick }: { song: Song; lines: string[]; c
  * Copia negli appunti e lo dice. Se il browser non lo permette, mostra il testo già
  * selezionato da copiare a mano (Ctrl+C).
  */
-function CopyButton({ label, text }: { label: string; text: string }) {
+export function CopyButton({ label, text }: { label: string; text: string }) {
   const [state, setState] = useState<"idle" | "ok" | "manual">("idle");
   const copy = async () => {
     try {
@@ -230,7 +236,9 @@ export function TrashSteps({ count }: { count: number }) {
         <strong>Esegui comunque</strong>. Si apre una finestra che sposta {plural(count, "file", "file")} nel Cestino e alla fine chiede di premere Invio.
       </li>
       <li>Navidrome se ne accorge da solo; se dopo un minuto li vedi ancora, in Navidrome: icona a onda → <strong>Quick Scan</strong>.</li>
-      <li>Buttato qualcosa per sbaglio? Cestino di Windows → tasto destro → <strong>Ripristina</strong>.</li>
+      <li>
+        Buttato qualcosa per sbaglio? <a href={href({ name: "trash" })}>Brani nel cestino</a> lo rimette al suo posto, anche nella sua raccolta.
+      </li>
     </ol>
   );
 }

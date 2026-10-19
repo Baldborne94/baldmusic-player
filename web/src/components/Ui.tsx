@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { dominantColor, tileColor } from "../lib/colors";
 import { formatDuration } from "../lib/format";
 import { addToPlaylist, createPlaylist, isCollection, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
-import { player, usePlayer } from "../lib/player";
+import { player, usePlayer, usePlayerSelect } from "../lib/player";
 import { current } from "../lib/queue";
 import { href, navigate } from "../lib/router";
 import { getClient, useClient } from "../lib/session";
+import { endSongDrag, startSongDrag } from "../lib/songDrag";
 import type { Album, Artist, Playlist, Song } from "../lib/subsonic";
 import { Cover } from "./Cover";
 import { Icon } from "./Icon";
@@ -319,6 +320,20 @@ export interface TrackSelection {
   toggle: (index: number, shift: boolean) => void;
 }
 
+/** Righe disegnate subito; le altre arrivano a blocchi, così una raccolta di migliaia di brani si apre al volo. */
+const FIRST_ROWS = 150;
+const MORE_ROWS = 400;
+
+interface RowActions {
+  play: (i: number) => void;
+  menu: (i: number, x: number, y: number) => void;
+  toggle: (i: number, shift: boolean) => void;
+  dragStart: (e: DragEvent, i: number) => void;
+  dragOver: (e: DragEvent, i: number) => void;
+  drop: (e: DragEvent, i: number) => void;
+  dragEnd: () => void;
+}
+
 export function TrackTable({
   songs,
   from,
@@ -339,12 +354,54 @@ export function TrackTable({
   /** Riordino: si trascina la maniglia ≡ e al rilascio il brano va in quella posizione. */
   onMove?: (from: number, to: number) => void;
 }) {
-  const { queue, playing } = usePlayer();
+  // Solo brano in corso e pausa: la posizione che avanza non ridisegna l'elenco.
+  const nowId = usePlayerSelect((p) => current(p.queue)?.id);
+  const playing = usePlayerSelect((p) => p.playing);
   const { liked } = useLibrary();
-  const now = current(queue);
   const [menu, setMenu] = useState<{ song: Song; index: number; x: number; y: number } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  const [shown, setShown] = useState(FIRST_ROWS);
+  useEffect(() => {
+    if (shown >= songs.length) return;
+    const t = setTimeout(() => setShown((n) => n + MORE_ROWS), 16);
+    return () => clearTimeout(t);
+  }, [shown, songs.length]);
+  // Le righe non si ridisegnano se non cambiano: le azioni leggono i valori di adesso da qui.
+  const live = useRef({ songs, from, selection, onMove, dragFrom });
+  live.current = { songs, from, selection, onMove, dragFrom };
+  const actions = useMemo<RowActions>(
+    () => ({
+      play: (i) => player.play(live.current.songs, i, false, live.current.from),
+      menu: (i, x, y) => setMenu({ song: live.current.songs[i], index: i, x, y }),
+      toggle: (i, shift) => live.current.selection?.toggle(i, shift),
+      dragStart: (e, i) => {
+        const { songs, selection, onMove } = live.current;
+        // Un brano selezionato si porta dietro tutti quelli selezionati.
+        startSongDrag(e, selection?.selected.has(i) ? songs.filter((_, j) => selection.selected.has(j)) : [songs[i]]);
+        if (onMove) setDragFrom(i);
+      },
+      dragOver: (e, i) => {
+        if (!live.current.onMove || live.current.dragFrom === null) return;
+        e.preventDefault();
+        setDragOver(i);
+      },
+      drop: (e, i) => {
+        const { onMove, dragFrom } = live.current;
+        if (!onMove || dragFrom === null) return;
+        e.preventDefault();
+        if (dragFrom !== i) onMove(dragFrom, i);
+        setDragFrom(null);
+        setDragOver(null);
+      },
+      dragEnd: () => {
+        endSongDrag();
+        setDragFrom(null);
+        setDragOver(null);
+      },
+    }),
+    [],
+  );
   if (songs.length === 0) return <p className="muted pad">Nessun brano.</p>;
   return (
     <div className={`tracks ${showAlbum ? "" : "tracks--noalbum"}`}>
@@ -358,94 +415,125 @@ export function TrackTable({
         </span>
         <span />
       </div>
-      {songs.map((s, i) => {
-        const active = now?.id === s.id;
-        const isLiked = liked.has(s.id);
-        return (
-          <div
-            key={`${s.id}-${i}`}
-            className={`trow ${active ? "trow--active" : ""} ${selection?.selected.has(i) ? "trow--selected" : ""} ${dragOver === i && dragFrom !== i ? "trow--drop" : ""}`}
-            draggable={!!onMove}
-            onDragStart={(e) => {
-              if (!onMove) return;
-              setDragFrom(i);
-              e.dataTransfer.effectAllowed = "move";
-            }}
-            onDragOver={(e) => {
-              if (!onMove || dragFrom === null) return;
-              e.preventDefault();
-              setDragOver(i);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (onMove && dragFrom !== null && dragFrom !== i) onMove(dragFrom, i);
-              setDragFrom(null);
-              setDragOver(null);
-            }}
-            onDragEnd={() => {
-              setDragFrom(null);
-              setDragOver(null);
-            }}
-            onClick={(e) => {
-              // Cuore, menu e link fanno il loro lavoro anche mentre si seleziona.
-              if (!selection || (e.target as HTMLElement).closest("button, a")) return;
-              e.preventDefault();
-              selection.toggle(i, e.shiftKey);
-            }}
-            onDoubleClick={() => !selection && !onMove && player.play(songs, i, false, from)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setMenu({ song: s, index: i, x: e.clientX, y: e.clientY });
-            }}
-          >
-            {selection ? (
-              <span className="trow__num trow__num--check">
-                <input type="checkbox" checked={selection.selected.has(i)} readOnly aria-label={`Seleziona ${s.title}`} />
-              </span>
-            ) : onMove ? (
-              <span className="trow__num trow__num--handle" title="Trascina per spostare">≡</span>
-            ) : (
-            <span className="trow__num">
-              <span className="trow__index">{active && playing ? <span className="eq"><i /><i /><i /></span> : numbered ? s.track ?? i + 1 : i + 1}</span>
-              <button className="trow__playbtn" onClick={() => (active ? player.toggle() : player.play(songs, i, false, from))} aria-label="Riproduci">
-                <Icon name={active && playing ? "pause" : "play"} size={16} />
-              </button>
-            </span>
-            )}
-            <span className="trow__main" onClick={() => !selection && !onMove && player.play(songs, i, false, from)}>
-              {showCover && <Cover id={s.coverArt} size={96} className="trow__cover" />}
-              <span className="trow__text">
-                <span className="trow__title">{s.title}</span>
-                <span className="trow__artist">
-                  {s.artistId ? (
-                    <a href={href({ name: "artist", id: s.artistId })} onClick={(e) => e.stopPropagation()}>
-                      {s.artist}
-                    </a>
-                  ) : (
-                    s.artist
-                  )}
-                </span>
-              </span>
-            </span>
-            {showAlbum && (
-              <span className="trow__album wide-only">{s.albumId ? <a href={href({ name: "album", id: s.albumId })}>{s.album}</a> : s.album}</span>
-            )}
-            <button className={`icon-btn trow__heart ${isLiked ? "is-on" : ""}`} onClick={() => toggleLike(s)} aria-label={isLiked ? "Togli da Mi piace" : "Mi piace"}>
-              <Icon name={isLiked ? "heart" : "heartOutline"} size={18} />
-            </button>
-            <span className="trow__dur">{formatDuration(s.duration)}</span>
-            <button className="icon-btn trow__more" onClick={(e) => setMenu({ song: s, index: i, x: e.clientX, y: e.clientY })} aria-label="Altre azioni">
-              <Icon name="more" size={18} />
-            </button>
-          </div>
-        );
-      })}
+      {songs.slice(0, shown).map((s, i) => (
+        <TrackRow
+          key={`${s.id}-${i}`}
+          s={s}
+          i={i}
+          active={nowId === s.id}
+          playing={nowId === s.id && playing}
+          isLiked={liked.has(s.id)}
+          selecting={!!selection}
+          selected={!!selection?.selected.has(i)}
+          reorder={!!onMove}
+          drop={dragOver === i && dragFrom !== i}
+          numbered={numbered}
+          showAlbum={showAlbum}
+          showCover={showCover}
+          actions={actions}
+        />
+      ))}
+      {shown < songs.length && <div className="tracks__more" style={{ height: (songs.length - shown) * 56 }} />}
       {menu && <SongMenu song={menu.song} x={menu.x} y={menu.y} playlistId={playlistId} index={menu.index} onClose={() => setMenu(null)} />}
     </div>
   );
 }
 
-/** Intestazione colorata di album, artisti e playlist. */
+const TrackRow = memo(function TrackRow({
+  s,
+  i,
+  active,
+  playing,
+  isLiked,
+  selecting,
+  selected,
+  reorder,
+  drop,
+  numbered,
+  showAlbum,
+  showCover,
+  actions,
+}: {
+  s: Song;
+  i: number;
+  active: boolean;
+  playing: boolean;
+  isLiked: boolean;
+  selecting: boolean;
+  selected: boolean;
+  reorder: boolean;
+  drop: boolean;
+  numbered: boolean;
+  showAlbum: boolean;
+  showCover: boolean;
+  actions: RowActions;
+}) {
+  return (
+    <div
+      className={`trow ${active ? "trow--active" : ""} ${selected ? "trow--selected" : ""} ${drop ? "trow--drop" : ""}`}
+      // Sempre trascinabile: sulle playlist della barra laterale; col riordino, anche dentro l'elenco.
+      draggable
+      onDragStart={(e) => actions.dragStart(e, i)}
+      onDragOver={(e) => actions.dragOver(e, i)}
+      onDrop={(e) => actions.drop(e, i)}
+      onDragEnd={actions.dragEnd}
+      onClick={(e) => {
+        // Cuore, menu e link fanno il loro lavoro anche mentre si seleziona.
+        if (!selecting || (e.target as HTMLElement).closest("button, a")) return;
+        e.preventDefault();
+        actions.toggle(i, e.shiftKey);
+      }}
+      onDoubleClick={() => !selecting && !reorder && actions.play(i)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        actions.menu(i, e.clientX, e.clientY);
+      }}
+    >
+      {selecting ? (
+        <span className="trow__num trow__num--check">
+          <input type="checkbox" checked={selected} readOnly aria-label={`Seleziona ${s.title}`} />
+        </span>
+      ) : reorder ? (
+        <span className="trow__num trow__num--handle" title="Trascina per spostare">≡</span>
+      ) : (
+        <span className="trow__num">
+          <span className="trow__index">{playing ? <span className="eq"><i /><i /><i /></span> : numbered ? s.track ?? i + 1 : i + 1}</span>
+          <button className="trow__playbtn" onClick={() => (active ? player.toggle() : actions.play(i))} aria-label="Riproduci">
+            <Icon name={playing ? "pause" : "play"} size={16} />
+          </button>
+        </span>
+      )}
+      <span className="trow__main" onClick={() => !selecting && !reorder && actions.play(i)}>
+        {showCover && <Cover id={s.coverArt} size={96} className="trow__cover" />}
+        <span className="trow__text">
+          <span className="trow__title">{s.title}</span>
+          <span className="trow__artist">
+            {s.artistId ? (
+              <a href={href({ name: "artist", id: s.artistId })} draggable={false} onClick={(e) => e.stopPropagation()}>
+                {s.artist}
+              </a>
+            ) : (
+              s.artist
+            )}
+          </span>
+        </span>
+      </span>
+      {showAlbum && (
+        <span className="trow__album wide-only">
+          {s.albumId ? <a href={href({ name: "album", id: s.albumId })} draggable={false}>{s.album}</a> : s.album}
+        </span>
+      )}
+      <button className={`icon-btn trow__heart ${isLiked ? "is-on" : ""}`} onClick={() => toggleLike(s)} aria-label={isLiked ? "Togli da Mi piace" : "Mi piace"}>
+        <Icon name={isLiked ? "heart" : "heartOutline"} size={18} />
+      </button>
+      <span className="trow__dur">{formatDuration(s.duration)}</span>
+      <button className="icon-btn trow__more" onClick={(e) => actions.menu(i, e.clientX, e.clientY)} aria-label="Altre azioni">
+        <Icon name="more" size={18} />
+      </button>
+    </div>
+  );
+});
+
 export function Hero({ color, art, kind, title, meta, round }: { color: string; art: ReactNode; kind: string; title: string; meta: ReactNode; round?: boolean }) {
   return (
     <header className="hero" style={{ "--hero": color } as React.CSSProperties}>
