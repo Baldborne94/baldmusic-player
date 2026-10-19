@@ -35,6 +35,10 @@ export interface Song {
   genre?: string;
   /** Percorso del file: vero solo se nel lettore di Navidrome è attivo "Mostra percorso reale". */
   path?: string;
+  /** ID MusicBrainz della registrazione (OpenSubsonic): c'è se il file è passato da Picard. */
+  musicBrainzId?: string;
+  /** Quando Navidrome ha trovato il file. */
+  created?: string;
 }
 
 export interface Album {
@@ -316,6 +320,13 @@ export class SubsonicClient {
       out.push(...songs);
       if (songs.length < page) return out;
     }
+  }
+
+  /** Sostituisce tutti i brani di una playlist (nome e commento restano). */
+  async replacePlaylistSongs(id: string, songIds: string[]): Promise<void> {
+    const q = new URLSearchParams();
+    songIds.forEach((s) => q.append("songId", s));
+    await this.callMulti("createPlaylist", { playlistId: id }, q);
   }
 
   async createPlaylist(name: string, songIds: string[] = []): Promise<Playlist> {

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { replaceCopies, type DuplicateGroup } from "./cleanup";
 import { collectionComment, collectionFolders, folderOf, isRealPath, planSync, type CollectionsState } from "./collections";
 import { getClient } from "./session";
 import type { Playlist, Song, SubsonicClient } from "./subsonic";
@@ -181,6 +182,26 @@ function saveState(c: SubsonicClient, s: CollectionsState): void {
   } catch {
     // ignorato: al prossimo giro le cartelle si confrontano di nuovo da capo
   }
+}
+
+/**
+ * Prima di buttare i doppioni: le raccolte, le playlist e i preferiti che avevano una copia
+ * buttata passano a quella tenuta, nella stessa posizione (come mergeTracks sul telefono).
+ */
+export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  const keptFor = new Map(groups.flatMap((g) => g.others.map((o) => [o.id, g.keep.id] as const)));
+  if (keptFor.size === 0) return;
+  const mine = state.playlists.filter((p) => !p.owner || p.owner.toLowerCase() === c.creds.user.toLowerCase());
+  for (const p of mine) {
+    const ids = ((await c.playlist(p.id)).entry ?? []).map((s) => s.id);
+    if (ids.some((id) => keptFor.has(id))) await c.replacePlaylistSongs(p.id, replaceCopies(ids, keptFor));
+  }
+  for (const [copy, kept] of keptFor) {
+    if (state.liked.has(copy) && !state.liked.has(kept)) await c.setStar(kept, true);
+  }
+  await refreshLibrary();
 }
 
 /** Ricerche recenti, solo su questo dispositivo. */

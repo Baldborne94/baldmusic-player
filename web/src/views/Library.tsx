@@ -158,15 +158,20 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
     <div className="page">
       <header className="page-head">
         <h1>La tua libreria</h1>
-        <button
-          className="btn"
-          onClick={async () => {
-            const name = prompt("Nome della nuova playlist", "La mia playlist");
-            if (name) await createPlaylist(name);
-          }}
-        >
-          <Icon name="plus" size={18} /> Nuova playlist
-        </button>
+        <span className="page-head__actions">
+          <a className="btn" href={href({ name: "cleanup" })} title="Anteprime di 30 secondi e doppioni">
+            <Icon name="trash" size={18} /> Pulizia
+          </a>
+          <button
+            className="btn"
+            onClick={async () => {
+              const name = prompt("Nome della nuova playlist", "La mia playlist");
+              if (name) await createPlaylist(name);
+            }}
+          >
+            <Icon name="plus" size={18} /> Nuova playlist
+          </button>
+        </span>
       </header>
       <div className="chips">
         {FILTERS.map(([k, label]) => (

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Icon } from "../components/Icon";
 import { syncCollections, useLibrary } from "../lib/library";
 import { player } from "../lib/player";
+import { href } from "../lib/router";
 import { CollectionsHint } from "./Library";
 import { saveCredentials, useClient } from "../lib/session";
 
@@ -62,6 +63,9 @@ export function Settings() {
           <button className="btn" disabled={lib.collections.state === "syncing"} onClick={() => void syncCollections()}>
             Aggiorna ora
           </button>
+          <a className="btn" href={href({ name: "cleanup" })}>
+            <Icon name="trash" size={18} /> Pulizia della libreria
+          </a>
         </div>
       </div>
       <div className="panel">
