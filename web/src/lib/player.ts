@@ -78,24 +78,62 @@ let loadedUid: number | null = null;
 /** Ascolto già registrato sul server per il brano corrente. */
 let scrobbled = false;
 
-function el(): HTMLAudioElement {
-  if (audio) return audio;
-  audio = new Audio();
-  audio.preload = "auto";
-  audio.volume = state.volume;
-  audio.addEventListener("play", () => set({ playing: true, error: null }));
-  audio.addEventListener("pause", () => set({ playing: false }));
-  audio.addEventListener("waiting", () => set({ buffering: true }));
-  audio.addEventListener("playing", () => set({ buffering: false }));
-  audio.addEventListener("canplay", () => set({ buffering: false }));
-  audio.addEventListener("durationchange", () => set({ duration: finite(audio!.duration) }));
-  audio.addEventListener("timeupdate", onTime);
-  audio.addEventListener("ended", () => advance(true));
-  audio.addEventListener("error", () => {
-    if (!audio?.src) return;
+// Quasi senza pause tra i brani: negli ultimi secondi il brano dopo si carica in un
+// secondo <audio>; alla fine si passa a quello, già pronto, invece di caricarlo da capo.
+let spare: HTMLAudioElement | null = null;
+let spareUid: number | null = null;
+const PRELOAD_SECONDS = 30;
+
+function makeAudio(): HTMLAudioElement {
+  const a = new Audio();
+  a.preload = "auto";
+  // Solo l'<audio> che sta suonando aggiorna lo stato: quello di scorta tace.
+  const on = (type: string, f: () => void) => a.addEventListener(type, () => a === audio && f());
+  on("play", () => set({ playing: true, error: null }));
+  on("pause", () => set({ playing: false }));
+  on("waiting", () => set({ buffering: true }));
+  on("playing", () => set({ buffering: false }));
+  on("canplay", () => set({ buffering: false }));
+  on("durationchange", () => set({ duration: finite(a.duration) }));
+  on("timeupdate", onTime);
+  on("ended", () => advance(true));
+  on("error", () => {
+    if (!a.src) return;
     set({ playing: false, buffering: false, error: "Impossibile riprodurre questo brano" });
   });
+  return a;
+}
+
+function el(): HTMLAudioElement {
+  if (audio) return audio;
+  audio = makeAudio();
+  audio.volume = state.volume;
   return audio;
+}
+
+/** Carica in anticipo il brano che viene dopo, se non è già pronto. */
+function preloadNext(): void {
+  const i = Q.nextIndex(state.queue, true);
+  const entry = i === null || i === state.queue.index ? undefined : state.queue.entries[i];
+  const client = getClient();
+  if (!entry || !client || spareUid === entry.uid) return;
+  spare ??= makeAudio();
+  spare.src = client.streamUrl(entry.song.id);
+  spare.load();
+  spareUid = entry.uid;
+}
+
+/** Se il brano da suonare è quello già caricato in anticipo, lo si scambia con l'attuale. */
+function swapToSpare(uid: number): boolean {
+  if (!spare || spareUid !== uid) return false;
+  const old = el();
+  audio = spare;
+  spare = old;
+  spareUid = null;
+  old.pause();
+  old.removeAttribute("src");
+  old.load();
+  return true;
 }
 
 const finite = (n: number) => (Number.isFinite(n) ? n : 0);
@@ -109,6 +147,7 @@ function onTime(): void {
   const a = el();
   set({ position: a.currentTime });
   updatePositionState();
+  if (a.duration > 0 && a.duration - a.currentTime < PRELOAD_SECONDS) preloadNext();
   // Regola di Last.fm/Subsonic: un ascolto conta dopo metà brano o 4 minuti.
   const song = Q.current(state.queue);
   if (song && !scrobbled && a.duration > 0 && (a.currentTime >= a.duration / 2 || a.currentTime >= 240)) {
@@ -134,7 +173,7 @@ function load(autoplay: boolean): void {
   if (loadedUid !== entry.uid) {
     loadedUid = entry.uid;
     scrobbled = false;
-    a.src = client.streamUrl(entry.song.id);
+    if (!swapToSpare(entry.uid)) el().src = client.streamUrl(entry.song.id);
     applyVolume();
     set({ position: 0, duration: entry.song.duration ?? 0, error: null });
     client.scrobble(entry.song.id, false).catch(() => {});
@@ -142,7 +181,8 @@ function load(autoplay: boolean): void {
   updateMediaSession();
   if (autoplay) {
     set({ buffering: true });
-    a.play().catch((e: unknown) => {
+    // el(), non a: dopo lo scambio suona l'<audio> preparato in anticipo.
+    el().play().catch((e: unknown) => {
       // NotAllowedError: il browser vuole un gesto dell'utente prima di suonare.
       set({ playing: false, buffering: false, error: e instanceof DOMException && e.name === "NotAllowedError" ? null : "Riproduzione non riuscita" });
     });
