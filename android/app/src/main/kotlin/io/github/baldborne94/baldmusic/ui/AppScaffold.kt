@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,7 +82,7 @@ sealed interface Screen {
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
-class Ui(
+data class Ui(
     val open: (mediaId: String, title: String) -> Unit,
     val trackMenu: (item: MediaItem, playlistId: String?) -> Unit,
     val addToPlaylist: (items: List<MediaItem>) -> Unit,
@@ -165,21 +167,37 @@ fun AppScaffold(vm: PlayerViewModel) {
             // Tablet: le schede in una barra a sinistra; in orizzontale anche la coda fissa a destra.
             val wide = maxWidth >= 600.dp
             val sideQueue = maxWidth >= 900.dp && vm.current != null
+            // In orizzontale la libreria resta a sinistra e quello che apri compare accanto, come sul PC.
+            val content = maxWidth - (if (wide) 88.dp else 0.dp) - (if (sideQueue) 341.dp else 0.dp)
+            val split = tab == Tab.LIBRARY && content >= 760.dp
             Row(Modifier.fillMaxSize()) {
                 if (wide) NavRail(tab, selectTab)
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
-                        when (val screen = stack.last()) {
-                            Screen.Root -> when (tab) {
-                                Tab.HOME -> HomeScreen(vm)
-                                Tab.SEARCH -> SearchScreen(vm)
-                                Tab.LIBRARY -> LibraryScreen(vm)
+                        if (split) {
+                            Row(Modifier.fillMaxSize()) {
+                                // Dalla libreria a sinistra si sceglie cosa vedere a destra: non si accumula una pila.
+                                val pick = remember(ui) {
+                                    ui.copy(open = { id, title ->
+                                        stacks.getValue(Tab.LIBRARY).let { s ->
+                                            while (s.size > 1) s.removeAt(s.lastIndex)
+                                            s.add(Screen.Detail(id, title))
+                                        }
+                                    })
+                                }
+                                Box(Modifier.width(340.dp).fillMaxHeight()) {
+                                    CompositionLocalProvider(LocalUi provides pick) { LibraryScreen(vm) }
+                                }
+                                Box(Modifier.width(1.dp).fillMaxHeight().background(Surface2))
+                                Box(Modifier.weight(1f).fillMaxHeight()) {
+                                    when (val screen = stack.last()) {
+                                        Screen.Root -> SplitPlaceholder()
+                                        else -> ScreenContent(vm, tab, screen)
+                                    }
+                                }
                             }
-                            is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
-                            Screen.Settings -> SettingsPage(vm)
-                            Screen.Stats -> StatsScreen(vm)
-                            Screen.Cleanup -> CleanupScreen(vm)
-                            Screen.Trash -> TrashScreen(vm)
+                        } else {
+                            ScreenContent(vm, tab, stack.last())
                         }
                     }
                     MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
@@ -187,7 +205,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                 }
                 if (sideQueue) {
                     Box(Modifier.width(1.dp).fillMaxHeight().background(Surface2))
-                    Box(Modifier.width(340.dp).fillMaxHeight()) { QueueScreen(vm, onClose = null) }
+                    SidePanel(vm, Modifier.width(340.dp).fillMaxHeight())
                 }
             }
 
@@ -264,6 +282,53 @@ fun AppScaffold(vm: PlayerViewModel) {
 
             addTo?.let { items ->
                 AddToPlaylistSheet(lib, onDismiss = { addTo = null }, onCreate = { name -> vm.createPlaylist(name, items) }, onPick = { id -> vm.addToPlaylist(id, items) })
+            }
+        }
+    }
+}
+
+/** La schermata in cima alla pila di una scheda. */
+@Composable
+private fun ScreenContent(vm: PlayerViewModel, tab: Tab, screen: Screen) {
+    when (screen) {
+        Screen.Root -> when (tab) {
+            Tab.HOME -> HomeScreen(vm)
+            Tab.SEARCH -> SearchScreen(vm)
+            Tab.LIBRARY -> LibraryScreen(vm)
+        }
+        is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
+        Screen.Settings -> SettingsPage(vm)
+        Screen.Stats -> StatsScreen(vm)
+        Screen.Cleanup -> CleanupScreen(vm)
+        Screen.Trash -> TrashScreen(vm)
+    }
+}
+
+/** La parte destra della libreria affiancata, finché non si sceglie niente. */
+@Composable
+private fun SplitPlaceholder() {
+    Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Icon(Icons.Outlined.LibraryMusic, null, tint = TextMuted, modifier = Modifier.size(64.dp))
+        Spacer(Modifier.height(16.dp))
+        Text("Scegli una raccolta, una playlist, un album o un artista dalla libreria.", color = TextMuted, textAlign = TextAlign.Center)
+    }
+}
+
+private enum class Side { QUEUE, LYRICS }
+
+/** Il pannello fisso a destra del tablet in orizzontale: la coda o il testo del brano. */
+@Composable
+private fun SidePanel(vm: PlayerViewModel, modifier: Modifier) {
+    var side by rememberSaveable { mutableStateOf(Side.QUEUE) }
+    Column(modifier.background(Background).statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip("Coda", selected = side == Side.QUEUE) { side = Side.QUEUE }
+            Chip("Testo", selected = side == Side.LYRICS) { side = Side.LYRICS }
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            when (side) {
+                Side.QUEUE -> QueueScreen(vm, onClose = null)
+                Side.LYRICS -> SideLyrics(vm)
             }
         }
     }
