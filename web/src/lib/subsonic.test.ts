@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { blockedAsMixedContent, buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicClient, SubsonicError } from "./subsonic";
+import { blockedAsMixedContent, buildUrl, makeCredentials, normalizeServerUrl, parseResponse, SubsonicClient, SubsonicError, sortArtists } from "./subsonic";
 
 describe("normalizeServerUrl", () => {
   it("aggiunge https e toglie gli slash finali", () => {
@@ -84,5 +84,19 @@ describe("blockedAsMixedContent", () => {
 
   it("da una pagina http non blocca niente", () => {
     expect(blockedAsMixedContent("http:", "http://192.168.1.20:4533")).toBe(false);
+  });
+});
+
+describe("sortArtists", () => {
+  it("ordina all'italiana, senza The, con gli alfabeti non latini in fondo", () => {
+    const names = sortArtists([
+      { id: "1", name: "Пётр Ильич Чайковский" },
+      { id: "2", name: "The Beatles" },
+      { id: "3", name: "avril lavigne" },
+      { id: "4", name: "Ënya" },
+      { id: "5", name: "久石譲" },
+      { id: "6", name: "Coldplay", sortName: "Coldplay" },
+    ]).map((a) => a.name);
+    expect(names).toEqual(["avril lavigne", "The Beatles", "Coldplay", "Ënya", "Пётр Ильич Чайковский", "久石譲"]);
   });
 });

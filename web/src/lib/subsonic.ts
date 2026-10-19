@@ -60,6 +60,8 @@ export interface Album {
 export interface Artist {
   id: string;
   name: string;
+  /** OpenSubsonic: nome per l'ordinamento (es. "Beatles, The"), se il tag c'è. */
+  sortName?: string;
   albumCount?: number;
   coverArt?: string;
   artistImageUrl?: string;
@@ -107,6 +109,18 @@ export class SubsonicError extends Error {
     super(message);
     this.name = "SubsonicError";
   }
+}
+
+const artistCollator = new Intl.Collator("it", { numeric: true, sensitivity: "base" });
+
+/**
+ * Artisti in ordine alfabetico, senza "The" davanti. Navidrome li raggruppa per lettera
+ * e mette prima i gruppi degli alfabeti non latini (cirillico, giapponese…): qui le
+ * regole dell'italiano li portano in fondo.
+ */
+export function sortArtists(artists: Artist[]): Artist[] {
+  const key = (a: Artist) => (a.sortName || a.name).replace(/^the\s+/i, "");
+  return [...artists].sort((a, b) => artistCollator.compare(key(a), key(b)));
 }
 
 /** Porta predefinita di Navidrome. */
@@ -226,7 +240,7 @@ export class SubsonicClient {
   async artists(): Promise<Artist[]> {
     const r = await this.call("getArtists");
     const indexes = list<Raw>((r.artists as Raw | undefined)?.index);
-    return indexes.flatMap((i) => list<Artist>(i.artist));
+    return sortArtists(indexes.flatMap((i) => list<Artist>(i.artist)));
   }
 
   async artist(id: string): Promise<Artist> {

@@ -43,7 +43,8 @@ export function SidebarLibrary({ route }: { route: Route }) {
   // Come sul telefono, prima le raccolte (se ci sono).
   const filter = chosen ?? (collections.length > 0 ? "collections" : "playlists");
   const [q, setQ] = useState("");
-  const albums = useLoad(() => (filter === "albums" ? getClient()!.albumList("recent", 100) : Promise.resolve([] as Album[])), [filter]);
+  // Tutti gli album veri in ordine alfabetico ("recent" erano solo quelli ascoltati di recente).
+  const albums = useLoad(async () => (filter === "albums" ? (await getClient()!.albumList("alphabeticalByName", 500)).filter(isRealAlbum) : ([] as Album[])), [filter]);
   const artists = useLoad(() => (filter === "artists" ? getClient()!.artists() : Promise.resolve([])), [filter]);
   const f = q.trim().toLowerCase();
   const active = "id" in route ? `${route.name}/${route.id}` : route.name;
