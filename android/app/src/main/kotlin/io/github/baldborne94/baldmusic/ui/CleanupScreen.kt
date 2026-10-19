@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -60,6 +61,14 @@ fun CleanupScreen(vm: PlayerViewModel) {
         contentPadding = PaddingValues(bottom = 32.dp),
     ) {
         item { PageHeader("Pulizia della libreria") }
+        if (trash != null) {
+            item {
+                androidx.compose.material3.TextButton(onClick = { ui.push(Screen.Trash) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Icon(Icons.Rounded.Restore, null, tint = Accent)
+                    Text("  Brani nel cestino: ripescali e rimettili al loro posto", color = Accent)
+                }
+            }
+        }
         val (duplicates, previews) = report ?: run {
             item { Loading() }
             return@LazyColumn

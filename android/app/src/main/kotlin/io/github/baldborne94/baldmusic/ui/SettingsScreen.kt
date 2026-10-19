@@ -103,6 +103,9 @@ fun SettingsScreen(vm: PlayerViewModel) {
         Text("Ascolto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
         SettingsLink("Pulizia della libreria", "Doppioni e anteprime di 30 secondi da buttare") { ui.push(Screen.Cleanup) }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            SettingsLink("Brani nel cestino", "Ripesca i brani buttati negli ultimi 30 giorni") { ui.push(Screen.Trash) }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Testi da internet", fontWeight = FontWeight.SemiBold)

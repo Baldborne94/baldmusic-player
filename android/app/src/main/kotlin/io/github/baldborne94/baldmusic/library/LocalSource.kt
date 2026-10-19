@@ -93,6 +93,46 @@ class LocalSource(
         shown.details(tagsRead = tags != null && !tags.isEmpty)
     }
 
+    /** Un file musicale nel cestino di Android, da poter ripescare. */
+    data class TrashedFile(val id: Long, val title: String, val artist: String?, val folder: String, val durationMs: Long, val expiresAt: Long)
+
+    /** I brani nel cestino di Android (prima di Android 11 il cestino non c'è). */
+    suspend fun trashed(): List<TrashedFile> = withContext(Dispatchers.IO) {
+        if (Build.VERSION.SDK_INT < 30 || !hasPermission()) return@withContext emptyList()
+        val args = android.os.Bundle().apply {
+            putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
+            putString(android.content.ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Audio.Media.IS_MUSIC} != 0")
+            putString(android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.MediaColumns.DATE_EXPIRES} DESC")
+        }
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.TITLE,
+            MediaStore.Audio.Media.ARTIST,
+            MediaStore.Audio.Media.DATA,
+            MediaStore.Audio.Media.DURATION,
+            MediaStore.MediaColumns.DATE_EXPIRES,
+        )
+        val out = ArrayList<TrashedFile>()
+        context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, args, null)?.use { c ->
+            while (c.moveToNext()) {
+                out += TrashedFile(
+                    id = c.getLong(0),
+                    title = c.getString(1) ?: "Senza titolo",
+                    artist = c.getString(2)?.takeUnless { it == UNKNOWN },
+                    folder = folderOf(c.getString(3)),
+                    durationMs = c.getLong(4),
+                    expiresAt = c.getLong(5),
+                )
+            }
+        }
+        out
+    }
+
+    /** Tutti i brani del telefono, riletti adesso (dopo un ripristino dal cestino). */
+    suspend fun allTracks(): List<LocalTrack> = withContext(Dispatchers.IO) {
+        if (!hasPermission()) emptyList() else songs()
+    }
+
     /** Doppioni e anteprime tra i brani del telefono, per la pagina "Pulizia della libreria". */
     suspend fun cleanup(): Pair<List<DuplicateGroup>, List<LocalTrack>> = withContext(Dispatchers.IO) {
         if (!hasPermission()) return@withContext emptyList<DuplicateGroup>() to emptyList()

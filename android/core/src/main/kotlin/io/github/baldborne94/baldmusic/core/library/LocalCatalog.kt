@@ -498,7 +498,7 @@ class LocalCatalog(
                 .sortedBy { it.name.lowercase() }
 
         /** "Music/Disney/CD1" → "Music/Disney"; null per i file sciolti e per la cartella di sistema Android. */
-        private fun collectionFolder(folder: String): String? {
+        fun collectionFolder(folder: String): String? {
             val parts = folder.split('/').filter { it.isNotEmpty() }
             return if (parts.size >= 2 && parts[0] != "Android") "${parts[0]}/${parts[1]}" else null
         }

@@ -257,6 +257,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Raccolta eliminata insieme ai suoi file: se la cartella si riempie di nuovo, torna. */
     fun deleteCollectionWithFiles(playlistId: String) = app.userData.deletePlaylist(playlistId, ignoreFolder = false)
 
+    /**
+     * Brani ripescati dal cestino: si rilegge la libreria e ognuno torna al suo posto
+     * nella raccolta della sua cartella, al posto della copia che lo aveva sostituito.
+     */
+    fun restoreTrashed(ids: Set<Long>) {
+        viewModelScope.launch {
+            app.local.invalidate()
+            app.tree.invalidate()
+            val all = app.local.allTracks()
+            app.userData.restoreInto(all.filter { it.id in ids }, all)
+            app.settings.touch()
+        }
+    }
+
     /** Doppioni buttati: preferiti, playlist e raccolte passano alla copia tenuta. */
     fun mergeDuplicates(groups: List<io.github.baldborne94.baldmusic.core.library.DuplicateGroup>) {
         val keep = groups.flatMap { g -> g.others.map { LocalCatalog.ref(it).id to LocalCatalog.ref(g.keep) } }.toMap()
