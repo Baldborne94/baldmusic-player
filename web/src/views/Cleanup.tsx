@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { duplicates, folderName, isWindowsPath, previews, trashScript, type DuplicateGroup } from "../lib/cleanup";
@@ -21,6 +21,8 @@ export function CleanupPage() {
   const [skip, setSkip] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string[] | null>(null);
+  // Ultima riga toccata, per Maiuscolo + clic su un intervallo.
+  const anchor = useRef<{ section: string; index: number } | null>(null);
   const report = useMemo(() => (data ? { dup: duplicates(data), prev: previews(data) } : null), [data]);
 
   if (loading && !data) return <Loading />;
@@ -31,12 +33,22 @@ export function CleanupPage() {
   const prev = report.prev.filter((s) => !skip.has(s.id));
   const files = [...groups.flatMap((g) => g.others), ...prev];
   const windows = files.every((s) => s.path && isWindowsPath(s.path));
-  const toggle = (id: string) => setSkip((old) => {
-    const next = new Set(old);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    return next;
-  });
+  const prevIds = report.prev.map((s) => s.id);
+  const dupIds = report.dup.map((g) => g.keep.id);
+
+  const setMany = (ids: string[], on: boolean) =>
+    setSkip((old) => {
+      const next = new Set(old);
+      ids.forEach((id) => (on ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  const click = (section: string, ids: string[], index: number, shift: boolean) => {
+    const on = skip.has(ids[index]);
+    const a = anchor.current;
+    if (shift && a && a.section === section) setMany(ids.slice(Math.min(a.index, index), Math.max(a.index, index) + 1), on);
+    else setMany([ids[index]], on);
+    anchor.current = { section, index };
+  };
 
   const prepare = async () => {
     const ask =
@@ -80,9 +92,7 @@ export function CleanupPage() {
           ) : (
             <p className="muted">Il server non è un PC Windows: sposta a mano questi file nel cestino.</p>
           )}
-          <button className="btn" onClick={() => void navigator.clipboard?.writeText(done.join("\n"))}>
-            <Icon name="share" size={16} /> Copia l'elenco dei file
-          </button>
+          <CopyButton label="Copia l'elenco dei file" text={done.join("\n")} />
         </div>
       )}
 
@@ -95,11 +105,19 @@ export function CleanupPage() {
             {plural(report.prev.length, "brano dura", "brani durano")} circa 30 secondi: quasi sempre sono anteprime scaricate al posto della canzone
             intera. Vanno buttati e riscaricati.
           </p>
-          <button className="btn" onClick={() => void navigator.clipboard?.writeText(report.prev.map((s) => `${s.artist ?? ""} - ${s.title} (${folderName(s.path)})`).join("\n"))}>
-            <Icon name="share" size={16} /> Copia l'elenco da riscaricare
-          </button>
-          {report.prev.map((s) => (
-            <Row key={s.id} checked={!skip.has(s.id)} onToggle={() => toggle(s.id)} song={s} lines={[`${s.artist ?? ""} · ${formatDuration(s.duration)} · ${folderName(s.path)}`]} />
+          <CopyButton
+            label={`Copia l'elenco da riscaricare (${prev.length})`}
+            text={prev.map((s) => `${s.artist ?? ""} - ${s.title} (${folderName(s.path)})`).join("\n")}
+          />
+          <SelectAll ids={prevIds} skip={skip} onChange={(on) => setMany(prevIds, on)} />
+          {report.prev.map((s, i) => (
+            <Row
+              key={s.id}
+              checked={!skip.has(s.id)}
+              onClick={(shift) => click("prev", prevIds, i, shift)}
+              song={s}
+              lines={[`${s.artist ?? ""} · ${formatDuration(s.duration)} · ${folderName(s.path)}`]}
+            />
           ))}
         </section>
       )}
@@ -111,11 +129,12 @@ export function CleanupPage() {
             {plural(report.dup.length, "brano è", "brani sono")} in più copie, in cartelle diverse. Si tiene la copia coi tag più completi: le
             raccolte che avevano le altre continuano ad avere il brano.
           </p>
-          {report.dup.map((g: DuplicateGroup) => (
+          <SelectAll ids={dupIds} skip={skip} onChange={(on) => setMany(dupIds, on)} />
+          {report.dup.map((g: DuplicateGroup, i) => (
             <Row
               key={g.keep.id}
               checked={!skip.has(g.keep.id)}
-              onToggle={() => toggle(g.keep.id)}
+              onClick={(shift) => click("dup", dupIds, i, shift)}
               song={g.keep}
               lines={[`${g.keep.artist ?? ""} · ${formatDuration(g.keep.duration)}`, `Resta in: ${folderName(g.keep.path)}`, `Da buttare: ${g.others.map((o) => folderName(o.path)).join(", ")}`]}
             />
@@ -134,10 +153,41 @@ export function CleanupPage() {
   );
 }
 
-function Row({ song, lines, checked, onToggle }: { song: Song; lines: string[]; checked: boolean; onToggle: () => void }) {
+/** "Seleziona tutti": spunta piena, vuota o a metà se solo alcuni sono scelti. */
+function SelectAll({ ids, skip, onChange }: { ids: string[]; skip: Set<string>; onChange: (on: boolean) => void }) {
+  const chosen = ids.filter((id) => !skip.has(id)).length;
+  const all = chosen === ids.length;
   return (
-    <label className="clean-row">
-      <input type="checkbox" checked={checked} onChange={onToggle} />
+    <label className="clean-row clean-row--all">
+      <input
+        type="checkbox"
+        checked={all}
+        ref={(el) => {
+          if (el) el.indeterminate = chosen > 0 && !all;
+        }}
+        onChange={() => onChange(!all)}
+      />
+      <span className="clean-row__text">
+        <strong>{all ? "Deseleziona tutti" : "Seleziona tutti"}</strong>
+        <span className="muted">
+          {chosen} di {ids.length} selezionati · Maiuscolo + clic per un intervallo
+        </span>
+      </span>
+    </label>
+  );
+}
+
+function Row({ song, lines, checked, onClick }: { song: Song; lines: string[]; checked: boolean; onClick: (shift: boolean) => void }) {
+  return (
+    <label
+      className="clean-row"
+      onClick={(e) => {
+        // Il clic lo gestiamo noi (serve sapere se c'è Maiuscolo): niente secondo clic sulla casella.
+        e.preventDefault();
+        onClick(e.shiftKey);
+      }}
+    >
+      <input type="checkbox" checked={checked} readOnly />
       <span className="clean-row__text">
         <strong>{song.title}</strong>
         {lines.map((l, i) => (
@@ -145,6 +195,36 @@ function Row({ song, lines, checked, onToggle }: { song: Song; lines: string[]; 
         ))}
       </span>
     </label>
+  );
+}
+
+/**
+ * Copia negli appunti e lo dice. Se il browser non lo permette, mostra il testo già
+ * selezionato da copiare a mano (Ctrl+C).
+ */
+function CopyButton({ label, text }: { label: string; text: string }) {
+  const [state, setState] = useState<"idle" | "ok" | "manual">("idle");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("ok");
+      setTimeout(() => setState("idle"), 2500);
+    } catch {
+      setState("manual");
+    }
+  };
+  return (
+    <div className="copy-box">
+      <button className="btn" onClick={() => void copy()} disabled={!text}>
+        <Icon name={state === "ok" ? "check" : "share"} size={16} /> {state === "ok" ? "Copiato negli appunti" : label}
+      </button>
+      {state === "manual" && (
+        <>
+          <p className="muted">Il browser non mi lascia copiare: il testo è qui sotto già selezionato, premi Ctrl+C.</p>
+          <textarea className="copy-box__text" readOnly value={text} rows={8} ref={(el) => el?.select()} />
+        </>
+      )}
+    </div>
   );
 }
 
