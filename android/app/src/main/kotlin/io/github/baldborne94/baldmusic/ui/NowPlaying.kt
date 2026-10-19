@@ -348,6 +348,21 @@ private fun ProgressBar(vm: PlayerViewModel) {
     }
 }
 
+/** Il testo del brano in corso nel pannello fisso del tablet, accanto alla libreria. */
+@Composable
+fun SideLyrics(vm: PlayerViewModel) {
+    val item = vm.current ?: return
+    val color by rememberArtworkColor(item.mediaMetadata.artworkUri)
+    var lyrics by remember(item.mediaId) { mutableStateOf<Lyrics?>(null) }
+    var loading by remember(item.mediaId) { mutableStateOf(true) }
+    LaunchedEffect(item.mediaId) {
+        loading = true
+        lyrics = runCatching { vm.lyricsFor(item) }.getOrNull()
+        loading = false
+    }
+    Box(Modifier.fillMaxSize().padding(12.dp)) { LyricsView(vm, lyrics, loading, color) }
+}
+
 /** Testo sincronizzato: la riga corrente in evidenza, le altre sfumate; tocca una riga per saltarci. */
 @Composable
 private fun LyricsView(vm: PlayerViewModel, lyrics: Lyrics?, loading: Boolean, color: Color) {

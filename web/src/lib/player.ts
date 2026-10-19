@@ -61,14 +61,21 @@ function set(patch: Partial<PlayerState>): void {
   listeners.forEach((l) => l());
 }
 
+function subscribe(l: () => void): () => void {
+  listeners.add(l);
+  return () => listeners.delete(l);
+}
+
 export function usePlayer(): PlayerState {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => state,
-  );
+  return useSyncExternalStore(subscribe, () => state);
+}
+
+/**
+ * Solo un pezzo dello stato (un valore semplice): chi lo usa si ridisegna quando cambia
+ * quello, non a ogni avanzamento della posizione. Serve agli elenchi con migliaia di brani.
+ */
+export function usePlayerSelect<T>(pick: (s: PlayerState) => T): T {
+  return useSyncExternalStore(subscribe, () => pick(state));
 }
 
 export function getPlayerState(): PlayerState {

@@ -12,6 +12,7 @@ import { Home } from "./views/Home";
 import { LibraryPage, SidebarLibrary } from "./views/Library";
 import { AlbumPage, ArtistPage, DecadePage, GenrePage, LikedPage, PlaylistPage, Stats } from "./views/Pages";
 import { CleanupPage } from "./views/Cleanup";
+import { TrashPage } from "./views/Trash";
 import { Search } from "./views/Search";
 import { Settings } from "./views/Settings";
 
@@ -33,6 +34,8 @@ function View({ route }: { route: Route }) {
       return <LibraryPage initial="collections" />;
     case "cleanup":
       return <CleanupPage />;
+    case "trash":
+      return <TrashPage />;
     case "album":
       return <AlbumPage id={route.id} />;
     case "artist":

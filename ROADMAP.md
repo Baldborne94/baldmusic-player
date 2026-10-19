@@ -53,7 +53,7 @@ statistiche, widget. I punti deboli emersi leggendo il codice:
 | **Test** | Le regole del telefono stanno in `:app` | Senza SDK in locale non si possono testare: proprio la parte più delicata (raggruppare e ordinare) non ha test |
 | **Ripresa** | Si salva solo l'ultimo brano | Riaprendo l'app o riaccendendo l'auto la coda è persa |
 | **Volume** | Ogni brano al suo volume | Niente ReplayGain: un disco degli anni 70 suona molto più piano di uno del 2010 |
-| **Tablet Android** | Schede a sinistra, coda fissa a destra in orizzontale | Libreria e dettaglio ancora non affiancati |
+| **Tablet Android** | Schede a sinistra; in orizzontale libreria e dettaglio affiancati, coda o testo fissi a destra | — |
 | **Documentazione** | `server/README.md` parla di "Qualità in streaming" | La funzione è stata tolta (si ascolta il file originale): la guida è vecchia, e in `RemoteSource` resta il parametro `maxBitRate` |
 
 ## Fase 0 — Fondamenta
@@ -115,11 +115,12 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 ## Fase 5 — Tablet e PC
 
 - [x] **Tablet Android**: da 600dp di larghezza le schede stanno in una barra a sinistra; da 900dp (tablet in orizzontale) la coda resta fissa a destra mentre suona qualcosa. "In riproduzione" ha i comandi in una colonna centrale. Si adatta da solo anche a schermo diviso.
-- [ ] Tablet, poi: libreria e dettaglio affiancati, testo nel pannello di destra.
+- [x] **Tablet in orizzontale**: nella Libreria l'elenco resta a sinistra e quello che apri compare accanto; il pannello di destra mostra la coda o il testo del brano.
 - [x] **Raccolte anche sul PC**: le cartelle della musica di Navidrome diventano raccolte (playlist di Navidrome) come sul telefono, prima di tutto in Home e in Libreria. Serve «Mostra percorso reale» nel lettore *baldmusic* di Navidrome.
 - [x] **Pulizia anche sul PC**: anteprime e doppioni come sul telefono; il browser non tocca i file, quindi l'app prepara uno script che li sposta nel Cestino di Windows, e le raccolte passano prima alla copia tenuta.
 - [x] **Web come il telefono**, dopo le raccolte: riordinare e ordinare le playlist, selezione di più brani, informazioni sul brano.
-- [ ] **App web sul PC**: elenchi lunghi veloci anche con decine di migliaia di brani, trascina-e-rilascia nelle playlist.
+- [x] **App web sul PC**: elenchi lunghi veloci anche con migliaia di brani; trascinare uno o più brani su una raccolta, una playlist o "Brani che ti piacciono" nella barra laterale.
+- [x] **Brani nel cestino anche sul PC**: l'app ricorda i file che ha mandato nel Cestino di Windows e prepara uno script che li rimette al loro posto; tornano nella loro raccolta al posto della copia tenuta.
 - [ ] **App web sul tablet** (se non Android): tocchi comodi, gesti, "In riproduzione" a schermo intero.
 
 ## Fase 6 — Quando arriva il NAS

@@ -104,6 +104,9 @@ export function Settings() {
           <a className="btn" href={href({ name: "cleanup" })}>
             <Icon name="trash" size={18} /> Pulizia della libreria
           </a>
+          <a className="btn" href={href({ name: "trash" })}>
+            <Icon name="restore" size={18} /> Brani nel cestino
+          </a>
         </div>
       </div>
       <div className="panel">

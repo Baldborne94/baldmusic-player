@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, LikedArt, PlaylistCards } from "../components/Ui";
 import { isRealAlbum } from "../lib/albums";
-import { createCollection, createPlaylist, isCollection, useLibrary, type CollectionsStatus } from "../lib/library";
+import { plural } from "../lib/format";
+import { addNewToPlaylist, createCollection, createPlaylist, isCollection, isMine, likeAll, useLibrary, type CollectionsStatus } from "../lib/library";
 import { href, type Route } from "../lib/router";
 import { getClient } from "../lib/session";
-import type { Album, AlbumListType } from "../lib/subsonic";
+import { draggedSongs, isSongDrag } from "../lib/songDrag";
+import type { Album, AlbumListType, Playlist, Song } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
 
 type Filter = "collections" | "playlists" | "albums" | "artists";
@@ -68,7 +70,13 @@ export function SidebarLibrary({ route }: { route: Route }) {
       </header>
       <div className="chips chips--small">
         {FILTERS.map(([k, label]) => (
-          <button key={k} className={`chip ${filter === k ? "is-on" : ""}`} onClick={() => setFilter(k)}>
+          <button
+            key={k}
+            className={`chip ${filter === k ? "is-on" : ""}`}
+            onClick={() => setFilter(k)}
+            // Trascinando dei brani sopra "Raccolte" o "Playlist" si apre quell'elenco.
+            onDragEnter={(e) => isSongDrag(e) && (k === "collections" || k === "playlists") && setFilter(k)}
+          >
             {label}
           </button>
         ))}
@@ -79,33 +87,41 @@ export function SidebarLibrary({ route }: { route: Route }) {
           <>
             {collections.length === 0 && <CollectionsHint status={lib.collections} />}
             {collections.filter((p) => !f || p.name.toLowerCase().includes(f)).map((p) => (
-              <a key={p.id} className={`lib-row ${active === `playlist/${p.id}` ? "is-active" : ""}`} href={href({ name: "playlist", id: p.id })}>
-                <Cover id={p.coverArt} size={96} className="lib-row__art" />
-                <span className="lib-row__text">
-                  <span className="lib-row__title">{p.name}</span>
-                  <span className="lib-row__sub">Raccolta · {p.songCount ?? 0} brani</span>
-                </span>
-              </a>
+              <LibRow
+                key={p.id}
+                to={href({ name: "playlist", id: p.id })}
+                active={active === `playlist/${p.id}`}
+                art={<Cover id={p.coverArt} size={96} className="lib-row__art" />}
+                title={p.name}
+                sub={`Raccolta · ${p.songCount ?? 0} brani`}
+                accept={dropInto(p)}
+              />
             ))}
           </>
         )}
         {filter === "playlists" && (
           <>
-            <a className={`lib-row ${active === "liked" ? "is-active" : ""}`} href={href({ name: "liked" })}>
-              <span className="lib-row__art"><LikedArt /></span>
-              <span className="lib-row__text">
-                <span className="lib-row__title">Brani che ti piacciono</span>
-                <span className="lib-row__sub">📌 Playlist · {lib.likedSongs.length} brani</span>
-              </span>
-            </a>
+            <LibRow
+              to={href({ name: "liked" })}
+              active={active === "liked"}
+              art={<span className="lib-row__art"><LikedArt /></span>}
+              title="Brani che ti piacciono"
+              sub={`📌 Playlist · ${lib.likedSongs.length} brani`}
+              accept={async (songs) => {
+                const n = await likeAll(songs);
+                return n === 0 ? "Ti piacciono già" : `✓ ${plural(n, "brano aggiunto", "brani aggiunti")}`;
+              }}
+            />
             {lib.playlists.filter((p) => !isCollection(p) && (!f || p.name.toLowerCase().includes(f))).map((p) => (
-              <a key={p.id} className={`lib-row ${active === `playlist/${p.id}` ? "is-active" : ""}`} href={href({ name: "playlist", id: p.id })}>
-                <Cover id={p.coverArt} size={96} className="lib-row__art" />
-                <span className="lib-row__text">
-                  <span className="lib-row__title">{p.name}</span>
-                  <span className="lib-row__sub">Playlist · {p.owner ?? ""}</span>
-                </span>
-              </a>
+              <LibRow
+                key={p.id}
+                to={href({ name: "playlist", id: p.id })}
+                active={active === `playlist/${p.id}`}
+                art={<Cover id={p.coverArt} size={96} className="lib-row__art" />}
+                title={p.name}
+                sub={`Playlist · ${p.owner ?? ""}`}
+                accept={dropInto(p)}
+              />
             ))}
           </>
         )}
@@ -131,6 +147,71 @@ export function SidebarLibrary({ route }: { route: Route }) {
           ))}
       </div>
     </div>
+  );
+}
+
+/** Rilasciare dei brani su una playlist o raccolta: si aggiungono in fondo, se sono nuovi. */
+function dropInto(p: Playlist): ((songs: Song[]) => Promise<string>) | undefined {
+  if (!isMine(p)) return undefined;
+  return async (songs) => {
+    const n = await addNewToPlaylist(p.id, songs);
+    return n === 0 ? (songs.length === 1 ? "C'è già" : "Ci sono già tutti") : `✓ ${plural(n, "brano aggiunto", "brani aggiunti")}`;
+  };
+}
+
+/**
+ * Una riga della libreria nella barra laterale. Con [accept] riceve i brani trascinati da
+ * un elenco e dice per un attimo com'è andata, al posto della seconda riga.
+ */
+function LibRow({ to, active, art, title, sub, accept }: { to: string; active: boolean; art: ReactNode; title: string; sub: string; accept?: (songs: Song[]) => Promise<string> }) {
+  const [over, setOver] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const depth = useRef(0);
+  const say = (text: string | null, ms = 0) => {
+    clearTimeout(timer.current);
+    setNote(text);
+    if (ms) timer.current = setTimeout(() => setNote(null), ms);
+  };
+  return (
+    <a
+      className={`lib-row ${active ? "is-active" : ""} ${over ? "is-drop" : ""}`}
+      href={to}
+      onDragOver={(e) => {
+        if (!accept || !isSongDrag(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setOver(true);
+      }}
+      // Entrare in un elemento dentro la riga conta come uscire dalla riga: si contano le entrate.
+      onDragEnter={(e) => {
+        if (accept && isSongDrag(e)) depth.current++;
+      }}
+      onDragLeave={() => {
+        depth.current = Math.max(0, depth.current - 1);
+        if (depth.current === 0) setOver(false);
+      }}
+      onDrop={async (e) => {
+        if (!accept || !isSongDrag(e)) return;
+        e.preventDefault();
+        depth.current = 0;
+        setOver(false);
+        const songs = draggedSongs();
+        if (songs.length === 0) return;
+        say("Aggiungo…");
+        try {
+          say(await accept(songs), 2500);
+        } catch (err) {
+          say(`Non riuscito: ${err instanceof Error ? err.message : String(err)}`, 4000);
+        }
+      }}
+    >
+      {art}
+      <span className="lib-row__text">
+        <span className="lib-row__title">{title}</span>
+        <span className={`lib-row__sub ${note ? "lib-row__sub--note" : ""}`}>{note ?? sub}</span>
+      </span>
+    </a>
   );
 }
 
@@ -175,7 +256,13 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
       </header>
       <div className="chips">
         {FILTERS.map(([k, label]) => (
-          <button key={k} className={`chip ${filter === k ? "is-on" : ""}`} onClick={() => setFilter(k)}>
+          <button
+            key={k}
+            className={`chip ${filter === k ? "is-on" : ""}`}
+            onClick={() => setFilter(k)}
+            // Trascinando dei brani sopra "Raccolte" o "Playlist" si apre quell'elenco.
+            onDragEnter={(e) => isSongDrag(e) && (k === "collections" || k === "playlists") && setFilter(k)}
+          >
             {label}
           </button>
         ))}
