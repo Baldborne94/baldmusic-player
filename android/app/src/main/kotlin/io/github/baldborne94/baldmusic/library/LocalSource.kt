@@ -147,6 +147,9 @@ class LocalSource(
     }
 
     /** Tutti i brani, riletti al massimo ogni 30 secondi (Auto chiede le liste a pagine). */
+    // Una lettura di MediaStore alla volta: a cache vuota (ripresa, Auto che chiede più pagine)
+    // le richieste in parallelo aspettano la prima invece di rileggere tutto ognuna.
+    @Synchronized
     private fun songs(): List<LocalTrack> {
         cached?.let { (at, list) -> if (System.currentTimeMillis() - at < 30_000) return list }
         val rows = rows(null, null)
@@ -160,7 +163,8 @@ class LocalSource(
         cached = System.currentTimeMillis() to list
         // Un elenco vuoto può voler dire permesso tolto o memoria non montata: non si tocca niente.
         if (list.isNotEmpty()) onSongs(list)
-        if (scanner.index.stale(rows.map { it.stamp }).isNotEmpty() || scanner.index.size() > rows.size) scan(rows.map { it.stamp })
+        // Con MediaStore vuoto (memoria non ancora montata, indice che si rifà) l'indice dei tag non si svuota.
+        if (rows.isNotEmpty() && (scanner.index.stale(rows.map { it.stamp }).isNotEmpty() || scanner.index.size() > rows.size)) scan(rows.map { it.stamp })
         return list
     }
 
@@ -177,6 +181,8 @@ class LocalSource(
     fun measureLoudness(stop: () -> Boolean): Pair<Int, Int> {
         if (!hasPermission()) return 0 to 0
         val rows = rows(null, null)
+        // Come sopra: un MediaStore vuoto non deve cancellare ore di misure.
+        if (rows.isEmpty()) return 0 to 0
         loudness.retain(rows.mapTo(HashSet()) { it.track.id })
         val files = toMeasure(rows)
         val done = loudness.measure(files, { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }, stop)

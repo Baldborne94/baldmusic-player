@@ -116,7 +116,7 @@ data class UserLibrary(
             .take(limit).map { it.track }
 
     fun createPlaylist(id: String, name: String, now: Long, first: List<TrackRef> = emptyList()) =
-        copy(playlists = playlists + UserPlaylist(id, name.trim().ifEmpty { "La mia playlist" }, first.map { it.copy(id = baseId(it.id)) }, now))
+        copy(playlists = playlists + UserPlaylist(id, name.trim().ifEmpty { "La mia playlist" }, first.map { it.copy(id = baseId(it.id)) }.distinctBy { it.id }, now))
 
     fun renamePlaylist(id: String, name: String) =
         copy(playlists = playlists.map { if (it.id == id && name.isNotBlank()) it.copy(name = name.trim()) else it })

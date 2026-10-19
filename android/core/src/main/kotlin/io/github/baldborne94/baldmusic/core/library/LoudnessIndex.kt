@@ -43,7 +43,9 @@ class LoudnessIndex private constructor(private val entries: MutableMap<Long, En
     fun toJson(): String = json.encodeToString(Stored.serializer(), Stored(VERSION, HashMap(entries)))
 
     companion object {
-        const val VERSION = 1
+        /** Da aumentare quando cambia come si misura: le misure si rifanno da capo. */
+        // 2: i file mono si misurano come doppio mono (prima risultavano 3 dB più piani).
+        const val VERSION = 2
 
         private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 

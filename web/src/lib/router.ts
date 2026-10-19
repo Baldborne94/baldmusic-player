@@ -26,9 +26,18 @@ export type Route =
 const WITH_ID = new Set(["album", "artist", "playlist", "genre", "decade"]);
 const SIMPLE = new Set(["library", "albums", "artists", "playlists", "collections", "cleanup", "trash", "liked", "stats", "queue", "settings"]);
 
+/** Un "%" scritto a mano (#/genre/100%) farebbe lanciare decodeURIComponent: resta com'è. */
+function decode(part: string): string {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return part;
+  }
+}
+
 export function parseRoute(hash: string): Route {
   const [path, qs = ""] = hash.replace(/^#\/?/, "").split("?");
-  const [section, id] = path.split("/").map((p) => decodeURIComponent(p));
+  const [section, id] = path.split("/").map(decode);
   if (section === "search") return { name: "search", query: new URLSearchParams(qs).get("q") ?? "" };
   if (section === "favorites") return { name: "liked" };
   if (WITH_ID.has(section)) return id ? ({ name: section, id } as Route) : { name: "home" };

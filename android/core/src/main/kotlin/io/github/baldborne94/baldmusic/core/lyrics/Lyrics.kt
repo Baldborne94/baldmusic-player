@@ -32,18 +32,31 @@ data class Lyrics(val synced: List<LyricLine> = emptyList(), val plain: String? 
 
 private val TIME_TAG = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 
+/** I tempi delle singole parole del formato LRC "avanzato": "<00:12.34>parola". */
+private val WORD_TAG = Regex("""<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>""")
+
+private val OFFSET = Regex("""\[offset:\s*([+-]?\d+)\s*]""", RegexOption.IGNORE_CASE)
+
 /**
  * Formato LRC: "[01:23.45]Testo". Una riga può avere più tempi
  * ("[00:10.00][01:10.00]Ritornello"); i tag di servizio ([ar:…], [offset:…]) si ignorano
- * tranne offset, che sposta tutto.
+ * tranne offset, che sposta tutto. Contano solo i tempi a inizio riga: un "[10:30]" nel
+ * testo resta testo.
  */
 fun parseLrc(text: String): List<LyricLine> {
-    val offset = Regex("""\[offset:\s*([+-]?\d+)]""", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+    val offset = OFFSET.find(text)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
     val lines = mutableListOf<LyricLine>()
     for (raw in text.lineSequence()) {
-        val tags = TIME_TAG.findAll(raw).toList()
+        val tags = mutableListOf<MatchResult>()
+        var pos = 0
+        while (true) {
+            while (pos < raw.length && raw[pos].isWhitespace()) pos++
+            val tag = TIME_TAG.find(raw, pos)?.takeIf { it.range.first == pos } ?: break
+            tags += tag
+            pos = tag.range.last + 1
+        }
         if (tags.isEmpty()) continue
-        val lyric = raw.substring(tags.last().range.last + 1).trim()
+        val lyric = raw.substring(pos).replace(WORD_TAG, "").trim()
         for (tag in tags) {
             val (min, sec, frac) = tag.destructured
             val fracMs = when (frac.length) {
@@ -84,7 +97,8 @@ class LrcLibClient(private val http: OkHttpClient, private val baseUrl: String =
             .apply { if (!album.isNullOrBlank()) addQueryParameter("album_name", album) }
             .apply { if (durationSec != null && durationSec > 0) addQueryParameter("duration", "$durationSec") }
             .build()
-        get(exact)?.let { record -> return@withContext record.toLyrics() }
+        // Un risultato esatto senza testo (né strumentale) non basta: si prova la ricerca libera.
+        get(exact)?.toLyrics()?.let { return@withContext it }
 
         val search = "$baseUrl/api/search".toHttpUrl().newBuilder()
             .addQueryParameter("track_name", title)
@@ -93,10 +107,11 @@ class LrcLibClient(private val http: OkHttpClient, private val baseUrl: String =
         val body = fetch(search.toString()) ?: return@withContext null
         val results = runCatching { json.decodeFromString<List<LrcLibRecord>>(body) }.getOrDefault(emptyList())
         // Preferisce un risultato sincronizzato con durata vicina a quella del file.
+        // Un testo vuoto ("") non conta: altrimenti passerebbe davanti a uno vero e darebbe niente.
         val best = results
-            .filter { it.syncedLyrics != null || it.plainLyrics != null }
+            .filter { it.hasSynced || !it.plainLyrics.isNullOrBlank() }
             .sortedWith(
-                compareBy<LrcLibRecord> { if (it.syncedLyrics != null) 0 else 1 }
+                compareBy<LrcLibRecord> { if (it.hasSynced) 0 else 1 }
                     .thenBy { r -> if (durationSec != null && r.duration != null) kotlin.math.abs(r.duration - durationSec) else 0.0 },
             )
             .firstOrNull()
@@ -110,6 +125,8 @@ class LrcLibClient(private val http: OkHttpClient, private val baseUrl: String =
         val request = Request.Builder().url(url).header("User-Agent", "BaldMusic (https://github.com/Baldborne94/baldmusic-player)").build()
         http.newCall(request).execute().use { res -> if (res.isSuccessful) res.body.string() else null }
     }.getOrNull()
+
+    private val LrcLibRecord.hasSynced get() = !syncedLyrics.isNullOrBlank() && parseLrc(syncedLyrics).isNotEmpty()
 
     private fun LrcLibRecord.toLyrics(): Lyrics? {
         if (instrumental) return Lyrics(plain = "♪ Brano strumentale ♪")

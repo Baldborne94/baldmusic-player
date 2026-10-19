@@ -16,7 +16,9 @@ import io.github.baldborne94.baldmusic.core.update.ReleaseInfo
 import io.github.baldborne94.baldmusic.core.update.ReleaseNotes
 import io.github.baldborne94.baldmusic.core.update.UpdateClient
 import io.github.baldborne94.baldmusic.ui.MainActivity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +46,12 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
     }
 
     private val prefs = context.getSharedPreferences("update", Context.MODE_PRIVATE)
+
+    /**
+     * Controllo e download vivono quanto l'app, non quanto la schermata: uscendo con
+     * "indietro" a metà download, il lavoro non resta bloccato a "Scarico… 43%".
+     */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val client = UpdateClient(http)
     private val pkg = context.packageName
 

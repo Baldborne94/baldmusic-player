@@ -36,8 +36,10 @@ Player musicale open source personale. Tre pezzi, un'unica libreria:
 - Copertine sempre via `content://<pkg>.artwork/<sorgente>/<id>` (`ArtworkProvider`): Android Auto non carica http né legge MediaStore per noi.
 
 ## Build e verifica
-- Web: `cd web && npm ci && npm run typecheck && npm test && npm run build`.
+- Web: `cd web && npm ci && npm run typecheck && npm test && npm run build && npm run e2e`. Le prove nel browser (`web/e2e/*.e2e.ts`, Playwright) usano un Navidrome finto in memoria (`web/src/test/fakeNavidrome.ts`, lo stesso dei test unitari) e girano anche nella CI del sito; in una sessione cloud: `PW_CHROMIUM=/opt/pw-browsers/chromium npm run e2e` (niente `playwright install`).
+- `:core` ha i test delle regole del telefono e del server (`android/core/src/test`): una regola nuova o cambiata arriva col suo test.
 - Android: nessun SDK in locale nelle sessioni cloud (dl.google.com bloccato). `:core` si testa in locale con un progetto Gradle che include solo `core`; `:app` lo compila GitHub Actions (`.github/workflows/android.yml`) — leggi i log del job per gli errori.
+- **Collaudo a mano** in `COLLAUDO.md`: quello che i test automatici non possono provare (telefono vero, Android Auto, tablet, script di Windows). Una funzione nuova o cambiata aggiunge o aggiorna lì i suoi casi.
 - L'APK è firmato con la chiave debug ripristinata dal secret `ANDROID_DEBUG_KEYSTORE_B64`: non cambiare chiave, gli aggiornamenti richiederebbero di disinstallare.
 
 ## Regole
@@ -46,3 +48,4 @@ Player musicale open source personale. Tre pezzi, un'unica libreria:
 - Credenziali Subsonic: solo `salt` + `token = md5(password + salt)`, mai la password in chiaro salvata.
 - Non mettere `toISOString()`/UTC dove serve l'ora locale; non introdurre un backend nostro se Navidrome lo fa già.
 - Nessun push diretto su `main`: branch + PR.
+- Ogni difetto corretto arriva con un test che lo riproduce (rosso prima, verde dopo), così non torna; le regole nuove stanno in codice puro e testato (`:core`, `web/src/lib`), non nelle schermate.

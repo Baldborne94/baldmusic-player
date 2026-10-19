@@ -19,8 +19,20 @@ data class QueueSnapshot(
 ) {
     val currentId: String? get() = ids.getOrNull(index)
 
-    /** Dove ripartire tra i brani ritrovati: il brano in corso, o quello che lo seguiva. */
+    /**
+     * Dove ripartire tra i brani ritrovati ([found]: la coda senza quelli spariti, nello
+     * stesso ordine): il brano in corso, o quello che lo seguiva. Si scorrono insieme le
+     * due code, così lo stesso brano messo in coda due volte riparte da quello giusto.
+     */
     fun indexIn(found: List<String>): Int {
+        var j = 0
+        ids.forEachIndexed { i, id ->
+            if (j < found.size && found[j] == id) {
+                if (i >= index) return j
+                j++
+            }
+        }
+        // Le code non combaciano (o dopo il brano in corso non resta niente): si cerca per ID.
         val wanted = ids.drop(index).toSet()
         val at = found.indexOf(currentId)
         if (at >= 0) return at
@@ -39,8 +51,9 @@ data class QueueSnapshot(
         fun of(ids: List<String>, index: Int, positionMs: Long, shuffle: Boolean, repeat: Int): QueueSnapshot? {
             if (ids.isEmpty() || index !in ids.indices) return null
             if (ids.size <= MAX) return QueueSnapshot(ids, index, positionMs, shuffle, repeat)
-            val from = (index - BEFORE).coerceAtLeast(0)
-            val to = minOf(ids.size, from + MAX)
+            // Verso la fine della coda si tengono più brani prima: sempre MAX in tutto.
+            val from = (index - BEFORE).coerceIn(0, ids.size - MAX)
+            val to = from + MAX
             return QueueSnapshot(ids.subList(from, to), index - from, positionMs, shuffle, repeat)
         }
 

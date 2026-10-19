@@ -25,9 +25,11 @@ object Loudness {
             ReplayGainMode.ALBUM -> if (rg.albumGain != null) rg.albumGain to rg.albumPeak else rg.trackGain to rg.trackPeak
             ReplayGainMode.TRACK -> if (rg.trackGain != null) rg.trackGain to rg.trackPeak else rg.albumGain to rg.albumPeak
         }
-        if (gain == null) return 1f
+        // Un guadagno che non è un numero (tag rovinato) vale come mancante: NaN darebbe un volume
+        // NaN al player, e -Infinity il silenzio.
+        if (gain == null || !gain.isFinite()) return 1f
         var v = 10f.pow(gain / 20f)
-        if (peak != null && peak > 0f) v = min(v, 1f / peak)
+        if (peak != null && peak.isFinite() && peak > 0f) v = min(v, 1f / peak)
         return v.coerceIn(0f, 1f)
     }
 }

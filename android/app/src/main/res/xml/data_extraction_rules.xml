@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Backup di Android e trasferimento su un telefono nuovo (Android 12+). I file dell'app
+  (libreria.json, coda.json, indici di tag e volume) parlano di brani per ID di MediaStore,
+  che su un altro telefono indicano altri file: si ripristinano solo dal backup di BaldMusic
+  (Impostazioni → Backup), che ritrova i brani per cartella, titolo e durata. Restano le
+  impostazioni (server, dissolvenza, volume), che valgono anche lì.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="backup.xml" />
+        <exclude domain="sharedpref" path="update.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="." />
+        <exclude domain="sharedpref" path="backup.xml" />
+        <exclude domain="sharedpref" path="update.xml" />
+    </device-transfer>
+</data-extraction-rules>

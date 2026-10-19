@@ -28,7 +28,11 @@ class UserData(context: Context) {
 
     private val file = File(context.filesDir, "libreria.json")
     private val json = Json { ignoreUnknownKeys = true }
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // Un salvataggio alla volta: update() arriva sia dall'interfaccia sia dai thread che leggono
+    // MediaStore, e due scritture insieme dello stesso .tmp rovinerebbero il file.
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private val lock = Any()
     private var pendingSave: Job? = null
 
     private val _state = MutableStateFlow(load())
@@ -36,21 +40,29 @@ class UserData(context: Context) {
 
     val value: UserLibrary get() = _state.value
 
-    private fun load(): UserLibrary = runCatching {
-        if (file.exists()) json.decodeFromString(UserLibrary.serializer(), file.readText()) else UserLibrary()
-    }.getOrDefault(UserLibrary())
+    private fun load(): UserLibrary {
+        if (!file.exists()) return UserLibrary()
+        return runCatching { json.decodeFromString(UserLibrary.serializer(), file.readText()) }.getOrElse {
+            // File rovinato: si mette da parte invece di scriverci sopra una libreria vuota, così si
+            // può ancora recuperare (e c'è il backup in Download/BaldMusic).
+            runCatching { file.copyTo(File(file.parentFile, "libreria-rovinata-${System.currentTimeMillis()}.json")) }
+            UserLibrary()
+        }
+    }
 
     private fun update(change: (UserLibrary) -> UserLibrary) {
         val before = _state.value
         _state.update(change)
         if (_state.value === before) return
         // Gli ascolti arrivano a raffica (salti di brano): si salva una volta sola.
-        pendingSave?.cancel()
-        pendingSave = scope.launch {
-            delay(800)
-            val tmp = File(file.parentFile, "${file.name}.tmp")
-            tmp.writeText(json.encodeToString(UserLibrary.serializer(), _state.value))
-            tmp.renameTo(file)
+        synchronized(lock) {
+            pendingSave?.cancel()
+            pendingSave = scope.launch {
+                delay(800)
+                val tmp = File(file.parentFile, "${file.name}.tmp")
+                tmp.writeText(json.encodeToString(UserLibrary.serializer(), _state.value))
+                tmp.renameTo(file)
+            }
         }
     }
 

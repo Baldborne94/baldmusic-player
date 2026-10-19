@@ -31,3 +31,36 @@ describe("range", () => {
     expect(range(4, 2)).toEqual([2, 3, 4]);
   });
 });
+
+describe("moveItem ai bordi", () => {
+  it("posizione di arrivo oltre la fine: in fondo; partenza fuori dall'elenco: niente", () => {
+    expect(moveItem(["a", "b", "c"], 0, 10)).toEqual(["b", "c", "a"]);
+    expect(moveItem(["a", "b", "c"], 2, -1)).toEqual(["c", "a", "b"]);
+    const list = ["a", "b"];
+    expect(moveItem(list, 5, 0)).toBe(list);
+    expect(moveItem(list, -1, 0)).toBe(list);
+  });
+
+  it("non tocca l'elenco di partenza", () => {
+    const list = ["a", "b", "c"];
+    moveItem(list, 0, 2);
+    expect(list).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("sortSongs ai bordi", () => {
+  it("brani senza artista vanno in cima, accenti e maiuscole non contano", () => {
+    const songs = [
+      { id: "1", title: "Été", artist: "Zucchero" },
+      { id: "2", title: "anima" },
+      { id: "3", title: "Èra", artist: "àlan" },
+    ];
+    expect(sortSongs(songs, "artist").map((s) => s.id)).toEqual(["2", "3", "1"]);
+    expect(sortSongs(songs, "title").map((s) => s.id)).toEqual(["2", "3", "1"]);
+    expect(songs.map((s) => s.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("range di un solo brano", () => {
+    expect(range(3, 3)).toEqual([3]);
+  });
+});

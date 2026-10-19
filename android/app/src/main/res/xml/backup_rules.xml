@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Come data_extraction_rules.xml, per Android 11 e precedenti. -->
+<full-backup-content>
+    <exclude domain="file" path="." />
+    <exclude domain="sharedpref" path="backup.xml" />
+    <exclude domain="sharedpref" path="update.xml" />
+</full-backup-content>

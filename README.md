@@ -69,7 +69,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 
 ## Sviluppo
 
-Il piano di lavoro, fase per fase, è in [`ROADMAP.md`](ROADMAP.md).
+Il piano di lavoro, fase per fase, è in [`ROADMAP.md`](ROADMAP.md); le prove da fare a mano su telefono, tablet, auto e PC sono in [`COLLAUDO.md`](COLLAUDO.md).
 
 | | Requisiti | Comandi |
 |-|-----------|---------|

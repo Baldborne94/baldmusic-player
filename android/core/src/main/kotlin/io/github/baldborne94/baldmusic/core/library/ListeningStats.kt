@@ -27,8 +27,13 @@ data class ListeningStats(
                 totalPlays = plays.sumOf { it.count },
                 minutes = plays.sumOf { it.count.toLong() * (it.track.durationMs ?: 0L) } / 60_000,
                 tracks = plays.size,
-                artists = plays.mapNotNull { it.track.artist?.lowercase() }.distinct().size,
-                topArtists = rank({ it.track.artist }) { k, v -> Ranked(k, v.sumOf { it.count }, v.firstNotNullOfOrNull { it.track.artwork }) },
+                // Lo stesso artista scritto in modi diversi ("Guns N' Roses", "guns n’ roses") è uno solo.
+                artists = plays.mapNotNull { it.track.artist?.let(ArtistNames::key) }.distinct().size,
+                topArtists = rank({ p -> p.track.artist?.let(ArtistNames::key) }) { _, v ->
+                    // Il nome scritto negli ascolti più numerosi.
+                    val name = v.groupBy { it.track.artist!!.trim() }.maxBy { (_, l) -> l.sumOf { it.count } }.key
+                    Ranked(name, v.sumOf { it.count }, v.firstNotNullOfOrNull { it.track.artwork })
+                },
                 topTracks = plays.sortedByDescending { it.count }.take(limit).map { Ranked(it.track.title, it.count, it.track.artwork, it.track.artist) },
                 topAlbums = rank({ it.track.album }) { k, v -> Ranked(k, v.sumOf { it.count }, v.firstNotNullOfOrNull { it.track.artwork }, v.first().track.artist) },
                 since = plays.minOfOrNull { it.lastPlayed },

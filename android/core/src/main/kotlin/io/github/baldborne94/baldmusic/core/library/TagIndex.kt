@@ -47,7 +47,8 @@ class TagIndex private constructor(private val entries: MutableMap<Long, Entry>)
     companion object {
         /** Da aumentare quando cambia cosa si legge dai file: l'indice si rifà da capo. */
         // 2: la data "1970-01-01" non vale più come anno.
-        const val VERSION = 2
+        // 3: un ReplayGain "NaN" o "Infinity" nei tag vale come mancante.
+        const val VERSION = 3
 
         private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 

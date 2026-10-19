@@ -82,6 +82,20 @@ describe("blockedAsMixedContent", () => {
     expect(blockedAsMixedContent("https:", "https://pc.tail1.ts.net")).toBe(false);
   });
 
+  it("loopback è solo localhost, *.localhost, 127.x.x.x e [::1]", () => {
+    expect(blockedAsMixedContent("https:", "http://[::1]:4533")).toBe(false);
+    expect(blockedAsMixedContent("https:", "http://pc.localhost:4533")).toBe(false);
+    expect(blockedAsMixedContent("https:", "http://127.10.20.30:4533")).toBe(false);
+    // Un nome che comincia per "127." è un server in rete come gli altri: il browser lo blocca.
+    expect(blockedAsMixedContent("https:", "http://127.0.0.1.nip.io:4533")).toBe(true);
+    expect(blockedAsMixedContent("https:", "http://127.example.com")).toBe(true);
+    expect(blockedAsMixedContent("https:", "http://localhost.example.com")).toBe(true);
+  });
+
+  it("un indirizzo non valido non si blocca qui: lo dirà la connessione", () => {
+    expect(blockedAsMixedContent("https:", "non è un indirizzo")).toBe(false);
+  });
+
   it("da una pagina http non blocca niente", () => {
     expect(blockedAsMixedContent("http:", "http://192.168.1.20:4533")).toBe(false);
   });

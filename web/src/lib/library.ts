@@ -45,6 +45,11 @@ export function useLibrary(): LibraryState {
   );
 }
 
+/** Lo stato di adesso, fuori da React (come getPlayerState). */
+export function getLibraryState(): LibraryState {
+  return state;
+}
+
 export async function refreshLibrary(): Promise<void> {
   const c = getClient();
   if (!c) return;
@@ -251,8 +256,12 @@ export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
     const ids = ((await c.playlist(p.id)).entry ?? []).map((s) => s.id);
     if (ids.some((id) => keptFor.has(id))) await c.replacePlaylistSongs(p.id, replaceCopies(ids, keptFor));
   }
+  // Più copie col cuore dello stesso brano: alla tenuta lo si mette una volta sola.
+  const liked = new Set(state.liked);
   for (const [copy, kept] of keptFor) {
-    if (state.liked.has(copy) && !state.liked.has(kept)) await c.setStar(kept, true);
+    if (!liked.has(copy) || liked.has(kept)) continue;
+    await c.setStar(kept, true);
+    liked.add(kept);
   }
   await refreshLibrary();
 }
