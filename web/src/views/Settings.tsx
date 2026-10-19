@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
+import { syncCollections, useLibrary } from "../lib/library";
 import { player } from "../lib/player";
+import { CollectionsHint } from "./Library";
 import { saveCredentials, useClient } from "../lib/session";
 
 export function Settings() {
   const client = useClient();
+  const lib = useLibrary();
   const [status, setStatus] = useState<string | null>(null);
   if (!client) return null;
   const { url, user } = client.creds;
@@ -47,6 +50,19 @@ export function Settings() {
           </button>
         </div>
         {status && <p className="muted">{status}</p>}
+      </div>
+      <div className="panel">
+        <h2>Raccolte dalle cartelle</h2>
+        <p className="muted">
+          Come sul telefono: ogni cartella dentro quella della musica di Navidrome è una raccolta. I brani nuovi della cartella entrano da
+          soli a ogni apertura; quelli tolti a mano non tornano; una raccolta eliminata non si ricrea. I file non si toccano mai.
+        </p>
+        {lib.collections.state === "ready" ? <p className="muted">Raccolte allineate alle cartelle ✓</p> : <CollectionsHint status={lib.collections} />}
+        <div className="actions">
+          <button className="btn" disabled={lib.collections.state === "syncing"} onClick={() => void syncCollections()}>
+            Aggiorna ora
+          </button>
+        </div>
       </div>
       <div className="panel">
         <h2>Scorciatoie da tastiera</h2>

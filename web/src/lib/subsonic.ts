@@ -33,6 +33,8 @@ export interface Song {
   bitRate?: number;
   playCount?: number;
   genre?: string;
+  /** Percorso del file: vero solo se nel lettore di Navidrome è attivo "Mostra percorso reale". */
+  path?: string;
 }
 
 export interface Album {
@@ -68,6 +70,7 @@ export interface Artist {
 export interface Playlist {
   id: string;
   name: string;
+  comment?: string;
   songCount?: number;
   duration?: number;
   coverArt?: string;
@@ -289,18 +292,31 @@ export class SubsonicClient {
     }
   }
 
-  async createPlaylist(name: string, songIds: string[] = []): Promise<void> {
-    const q = new URLSearchParams();
-    songIds.forEach((id) => q.append("songId", id));
-    await this.callMulti("createPlaylist", { name }, q);
+  /** Tutti i brani, a pagine: la ricerca vuota ("") di Navidrome li restituisce tutti. */
+  async allSongs(): Promise<Song[]> {
+    const page = 500;
+    const out: Song[] = [];
+    for (let offset = 0; ; offset += page) {
+      const r = await this.call("search3", { query: '""', artistCount: 0, albumCount: 0, songCount: page, songOffset: offset });
+      const songs = list<Song>((r.searchResult3 as Raw | undefined)?.song);
+      out.push(...songs);
+      if (songs.length < page) return out;
+    }
   }
 
-  /** Rinomina, aggiunge brani, toglie brani per posizione. */
-  async updatePlaylist(id: string, change: { name?: string; add?: string[]; removeIndexes?: number[] }): Promise<void> {
+  async createPlaylist(name: string, songIds: string[] = []): Promise<Playlist> {
+    const q = new URLSearchParams();
+    songIds.forEach((id) => q.append("songId", id));
+    const r = await this.callMulti("createPlaylist", { name }, q);
+    return r.playlist as Playlist;
+  }
+
+  /** Rinomina, cambia il commento, aggiunge brani, toglie brani per posizione. */
+  async updatePlaylist(id: string, change: { name?: string; comment?: string; add?: string[]; removeIndexes?: number[] }): Promise<void> {
     const q = new URLSearchParams();
     change.add?.forEach((s) => q.append("songIdToAdd", s));
     change.removeIndexes?.forEach((i) => q.append("songIndexToRemove", String(i)));
-    await this.callMulti("updatePlaylist", { playlistId: id, name: change.name }, q);
+    await this.callMulti("updatePlaylist", { playlistId: id, name: change.name, comment: change.comment }, q);
   }
 
   async deletePlaylist(id: string): Promise<void> {

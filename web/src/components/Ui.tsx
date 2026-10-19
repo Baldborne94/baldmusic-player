@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { dominantColor, tileColor } from "../lib/colors";
 import { formatDuration } from "../lib/format";
-import { addToPlaylist, createPlaylist, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
+import { addToPlaylist, createPlaylist, isCollection, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
 import { player, usePlayer } from "../lib/player";
 import { current } from "../lib/queue";
 import { href, navigate } from "../lib/router";
@@ -119,7 +119,7 @@ export function PlaylistCards({ playlists, scroll = false, bare = false }: { pla
           to={href({ name: "playlist", id: p.id })}
           cover={p.coverArt}
           title={p.name}
-          subtitle={`Playlist · ${p.songCount ?? 0} brani`}
+          subtitle={`${isCollection(p) ? "Raccolta" : "Playlist"} · ${p.songCount ?? 0} brani`}
           playId={`playlist/${p.id}`}
           onPlay={async () => {
             const full = await getClient()!.playlist(p.id);

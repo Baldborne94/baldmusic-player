@@ -4,18 +4,44 @@ import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, LikedArt, PlaylistCards } from "../components/Ui";
 import { isRealAlbum } from "../lib/albums";
-import { createPlaylist, useLibrary } from "../lib/library";
+import { createCollection, createPlaylist, isCollection, useLibrary, type CollectionsStatus } from "../lib/library";
 import { href, type Route } from "../lib/router";
 import { getClient } from "../lib/session";
 import type { Album, AlbumListType } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
 
-type Filter = "playlists" | "albums" | "artists";
+type Filter = "collections" | "playlists" | "albums" | "artists";
+
+const FILTERS: [Filter, string][] = [
+  ["collections", "Raccolte"],
+  ["playlists", "Playlist"],
+  ["albums", "Album"],
+  ["artists", "Artisti"],
+];
+
+/** Perché non ci sono raccolte, se non è solo che non ci sono cartelle. */
+export function CollectionsHint({ status }: { status: CollectionsStatus }) {
+  if (status.state === "syncing" || status.state === "idle") return <p className="muted pad">Leggo le cartelle della musica…</p>;
+  if (status.state === "error") return <p className="muted pad">Raccolte non aggiornate: {status.error}</p>;
+  if (status.state === "noRealPath") {
+    return (
+      <p className="muted pad">
+        Le raccolte nascono dalle cartelle, ma Navidrome non dice dove stanno i file. Si attiva una volta: in Navidrome, menu in alto a
+        destra → <strong>Lettori</strong> → la riga con applicazione <strong>baldmusic</strong> → <strong>Mostra percorso reale</strong>, salva e
+        ricarica questa pagina.
+      </p>
+    );
+  }
+  return <p className="muted pad">Nessuna raccolta: non ci sono cartelle dentro quella della musica di Navidrome.</p>;
+}
 
 /** La libreria della barra laterale: preferiti, playlist, album e artisti in elenco compatto. */
 export function SidebarLibrary({ route }: { route: Route }) {
   const lib = useLibrary();
-  const [filter, setFilter] = useState<Filter>("playlists");
+  const [chosen, setFilter] = useState<Filter | null>(null);
+  const collections = lib.playlists.filter(isCollection);
+  // Come sul telefono, prima le raccolte (se ci sono).
+  const filter = chosen ?? (collections.length > 0 ? "collections" : "playlists");
   const [q, setQ] = useState("");
   const albums = useLoad(() => (filter === "albums" ? getClient()!.albumList("recent", 100) : Promise.resolve([] as Album[])), [filter]);
   const artists = useLoad(() => (filter === "artists" ? getClient()!.artists() : Promise.resolve([])), [filter]);
@@ -40,14 +66,28 @@ export function SidebarLibrary({ route }: { route: Route }) {
         </button>
       </header>
       <div className="chips chips--small">
-        {(["playlists", "albums", "artists"] as Filter[]).map((k) => (
+        {FILTERS.map(([k, label]) => (
           <button key={k} className={`chip ${filter === k ? "is-on" : ""}`} onClick={() => setFilter(k)}>
-            {k === "playlists" ? "Playlist" : k === "albums" ? "Album" : "Artisti"}
+            {label}
           </button>
         ))}
       </div>
       <input className="side-lib__filter" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca nella libreria" />
       <div className="side-lib__list">
+        {filter === "collections" && (
+          <>
+            {collections.length === 0 && <CollectionsHint status={lib.collections} />}
+            {collections.filter((p) => !f || p.name.toLowerCase().includes(f)).map((p) => (
+              <a key={p.id} className={`lib-row ${active === `playlist/${p.id}` ? "is-active" : ""}`} href={href({ name: "playlist", id: p.id })}>
+                <Cover id={p.coverArt} size={96} className="lib-row__art" />
+                <span className="lib-row__text">
+                  <span className="lib-row__title">{p.name}</span>
+                  <span className="lib-row__sub">Raccolta · {p.songCount ?? 0} brani</span>
+                </span>
+              </a>
+            ))}
+          </>
+        )}
         {filter === "playlists" && (
           <>
             <a className={`lib-row ${active === "liked" ? "is-active" : ""}`} href={href({ name: "liked" })}>
@@ -57,7 +97,7 @@ export function SidebarLibrary({ route }: { route: Route }) {
                 <span className="lib-row__sub">📌 Playlist · {lib.likedSongs.length} brani</span>
               </span>
             </a>
-            {lib.playlists.filter((p) => !f || p.name.toLowerCase().includes(f)).map((p) => (
+            {lib.playlists.filter((p) => !isCollection(p) && (!f || p.name.toLowerCase().includes(f))).map((p) => (
               <a key={p.id} className={`lib-row ${active === `playlist/${p.id}` ? "is-active" : ""}`} href={href({ name: "playlist", id: p.id })}>
                 <Cover id={p.coverArt} size={96} className="lib-row__art" />
                 <span className="lib-row__text">
@@ -104,7 +144,9 @@ const SORTS: [AlbumListType, string][] = [
 /** La libreria a pagina intera (telefono, tablet e "Mostra tutto"). */
 export function LibraryPage({ initial }: { initial: Filter | null }) {
   const lib = useLibrary();
-  const [filter, setFilter] = useState<Filter>(initial ?? "playlists");
+  const [chosen, setFilter] = useState<Filter | null>(initial);
+  const collections = lib.playlists.filter(isCollection);
+  const filter = chosen ?? (collections.length > 0 ? "collections" : "playlists");
   const [sort, setSort] = useState<AlbumListType>("alphabeticalByName");
   // Singoli e album di cui c'è un brano solo stanno sotto l'artista, non qui.
   const albums = useLoad(async () => (filter === "albums" ? (await getClient()!.albumList(sort, 500)).filter(isRealAlbum) : ([] as Album[])), [filter, sort]);
@@ -126,9 +168,9 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
         </button>
       </header>
       <div className="chips">
-        {(["playlists", "albums", "artists"] as Filter[]).map((k) => (
+        {FILTERS.map(([k, label]) => (
           <button key={k} className={`chip ${filter === k ? "is-on" : ""}`} onClick={() => setFilter(k)}>
-            {k === "playlists" ? "Playlist" : k === "albums" ? "Album" : "Artisti"}
+            {label}
           </button>
         ))}
         {filter === "albums" && (
@@ -139,13 +181,30 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
           </select>
         )}
       </div>
+      {filter === "collections" && (
+        <>
+          {collections.length === 0 ? <CollectionsHint status={lib.collections} /> : <PlaylistCards playlists={collections} />}
+          {lib.collections.missing.length > 0 && (
+            <div className="pad">
+              <p className="muted">Cartelle senza raccolta (eliminata, o creata da un altro browser):</p>
+              <div className="chips">
+                {lib.collections.missing.map((folder) => (
+                  <button key={folder} className="chip" onClick={() => void createCollection(folder)}>
+                    <Icon name="plus" size={16} /> {folder}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
       {filter === "playlists" && (
         <div className="grid">
           <a className="card liked-card" href={href({ name: "liked" })}>
             <span className="liked-card__title">Brani che ti piacciono</span>
             <span className="liked-card__sub">{likedAsPlaylist.length} brani</span>
           </a>
-          <PlaylistCards playlists={lib.playlists} bare />
+          <PlaylistCards playlists={lib.playlists.filter((p) => !isCollection(p))} bare />
         </div>
       )}
       {filter === "albums" && (albums.loading ? <Loading /> : albums.error ? <ErrorState message={albums.error} /> : <AlbumCards albums={albums.data ?? []} />)}
