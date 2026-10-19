@@ -6,7 +6,7 @@ import { AlbumCards, Hero, LikedArt, PlayButton, PlaylistPicker, startRadio, Tra
 import { albumYear, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
-import { isWindowsPath, trashScript } from "../lib/cleanup";
+import { isWindowsPath, TRASH_SCRIPT_NAME, trashScript } from "../lib/cleanup";
 import { deletePlaylist, isCollection, removeManyFromPlaylist, renamePlaylist, rewritePlaylist, useLibrary } from "../lib/library";
 import { moveItem, range, sortSongs } from "../lib/playlistEdit";
 import { player, usePlayer } from "../lib/player";
@@ -240,7 +240,7 @@ export function PlaylistPage({ id }: { id: string }) {
     if (!confirm(`Spostare ${plural(files.length, "file", "file")} nel Cestino di Windows? Si prepara lo script, come nella Pulizia, e i brani escono da questa ${what}.`)) return;
     const indexes = songs.map((s, i) => (files.includes(s) ? i : -1)).filter((i) => i >= 0);
     await removeManyFromPlaylist(id, indexes);
-    download("baldmusic-pulizia.ps1", trashScript(files.map((s) => s.path!)));
+    download(TRASH_SCRIPT_NAME, trashScript(files.map((s) => s.path!)));
     setTrashed(files.length);
     setSelected(new Set());
     fresh.reload();

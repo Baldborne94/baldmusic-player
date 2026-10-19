@@ -52,9 +52,12 @@ describe("replaceCopies", () => {
 });
 
 describe("trashScript", () => {
-  it("manda i file nel Cestino, con BOM e apici raddoppiati", () => {
+  it("si apre col doppio clic, manda i file nel Cestino, apici raddoppiati", () => {
     const s = trashScript(["C:\\Music\\Disney\\L'amore è.mp3"]);
-    expect(s.startsWith("\uFEFF")).toBe(true);
+    // Prima riga: per il prompt è un'etichetta, per PowerShell l'inizio di un commento.
+    expect(s.startsWith("<# :")).toBe(true);
+    expect(s).toContain("-ExecutionPolicy Bypass");
+    expect(s).toContain("[Text.Encoding]::UTF8");
     expect(s).toContain("'C:\\Music\\Disney\\L''amore è.mp3'");
     expect(s).toContain("SendToRecycleBin");
   });

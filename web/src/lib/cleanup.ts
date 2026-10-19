@@ -110,33 +110,41 @@ export function replaceCopies(ids: string[], keptFor: Map<string, string>): stri
 /** Percorso di Windows (C:\…): lo script per il Cestino è per Windows. */
 export const isWindowsPath = (path: string) => /^[A-Za-z]:\\/.test(path);
 
+/** Il nome del file da scaricare: un .cmd parte col doppio clic, un .ps1 no. */
+export const TRASH_SCRIPT_NAME = "baldmusic-pulizia.cmd";
+
 /**
- * Script PowerShell che sposta i file nel Cestino di Windows. Con il BOM UTF-8, così
- * PowerShell 5 legge giusti anche i percorsi con lettere accentate.
+ * Script che sposta i file nel Cestino di Windows. È un .cmd che contiene PowerShell:
+ * col doppio clic Windows lo apre, la parte per il prompt dei comandi lancia PowerShell
+ * su questo stesso file (letto come UTF-8, così i percorsi con le lettere accentate
+ * restano giusti) e la parte per PowerShell, dentro un commento per il prompt, fa il lavoro.
  */
 export function trashScript(paths: string[]): string {
   const quoted = paths.map((p) => `  '${p.replace(/'/g, "''")}'`).join(",\r\n");
-  return (
-    "\uFEFF" +
-    [
-      "# BaldMusic - pulizia della libreria",
-      "# Sposta questi file nel Cestino di Windows: se serve, si ripristinano da li'.",
-      "Add-Type -AssemblyName Microsoft.VisualBasic",
-      "$files = @(",
-      quoted,
-      ")",
-      "$ok = 0",
-      "foreach ($f in $files) {",
-      "  if (Test-Path -LiteralPath $f) {",
-      "    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($f, 'OnlyErrorDialogs', 'SendToRecycleBin')",
-      "    $ok++",
-      "  } else {",
-      '    Write-Host "Non trovato: $f"',
-      "  }",
-      "}",
-      'Write-Host "$ok file spostati nel Cestino."',
-      'Read-Host "Premi Invio per chiudere"',
-      "",
-    ].join("\r\n")
-  );
+  return [
+    "<# : prompt dei comandi",
+    "@echo off",
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Expression ([IO.File]::ReadAllText('%~f0', [Text.Encoding]::UTF8))"`,
+    "if errorlevel 1 pause",
+    "goto :EOF",
+    ": da qui PowerShell #>",
+    "# BaldMusic - pulizia della libreria",
+    "# Sposta questi file nel Cestino di Windows: se serve, si ripristinano da li'.",
+    "Add-Type -AssemblyName Microsoft.VisualBasic",
+    "$files = @(",
+    quoted,
+    ")",
+    "$ok = 0",
+    "foreach ($f in $files) {",
+    "  if (Test-Path -LiteralPath $f) {",
+    "    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($f, 'OnlyErrorDialogs', 'SendToRecycleBin')",
+    "    $ok++",
+    "  } else {",
+    '    Write-Host "Non trovato: $f"',
+    "  }",
+    "}",
+    'Write-Host "$ok file spostati nel Cestino."',
+    'Read-Host "Premi Invio per chiudere"',
+    "",
+  ].join("\r\n");
 }
