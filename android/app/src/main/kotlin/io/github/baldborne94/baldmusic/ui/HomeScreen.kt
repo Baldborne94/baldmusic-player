@@ -123,6 +123,8 @@ fun HomeScreen(vm: PlayerViewModel) {
 
         // C'è una versione nuova dell'app.
         item { UpdateBanner(vm) }
+        // App appena installata o telefono nuovo: la tua musica si riprende dal backup.
+        item { RestoreBanner(vm) }
 
         if (needsPermission) {
             item {

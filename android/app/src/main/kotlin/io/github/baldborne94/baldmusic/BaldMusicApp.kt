@@ -9,6 +9,7 @@ import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
+import io.github.baldborne94.baldmusic.data.Backups
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.library.LocalSource
@@ -38,6 +39,9 @@ class BaldMusicApp : Application() {
 
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
+    /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
+    val backups: Backups by lazy { Backups(this, userData, local) }
+
     /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
     val updater: Updater by lazy { Updater(this, http) }
 
@@ -66,6 +70,7 @@ class BaldMusicApp : Application() {
         )
         userData = UserData(this)
         personal = PersonalSource { userData.value }
+        backups.start()
     }
 
     /** La tua musica per prima: in Android Auto è la prima scheda. */

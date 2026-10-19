@@ -441,6 +441,19 @@ class LocalCatalog(
         /** I brani che non stanno in un album mostrato. */
         val loose: List<LocalTrack> = tracks.filter { t -> albumKeys[t.id]?.let { albums[it]?.shown } != true }
 
+        /** Perché un brano è tra i brani sparsi; null se sta in un album. */
+        fun looseReason(t: LocalTrack): LooseReason? {
+            val album = albumKeys[t.id]?.let { albums[it] } ?: return LooseReason.NO_ALBUM
+            return when {
+                album.isSingle -> LooseReason.SINGLE
+                album.tracks.size < 2 -> LooseReason.ALONE
+                else -> null
+            }
+        }
+
+        /** Quanti brani hai dello stesso disco del brano (lui compreso). */
+        fun albumSize(t: LocalTrack): Int = albumKeys[t.id]?.let { albums[it]?.tracks?.size } ?: 0
+
         private val pages = HashMap<String, ArtistPage>()
 
         /** Chi ha un album o compare in un brano; non "Artisti vari". */
@@ -538,6 +551,12 @@ class LocalCatalog(
         }
 
         private const val EPOCH_YEAR = 1970
+
+        /** Per ogni brano: perché è tra gli sparsi (o null) e quanti brani hai del suo disco. Per [LibraryHealth]. */
+        fun albumFacts(tracks: List<LocalTrack>): Map<Long, AlbumFact> {
+            val ix = Index(tracks)
+            return tracks.associate { it.id to AlbumFact(ix.looseReason(it), ix.albumSize(it)) }
+        }
 
         /**
          * Le cartelle del telefono come raccolte: la prima cartella dentro quella principale
