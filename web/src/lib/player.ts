@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import * as Q from "./queue";
+import { replayGainVolume, storedReplayGainMode, storeReplayGainMode, type ReplayGainMode } from "./replaygain";
 import { getClient } from "./session";
 import type { Song } from "./subsonic";
 
@@ -19,6 +20,8 @@ export interface PlayerState {
   from: { label: string; id: string } | null;
   /** Fine del timer di spegnimento (ms), -1 = a fine brano, null = spento. */
   sleepAt: number | null;
+  /** Volume uguale tra i brani: album, brano o spento. */
+  replayGain: ReplayGainMode;
 }
 
 const VOLUME_KEY = "baldmusic.volume";
@@ -42,6 +45,7 @@ let state: PlayerState = {
   error: null,
   from: null,
   sleepAt: null,
+  replayGain: storedReplayGainMode(),
 };
 
 let sleepTimer: ReturnType<typeof setTimeout> | null = null;
@@ -96,6 +100,11 @@ function el(): HTMLAudioElement {
 
 const finite = (n: number) => (Number.isFinite(n) ? n : 0);
 
+/** Il volume scelto dall'utente per quello del ReplayGain del brano in corso. */
+function applyVolume(): void {
+  el().volume = state.volume * replayGainVolume(Q.current(state.queue)?.replayGain, state.replayGain);
+}
+
 function onTime(): void {
   const a = el();
   set({ position: a.currentTime });
@@ -126,6 +135,7 @@ function load(autoplay: boolean): void {
     loadedUid = entry.uid;
     scrobbled = false;
     a.src = client.streamUrl(entry.song.id);
+    applyVolume();
     set({ position: 0, duration: entry.song.duration ?? 0, error: null });
     client.scrobble(entry.song.id, false).catch(() => {});
   }
@@ -243,8 +253,8 @@ export const player = {
   },
   setVolume(v: number): void {
     const volume = Math.max(0, Math.min(1, v));
-    el().volume = volume;
     set({ volume });
+    applyVolume();
     try {
       localStorage.setItem(VOLUME_KEY, String(volume));
     } catch {
@@ -253,6 +263,11 @@ export const player = {
   },
   clear(): void {
     setQueue(Q.emptyQueue, false);
+  },
+  setReplayGain(mode: ReplayGainMode): void {
+    set({ replayGain: mode });
+    storeReplayGainMode(mode);
+    applyVolume();
   },
   /** Aggiorna il brano in coda dopo un "mi piace", senza toccare la riproduzione. */
   patchSong(id: string, patch: Partial<Song>): void {

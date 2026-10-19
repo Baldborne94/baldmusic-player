@@ -125,6 +125,7 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         streamUri = client.streamUrl(s.id),
         albumId = s.albumId?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = s.artistId?.let { MediaId(KEY, ARTIST, it).toString() },
+        replayGain = s.replayGain?.let { ReplayGain(it.trackGain, it.albumGain, it.trackPeak, it.albumPeak) },
     )
 
     companion object {

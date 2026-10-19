@@ -33,6 +33,7 @@ import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
+import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
 import io.github.baldborne94.baldmusic.core.library.VoiceQuery
@@ -71,6 +72,9 @@ class PlaybackService : MediaLibraryService() {
     private var listenJob: Job? = null
     private var sleepJob: Job? = null
 
+    /** Il timer di spegnimento abbassa piano il volume: si moltiplica per quello del ReplayGain. */
+    private var fade = 1f
+
     override fun onCreate() {
         super.onCreate()
         // OkHttp anche per lo streaming: stessi timeout e stessa connessione del resto dell'app.
@@ -107,6 +111,7 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
+        scope.launch { app.settings.replayGain.collect { applyVolume() } }
 
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
@@ -180,6 +185,7 @@ class PlaybackService : MediaLibraryService() {
 
     private inner class PlayerEvents : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            applyVolume()
             saveLast()
             startScrobble(mediaItem)
             startListen(mediaItem)
@@ -281,22 +287,34 @@ class PlaybackService : MediaLibraryService() {
         return null
     }
 
+    /**
+     * Volume del brano in corso: ReplayGain (si abbassa e basta, mai oltre il picco) per
+     * la sfumatura del timer. Il volume del telefono resta all'utente.
+     */
+    private fun applyVolume() {
+        val rg = Loudness.volume(player.currentMediaItem?.replayGain, app.settings.replayGain.value)
+        player.volume = (rg * fade).coerceIn(0f, 1f)
+    }
+
     /** Timer di spegnimento: abbassa piano il volume nell'ultimo tratto, poi pausa. */
     private fun scheduleSleep(end: Long?) {
         sleepJob?.cancel()
-        player.volume = 1f
+        fade = 1f
+        applyVolume()
         if (end == null || end == BaldMusicApp.SLEEP_END_OF_TRACK) return
         sleepJob = scope.launch {
-            val fade = 10_000L
-            delay((end - System.currentTimeMillis() - fade).coerceAtLeast(0))
+            val fadeMs = 10_000L
+            delay((end - System.currentTimeMillis() - fadeMs).coerceAtLeast(0))
             while (true) {
                 val left = end - System.currentTimeMillis()
                 if (left <= 0) break
-                player.volume = (left.toFloat() / fade).coerceIn(0f, 1f)
+                fade = (left.toFloat() / fadeMs).coerceIn(0f, 1f)
+                applyVolume()
                 delay(250)
             }
             player.pause()
-            player.volume = 1f
+            fade = 1f
+            applyVolume()
             app.sleepTimer.value = null
         }
     }

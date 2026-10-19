@@ -2,6 +2,7 @@ package io.github.baldborne94.baldmusic
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,18 @@ class Settings(context: Context) {
         set(value) {
             prefs.edit { putBoolean(KEY_LYRICS, value) }
         }
+
+    private val _replayGain = MutableStateFlow(
+        prefs.getString(KEY_REPLAY_GAIN, null)?.let { runCatching { ReplayGainMode.valueOf(it) }.getOrNull() } ?: ReplayGainMode.ALBUM,
+    )
+
+    /** Volume uguale tra i brani (ReplayGain): il servizio lo segue mentre suona. */
+    val replayGain: StateFlow<ReplayGainMode> = _replayGain.asStateFlow()
+
+    fun setReplayGain(mode: ReplayGainMode) {
+        prefs.edit { putString(KEY_REPLAY_GAIN, mode.name) }
+        _replayGain.value = mode
+    }
 
     /** Qualcosa è cambiato (server, permessi): la libreria va riletta. */
     fun touch() {
@@ -69,5 +82,6 @@ class Settings(context: Context) {
         const val KEY_LAST_ID = "last_media_id"
         const val KEY_LAST_POS = "last_position"
         const val KEY_LYRICS = "lyrics_online"
+        const val KEY_REPLAY_GAIN = "replay_gain"
     }
 }
