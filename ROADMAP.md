@@ -9,9 +9,12 @@ provata sul telefono prima di passare alla successiva. Le voci si spuntano qui q
 ## Come si usa BaldMusic oggi
 
 - **La musica sta su ogni dispositivo**, in locale, finché non arriva il NAS.
-- **I file sono già passati da Picard**: i tag sono buoni e completi (artista dell'album, numeri di
+- **Sul PC i file sono passati da Picard**: i tag sono buoni e completi (artista dell'album, numeri di
   traccia e disco, anno originale, tipo di uscita, ID MusicBrainz, ReplayGain se calcolato).
   Il lavoro vero è **leggerli tutti** e usarli bene.
+- **Sul telefono no**: i file sono scaricati lì, divisi in cartelle per playlist, con tag poveri (album
+  diverso da brano a brano, anno 1970, niente ReplayGain). Lì contano le cartelle, la pulizia e il volume
+  misurato dall'app.
 - **ReplayGain sì**: volume uniforme tra un brano e l'altro, letto dai tag. Non è un effetto: il suono
   resta quello del file, cambia solo il volume, di una quantità fissa per brano o per album.
 
@@ -38,23 +41,19 @@ Quindi, dispositivo per dispositivo:
 
 ## Dove siamo
 
-La prima stesura funziona già: app Android nativa con Android Auto, app web stile Spotify,
-server Navidrome raggiungibile con Tailscale, testi sincronizzati, preferiti, playlist, radio,
-statistiche, widget. I punti deboli emersi leggendo il codice:
+Fatto e in uso: app Android nativa con Android Auto, app web stile Spotify, server Navidrome
+raggiungibile con Tailscale; raccolte dalle cartelle su telefono e PC; tag di Picard letti per intero
+(artisti, album, dischi, tipo di uscita, anno originale); volume uguale (ReplayGain o misurato);
+dissolvenza tra i brani; pulizia e cestino; coda che riparte da dov'era; tablet con libreria affiancata;
+aggiornamenti dall'app con le novità. I punti ancora aperti:
 
-| Area | Oggi | Problema |
-|------|------|----------|
-| **Tag sul telefono** | Si legge solo MediaStore | MediaStore non espone quasi niente di quello che Picard ha scritto: niente tipo di uscita, anno originale, nomi di ordinamento, ID MusicBrainz, ReplayGain |
-| **Artisti (telefono)** | `LocalSource` raggruppa per `ARTIST_ID` di MediaStore | "Vasco Rossi feat. X" è un artista diverso da "Vasco Rossi"; l'*artista dell'album* non viene letto, quindi le compilation e gli album con ospiti si spezzano sotto tanti artisti |
-| **Artisti (Navidrome)** | Si usa solo il campo `artist` | Navidrome manda già gli artisti multipli (`artists`, `albumArtists`, `displayArtist`), il tipo di uscita e il ReplayGain: li ignoriamo |
-| **Album (telefono)** | Raggruppati per `ALBUM_ID` di MediaStore | Dipende da come Android indicizza: album omonimi di artisti diversi o lo stesso album in due cartelle possono fondersi o spezzarsi |
-| **Ordine alfabetico** | `lowercase()` | Le lettere accentate finiscono in fondo, "The Beatles" sta sotto la T, "Brano 10" viene prima di "Brano 2" |
-| **Discografia** | Album per anno, poi i singoli | Non distingue EP, raccolte, live e "compare in"; usa l'anno dell'edizione e non quello originale |
-| **Test** | Le regole del telefono stanno in `:app` | Senza SDK in locale non si possono testare: proprio la parte più delicata (raggruppare e ordinare) non ha test |
-| **Ripresa** | Si salva solo l'ultimo brano | Riaprendo l'app o riaccendendo l'auto la coda è persa |
-| **Volume** | Ogni brano al suo volume | Niente ReplayGain: un disco degli anni 70 suona molto più piano di uno del 2010 |
-| **Tablet Android** | Schede a sinistra; in orizzontale libreria e dettaglio affiancati, coda o testo fissi a destra | — |
-| **Documentazione** | `server/README.md` parla di "Qualità in streaming" | La funzione è stata tolta (si ascolta il file originale): la guida è vecchia, e in `RemoteSource` resta il parametro `maxBitRate` |
+| Area | Oggi | Cosa manca |
+|------|------|------------|
+| **Tag sul telefono** | L'app li legge tutti, ma quelli dei file scaricati sono poveri | Per sistemarli serve passare da Picard sul PC (guida in `server/README.md`); una pagina "Salute della libreria" che dica quali file sistemare (fase 7) |
+| **Android Auto** | Raccolte, lettere, voce, cuore/casuale/ripeti | Prova completa in macchina e col Desktop Head Unit (fase 4) |
+| **Senza pause tra i brani** | ExoPlayer è gapless; sul PC il brano dopo si carica in anticipo | Da sentire a orecchio sul telefono con album dal vivo (fase 3) |
+| **Telefono e PC** | Preferiti e playlist separati: sul telefono in un file dell'app, sul PC su Navidrome | Unirli quando il telefono raggiunge il server (fase 6) |
+| **Backup** | La tua musica del telefono (preferiti, playlist, raccolte, ascolti) sta solo nell'app | Esporta/importa, e un backup che sopravvive alla disinstallazione |
 
 ## Fase 0 — Fondamenta
 
@@ -90,9 +89,9 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 ## Fase 2 — L'ordine giusto
 
-- [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).
+- [x] **Brani di un album**: disco → traccia dai tag. Resta da fare: il numero nel nome del file come ripiego per i file senza numero di traccia.
 - [x] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
-- [ ] **Ordine alfabetico come una persona**: prima i nomi di ordinamento di Picard ("Beatles, The"); senza, `Collator` italiano (gli accenti stanno con la loro lettera), articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"), numeri in ordine naturale. Lettere-indice laterali nell'elenco artisti.
+- [x] **Ordine alfabetico come una persona** (`ArtistNames.sortKey`): nomi di ordinamento di Picard, accenti con la loro lettera, articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"); intestazioni A–Z negli elenchi, anche in Auto. Resta da fare: lettere-indice laterali per saltare a una lettera.
 - [x] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente. L'**anno originale** è già usato (fase 1) per album, decenni e ordine.
 - [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui, verificate con la stessa libreria di prova in JSON (casi difficili: feat., raccolte, accenti, articoli, dischi multipli, album omonimi) usata dai test Kotlin.
 
@@ -134,9 +133,9 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 
 ## Fase 7 — Rifinitura
 
-- [ ] **Salute della libreria**: una pagina che segnala i file aggiunti dopo Picard con tag incompleti (senza artista dell'album, numeri di traccia mancanti o doppi, senza copertina) e i **brani di 30 secondi**, che di solito sono anteprime scaricate al posto della canzone intera.
+- [ ] **Salute della libreria**: una pagina che segnala i file con tag incompleti (senza album o artista dell'album, anno 1970, numeri di traccia mancanti o doppi, senza copertina), cartella per cartella. I **brani di 30 secondi** li trova già la Pulizia.
 - [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.
-- [ ] Note di versione nella release `apk-latest`: cosa è cambiato da un APK all'altro.
+- [x] **Note di versione e aggiornamenti dall'app**: ogni APK pubblica in `apk-latest` anche `version.json` con le novità (i titoli delle PR unite); l'app avvisa in Home, scarica e installa sopra con la conferma di Android, e dopo l'aggiornamento mostra cosa c'è di nuovo.
 - [ ] Accessibilità: TalkBack, contrasto, dimensione del testo.
 
 ## Cosa non faremo

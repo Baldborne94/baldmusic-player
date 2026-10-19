@@ -194,6 +194,9 @@ fun SettingsScreen(vm: PlayerViewModel) {
         }) { Text("Apri Android Auto") }
 
         Spacer(Modifier.height(12.dp))
+        UpdateSection(vm)
+
+        Spacer(Modifier.height(12.dp))
         Text("Informazioni", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(
             "BaldMusic è open source: github.com/Baldborne94/baldmusic-player",

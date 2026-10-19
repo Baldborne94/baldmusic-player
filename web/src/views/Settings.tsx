@@ -115,6 +115,8 @@ export function Settings() {
           <li><kbd>Spazio</kbd> riproduci / pausa</li>
           <li><kbd>Shift</kbd> + <kbd>→</kbd> / <kbd>←</kbd> brano successivo / precedente</li>
           <li><kbd>→</kbd> / <kbd>←</kbd> avanti / indietro di 10 secondi</li>
+          <li><kbd>S</kbd> casuale · <kbd>R</kbd> ripeti</li>
+          <li><kbd>F</kbd> "In riproduzione" a schermo intero</li>
           <li><kbd>/</kbd> cerca</li>
         </ul>
       </div>
