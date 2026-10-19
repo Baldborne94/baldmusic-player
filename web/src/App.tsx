@@ -3,7 +3,7 @@ import { Icon } from "./components/Icon";
 import { Login } from "./components/Login";
 import { FullPlayer, QueueList, RightPanel } from "./components/Panels";
 import { PlayerBar, type Panel } from "./components/PlayerBar";
-import { refreshLibrary } from "./lib/library";
+import { refreshLibrary, syncCollections } from "./lib/library";
 import { getPlayerState, player, usePlayer } from "./lib/player";
 import { current } from "./lib/queue";
 import { href, navigate, useRoute, type Route } from "./lib/router";
@@ -28,6 +28,8 @@ function View({ route }: { route: Route }) {
       return <LibraryPage initial="artists" />;
     case "playlists":
       return <LibraryPage initial="playlists" />;
+    case "collections":
+      return <LibraryPage initial="collections" />;
     case "album":
       return <AlbumPage id={route.id} />;
     case "artist":
@@ -114,7 +116,10 @@ export function App() {
   useShortcuts(openFull);
 
   useEffect(() => {
-    if (client) void refreshLibrary();
+    if (!client) return;
+    void refreshLibrary();
+    // Le raccolte seguono le cartelle: si allineano a ogni apertura.
+    void syncCollections();
   }, [client]);
 
   // Ogni cambio pagina riparte dall'alto, come in un'app nativa.
@@ -129,7 +134,7 @@ export function App() {
 
   if (!client) return <Login />;
 
-  const at = (name: Route["name"]) => route.name === name || (name === "library" && ["library", "albums", "artists", "playlists"].includes(route.name));
+  const at = (name: Route["name"]) => route.name === name || (name === "library" && ["library", "albums", "artists", "playlists", "collections"].includes(route.name));
   const showPanel = !!song && panel !== null;
 
   return (

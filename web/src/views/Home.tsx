@@ -4,7 +4,7 @@ import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, PlayButton, PlaylistCards, Shelf, LikedArt } from "../components/Ui";
 import { isRealAlbum } from "../lib/albums";
 import { tileGradient } from "../lib/colors";
-import { useLibrary } from "../lib/library";
+import { isCollection, useLibrary } from "../lib/library";
 import { player } from "../lib/player";
 import { href } from "../lib/router";
 import { getClient } from "../lib/session";
@@ -43,6 +43,9 @@ export function MixCard({ mix }: { mix: Mix }) {
 
 export function Home() {
   const lib = useLibrary();
+  // Come sul telefono: le raccolte (le cartelle) vengono prima di tutto il resto.
+  const collections = lib.playlists.filter(isCollection);
+  const playlists = lib.playlists.filter((p) => !isCollection(p));
   const { data, error, loading, reload } = useLoad(async () => {
     const c = getClient()!;
     const [recent, newest, frequent, random, genres, decadeHits] = await Promise.all([
@@ -117,6 +120,11 @@ export function Home() {
         </div>
       )}
 
+      {collections.length > 0 && (
+        <Shelf title="Le tue raccolte" more={href({ name: "collections" })}>
+          <PlaylistCards playlists={collections.slice(0, 12)} scroll />
+        </Shelf>
+      )}
       <Shelf title="I tuoi mix">
         <div className="row-scroll">
           {mixes.map((m) => (
@@ -129,9 +137,9 @@ export function Home() {
           <AlbumCards albums={d.recent} scroll />
         </Shelf>
       )}
-      {lib.playlists.length > 0 && (
+      {playlists.length > 0 && (
         <Shelf title="Le tue playlist" more={href({ name: "playlists" })}>
-          <PlaylistCards playlists={lib.playlists.slice(0, 12)} scroll />
+          <PlaylistCards playlists={playlists.slice(0, 12)} scroll />
         </Shelf>
       )}
       {d.newest.length > 0 && (

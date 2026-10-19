@@ -6,7 +6,7 @@ import { AlbumCards, Hero, LikedArt, PlayButton, PlaylistPicker, startRadio, Tra
 import { albumYear, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
-import { deletePlaylist, renamePlaylist, useLibrary } from "../lib/library";
+import { deletePlaylist, isCollection, renamePlaylist, useLibrary } from "../lib/library";
 import { player, usePlayer } from "../lib/player";
 import { href, navigate } from "../lib/router";
 import { getClient } from "../lib/session";
@@ -186,12 +186,13 @@ export function PlaylistPage({ id }: { id: string }) {
   if (error || !playlist) return <ErrorState message={error ?? "Playlist non trovata"} onRetry={reload} />;
   const songs = playlist.entry ?? [];
   const mine = lib.playlists.some((p) => p.id === id);
+  const collection = isCollection(playlist);
   return (
     <Gradient color={color}>
       <Hero
         color={color}
         art={songs.length ? <Mosaic songs={songs} /> : <div className="empty-art"><Icon name="music" size={64} /></div>}
-        kind="Playlist"
+        kind={collection ? "Raccolta" : "Playlist"}
         title={playlist.name}
         meta={<>{playlist.owner && <strong>{playlist.owner} • </strong>}{plural(songs.length, "brano", "brani")}, {formatTotal(total(songs))}</>}
       />
@@ -205,7 +206,16 @@ export function PlaylistPage({ id }: { id: string }) {
               <button className="icon-btn icon-btn--lg" title="Rinomina" onClick={async () => { const n = prompt("Nuovo nome", playlist.name); if (n) await renamePlaylist(id, n); fresh.reload(); }}>
                 <Icon name="pencil" size={22} />
               </button>
-              <button className="icon-btn icon-btn--lg" title="Elimina playlist" onClick={async () => { if (confirm(`Eliminare “${playlist.name}”?`)) { await deletePlaylist(id); navigate({ name: "library" }); } }}>
+              <button
+                className="icon-btn icon-btn--lg"
+                title={collection ? "Elimina raccolta" : "Elimina playlist"}
+                onClick={async () => {
+                  const ask = collection
+                    ? `Eliminare la raccolta “${playlist.name}”? I file restano nella loro cartella e la raccolta non si ricrea da sola.`
+                    : `Eliminare “${playlist.name}”?`;
+                  if (confirm(ask)) { await deletePlaylist(id); navigate({ name: "library" }); }
+                }}
+              >
                 <Icon name="trash" size={22} />
               </button>
             </>
@@ -213,7 +223,7 @@ export function PlaylistPage({ id }: { id: string }) {
         }
       />
       {songs.length === 0 ? (
-        <p className="muted pad">La playlist è vuota. Aggiungi brani dal menu ⋯ di un brano o col tasto destro.</p>
+        <p className="muted pad">{collection ? "La raccolta è vuota." : "La playlist è vuota."} Aggiungi brani dal menu ⋯ di un brano o col tasto destro.</p>
       ) : (
         <TrackTable songs={songs} from={{ label: playlist.name, id: `playlist/${playlist.id}` }} playlistId={mine ? id : undefined} />
       )}
