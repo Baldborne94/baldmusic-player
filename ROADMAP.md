@@ -53,7 +53,7 @@ statistiche, widget. I punti deboli emersi leggendo il codice:
 | **Test** | Le regole del telefono stanno in `:app` | Senza SDK in locale non si possono testare: proprio la parte più delicata (raggruppare e ordinare) non ha test |
 | **Ripresa** | Si salva solo l'ultimo brano | Riaprendo l'app o riaccendendo l'auto la coda è persa |
 | **Volume** | Ogni brano al suo volume | Niente ReplayGain: un disco degli anni 70 suona molto più piano di uno del 2010 |
-| **Tablet Android** | Layout da telefono | Su schermo grande niente pannelli affiancati |
+| **Tablet Android** | Schede a sinistra, coda fissa a destra in orizzontale | Libreria e dettaglio ancora non affiancati |
 | **Documentazione** | `server/README.md` parla di "Qualità in streaming" | La funzione è stata tolta (si ascolta il file originale): la guida è vecchia, e in `RemoteSource` resta il parametro `maxBitRate` |
 
 ## Fase 0 — Fondamenta
@@ -112,7 +112,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 ## Fase 5 — Tablet e PC
 
-- [ ] **Tablet Android**: barra di navigazione laterale, libreria e dettaglio affiancati, pannello "In riproduzione" a destra con testo e coda, come l'app web. Funziona anche in orizzontale e a schermo diviso.
+- [x] **Tablet Android**: da 600dp di larghezza le schede stanno in una barra a sinistra; da 900dp (tablet in orizzontale) la coda resta fissa a destra mentre suona qualcosa. "In riproduzione" ha i comandi in una colonna centrale. Si adatta da solo anche a schermo diviso.
+- [ ] Tablet, poi: libreria e dettaglio affiancati, testo nel pannello di destra.
 - [ ] **App web sul PC**: elenchi lunghi veloci anche con decine di migliaia di brani, trascina-e-rilascia nelle playlist.
 - [ ] **App web sul tablet** (se non Android): tocchi comodi, gesti, "In riproduzione" a schermo intero.
 

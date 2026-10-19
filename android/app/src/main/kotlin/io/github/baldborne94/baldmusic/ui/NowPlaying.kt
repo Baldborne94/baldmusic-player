@@ -139,8 +139,9 @@ fun NowPlayingScreen(
                 ) { _, delta -> dragY = (dragY + delta).coerceAtLeast(0f) }
             },
     ) {
+        // Sul tablet i comandi restano in una colonna centrale, non larghi quanto lo schermo.
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 22.dp),
+            Modifier.align(Alignment.TopCenter).widthIn(max = 640.dp).fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Barra in alto: chiudi, da dove arriva, menu.

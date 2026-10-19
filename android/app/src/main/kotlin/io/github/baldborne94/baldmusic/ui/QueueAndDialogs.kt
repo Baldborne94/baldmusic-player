@@ -61,7 +61,7 @@ import io.github.baldborne94.baldmusic.core.library.UserLibrary
 
 /** La coda: cosa suona ora e cosa viene dopo, da riordinare o togliere. */
 @Composable
-fun QueueScreen(vm: PlayerViewModel, onClose: () -> Unit) {
+fun QueueScreen(vm: PlayerViewModel, onClose: (() -> Unit)?) {
     val queue = vm.queue
     val index = vm.queueIndex
     Column(
@@ -73,8 +73,9 @@ fun QueueScreen(vm: PlayerViewModel, onClose: () -> Unit) {
             .navigationBarsPadding(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Chiudi", Modifier.size(30.dp)) }
-            Text("Coda", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            // Senza onClose è il pannello fisso del tablet: niente tasto per chiuderlo.
+            if (onClose != null) IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Chiudi", Modifier.size(30.dp)) }
+            Text("Coda", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(start = if (onClose == null) 16.dp else 0.dp))
             if (index + 1 < queue.size) TextButton(onClick = { vm.clearUpcoming() }) { Text("Svuota", color = TextMuted) }
         }
         if (queue.isEmpty()) Message("La coda è vuota.")
