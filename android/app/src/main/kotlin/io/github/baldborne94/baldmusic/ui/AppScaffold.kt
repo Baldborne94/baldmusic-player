@@ -11,15 +11,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -151,28 +154,40 @@ fun AppScaffold(vm: PlayerViewModel) {
         }
     }
 
+    val selectTab: (Tab) -> Unit = { selected ->
+        // Toccare di nuovo la scheda attiva riporta alla sua radice, come in Spotify.
+        if (selected == tab) stacks.getValue(tab).let { while (it.size > 1) it.removeAt(it.lastIndex) }
+        tab = selected
+    }
+
     CompositionLocalProvider(LocalUi provides ui) {
-        Box(Modifier.fillMaxSize().background(Background)) {
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (val screen = stack.last()) {
-                        Screen.Root -> when (tab) {
-                            Tab.HOME -> HomeScreen(vm)
-                            Tab.SEARCH -> SearchScreen(vm)
-                            Tab.LIBRARY -> LibraryScreen(vm)
+        BoxWithConstraints(Modifier.fillMaxSize().background(Background)) {
+            // Tablet: le schede in una barra a sinistra; in orizzontale anche la coda fissa a destra.
+            val wide = maxWidth >= 600.dp
+            val sideQueue = maxWidth >= 900.dp && vm.current != null
+            Row(Modifier.fillMaxSize()) {
+                if (wide) NavRail(tab, selectTab)
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        when (val screen = stack.last()) {
+                            Screen.Root -> when (tab) {
+                                Tab.HOME -> HomeScreen(vm)
+                                Tab.SEARCH -> SearchScreen(vm)
+                                Tab.LIBRARY -> LibraryScreen(vm)
+                            }
+                            is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
+                            Screen.Settings -> SettingsPage(vm)
+                            Screen.Stats -> StatsScreen(vm)
+                            Screen.Cleanup -> CleanupScreen(vm)
+                            Screen.Trash -> TrashScreen(vm)
                         }
-                        is Screen.Detail -> DetailScreen(vm, screen.mediaId, screen.title)
-                        Screen.Settings -> SettingsPage(vm)
-                        Screen.Stats -> StatsScreen(vm)
-                        Screen.Cleanup -> CleanupScreen(vm)
-                        Screen.Trash -> TrashScreen(vm)
                     }
+                    MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
+                    if (wide) Spacer(Modifier.navigationBarsPadding()) else BottomBar(tab, selectTab)
                 }
-                MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })
-                BottomBar(tab) { selected ->
-                    // Toccare di nuovo la scheda attiva riporta alla sua radice, come in Spotify.
-                    if (selected == tab) stacks.getValue(tab).let { while (it.size > 1) it.removeAt(it.lastIndex) }
-                    tab = selected
+                if (sideQueue) {
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(Surface2))
+                    Box(Modifier.width(340.dp).fillMaxHeight()) { QueueScreen(vm, onClose = null) }
                 }
             }
 
@@ -251,6 +266,36 @@ fun AppScaffold(vm: PlayerViewModel) {
                 AddToPlaylistSheet(lib, onDismiss = { addTo = null }, onCreate = { name -> vm.createPlaylist(name, items) }, onPick = { id -> vm.addToPlaylist(id, items) })
             }
         }
+    }
+}
+
+/** Le schede del tablet: una barra verticale a sinistra al posto di quella in basso. */
+@Composable
+private fun NavRail(tab: Tab, onSelect: (Tab) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxHeight()
+            .width(88.dp)
+            .background(Color.Black)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(top = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        RailItem("Home", Icons.Rounded.Home, Icons.Outlined.Home, tab == Tab.HOME) { onSelect(Tab.HOME) }
+        RailItem("Cerca", Icons.Rounded.Search, Icons.Outlined.Search, tab == Tab.SEARCH) { onSelect(Tab.SEARCH) }
+        RailItem("Libreria", Icons.Rounded.LibraryMusic, Icons.Outlined.LibraryMusic, tab == Tab.LIBRARY) { onSelect(Tab.LIBRARY) }
+    }
+}
+
+@Composable
+private fun RailItem(label: String, selectedIcon: ImageVector, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) Color.White else TextMuted, modifier = Modifier.size(28.dp))
+        Text(label, fontSize = 12.sp, color = if (selected) Color.White else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }
 
