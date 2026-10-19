@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
-import { duplicates, folderName, isWindowsPath, previews, trashScript, type DuplicateGroup } from "../lib/cleanup";
+import { duplicates, folderName, isWindowsPath, previews, TRASH_SCRIPT_NAME, trashScript, type DuplicateGroup } from "../lib/cleanup";
 import { isRealPath } from "../lib/collections";
 import { formatDuration, plural } from "../lib/format";
 import { mergeDuplicates } from "../lib/library";
@@ -58,7 +58,7 @@ export function CleanupPage() {
     setBusy(true);
     try {
       await mergeDuplicates(groups);
-      download("baldmusic-pulizia.ps1", trashScript(files.map((s) => s.path!)));
+      download(TRASH_SCRIPT_NAME, trashScript(files.map((s) => s.path!)));
       setDone(files.map((s) => s.path!));
     } finally {
       setBusy(false);
@@ -224,10 +224,10 @@ function CopyButton({ label, text }: { label: string; text: string }) {
 export function TrashSteps({ count }: { count: number }) {
   return (
     <ol className="steps">
-      <li>Apri la cartella <strong>Download</strong>: c'è <code>baldmusic-pulizia.ps1</code> (se Chrome avvisa che è un file da controllare, scegli <strong>Mantieni</strong>).</li>
+      <li>Apri la cartella <strong>Download</strong>: c'è <code>{TRASH_SCRIPT_NAME}</code> (se Chrome avvisa che è un file da controllare, scegli <strong>Mantieni</strong>).</li>
       <li>
-        Tasto destro sul file → <strong>Esegui con PowerShell</strong> (se chiede di cambiare i criteri di esecuzione, rispondi <strong>S</strong>). Sposta{" "}
-        {plural(count, "file", "file")} nel Cestino e alla fine chiede di premere Invio.
+        <strong>Doppio clic</strong> sul file. Se Windows dice «Windows ha protetto il PC», premi <strong>Ulteriori informazioni</strong> →{" "}
+        <strong>Esegui comunque</strong>. Si apre una finestra che sposta {plural(count, "file", "file")} nel Cestino e alla fine chiede di premere Invio.
       </li>
       <li>Navidrome se ne accorge da solo; se dopo un minuto li vedi ancora, in Navidrome: icona a onda → <strong>Quick Scan</strong>.</li>
       <li>Buttato qualcosa per sbaglio? Cestino di Windows → tasto destro → <strong>Ripristina</strong>.</li>
