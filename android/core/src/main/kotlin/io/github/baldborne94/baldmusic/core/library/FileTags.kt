@@ -120,7 +120,10 @@ data class FileTags(
             return Regex("\\d{4}").find(s)?.value?.toIntOrNull() ?: 0
         }
 
-        private fun db(s: String?) = s?.replace(Regex("(?i)\\s*db\\s*$"), "")?.replace(',', '.')?.trim()?.toFloatOrNull()
+        /** Un numero dei tag; "NaN" o "Infinity" (che Kotlin legge come numeri) valgono come mancanti. */
+        private fun decimal(s: String?) = s?.replace(',', '.')?.trim()?.toFloatOrNull()?.takeIf { it.isFinite() }
+
+        private fun db(s: String?) = decimal(s?.replace(Regex("(?i)\\s*db\\s*$"), ""))
 
         private fun replayGain(track: String?, album: String?, trackPeak: String?, albumPeak: String?, r128Track: String?, r128Album: String?): ReplayGain? {
             // Opus: R128_*_GAIN è in 1/256 di dB rispetto a -23 LUFS; il ReplayGain sta 5 dB più in alto.
@@ -128,8 +131,8 @@ data class FileTags(
             val rg = ReplayGain(
                 trackGain = db(track) ?: r128(r128Track),
                 albumGain = db(album) ?: r128(r128Album),
-                trackPeak = trackPeak?.replace(',', '.')?.trim()?.toFloatOrNull(),
-                albumPeak = albumPeak?.replace(',', '.')?.trim()?.toFloatOrNull(),
+                trackPeak = decimal(trackPeak),
+                albumPeak = decimal(albumPeak),
             )
             return rg.takeIf { it.trackGain != null || it.albumGain != null }
         }

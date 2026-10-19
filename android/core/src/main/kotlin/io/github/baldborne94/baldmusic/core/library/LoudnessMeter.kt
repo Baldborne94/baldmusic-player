@@ -85,8 +85,10 @@ class LoudnessMeter(val sampleRate: Int, val channels: Int) {
 
     private fun endFrame() {
         if (++inStep < step) return
-        // Ogni canale pesa uguale (stereo e mono); i surround sono rari nella musica.
-        subBlocks += sums.sum() / step
+        // Ogni canale pesa uguale; i surround sono rari nella musica. Un mono si ascolta sui due
+        // altoparlanti: si misura come "doppio mono" (ReplayGain 2.0, EBU), cioè come lo stesso
+        // suono in stereo, altrimenti risulterebbe 3 dB più piano e suonerebbe più forte degli altri.
+        subBlocks += sums.sum() * (if (channels == 1) 2 else 1) / step
         sums.fill(0.0)
         inStep = 0
     }

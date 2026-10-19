@@ -41,8 +41,8 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         // Per lettera, con le stesse regole del telefono: in Android Auto ogni lettera è un'intestazione.
         ALBUMS -> client.albumList("alphabeticalByName", 500).filter { it.isReal }.sortedBy { ArtistNames.sortKey(it.name) }
             .map { albumNode(it).copy(group = ArtistNames.letter(it.name)) }
-        ARTISTS -> client.artists().sortedBy { ArtistNames.sortKey(it.sortName ?: it.name) }
-            .map { artistNode(it).copy(group = ArtistNames.letter(it.sortName ?: it.name)) }
+        ARTISTS -> client.artists().sortedBy { ArtistNames.sortKey(it.orderName) }
+            .map { artistNode(it).copy(group = ArtistNames.letter(it.orderName)) }
         PLAYLISTS -> client.playlists().map(::playlistNode)
         STARRED -> client.starred().song.map { songNode(it, id) }
         RANDOM -> {
@@ -62,18 +62,23 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         }
         ARTIST -> {
             val (real, singles) = client.artist(requireNotNull(id.id)).album.partition { it.isReal }
-            // Discografia per tipo (Album, EP, Dal vivo, Colonne sonore…), ognuno dal più recente.
-            Discography.grouped(real, { it.releaseTypes }, { it.shownYear ?: 0 }, { it.name }).map { (kind, a) -> albumNode(a).copy(group = kind.title) } + listOfNotNull(
-                singles.takeIf { it.isNotEmpty() }?.let { s ->
-                    LibraryNode(
-                        MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION,
-                        subtitle = count(s.size), artwork = s.first().coverArt?.let { "$KEY/$it" }, group = LocalCatalog.OTHER_GROUP,
-                    )
-                },
-            )
+            if (real.isEmpty()) {
+                // Senza album, i brani si vedono subito invece che dentro una sezione (come sul telefono).
+                looseSongs(singles).map { songNode(it, id.copy(parent = null)) }
+            } else {
+                // Discografia per tipo (Album, EP, Dal vivo, Colonne sonore…), ognuno dal più recente.
+                Discography.grouped(real, { it.releaseTypes }, { it.shownYear ?: 0 }, { it.name }).map { (kind, a) -> albumNode(a).copy(group = kind.title) } + listOfNotNull(
+                    singles.takeIf { it.isNotEmpty() }?.let { s ->
+                        LibraryNode(
+                            // I brani, non i dischi: un singolo ha spesso anche il lato B.
+                            MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION,
+                            subtitle = count(s.sumOf { (it.songCount ?: 1).coerceAtLeast(1) }), artwork = s.first().coverArt?.let { "$KEY/$it" }, group = LocalCatalog.OTHER_GROUP,
+                        )
+                    },
+                )
+            }
         }
-        ARTIST_SINGLES -> songsOf(client.artist(requireNotNull(id.id)).album.filterNot { it.isReal })
-            .sortedWith(compareBy({ it.year ?: 0 }, { it.title.lowercase() }))
+        ARTIST_SINGLES -> looseSongs(client.artist(requireNotNull(id.id)).album.filterNot { it.isReal })
             .map { songNode(it, id.copy(parent = null)) }
         PLAYLIST -> client.playlist(requireNotNull(id.id)).entry.map { songNode(it, id.copy(parent = null)) }
         else -> emptyList()
@@ -89,6 +94,13 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         val r = client.search(query)
         return r.artist.map(::artistNode) + r.album.map(::albumNode) + r.song.map { songNode(it, null) }
     }
+
+    /** I brani di singoli e album da un brano, per anno e titolo. */
+    private suspend fun looseSongs(albums: List<Album>) =
+        songsOf(albums).sortedWith(compareBy({ it.year ?: 0 }, { it.title.lowercase() }))
+
+    /** Il nome con cui ordinare: Navidrome manda "sortName" vuoto a chi non ha il tag. */
+    private val Artist.orderName get() = sortName?.takeIf { it.isNotBlank() } ?: name
 
     /** I brani di tanti piccoli album, pochi alla volta per non intasare il server. */
     private suspend fun songsOf(albums: List<Album>): List<Song> = albums.chunked(6).flatMap { chunk ->
