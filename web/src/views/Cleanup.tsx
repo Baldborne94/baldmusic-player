@@ -80,15 +80,7 @@ export function CleanupPage() {
         <div className="panel-box">
           <h2>Ultimo passo: sul PC</h2>
           {windows ? (
-            <ol className="steps">
-              <li>Apri la cartella <strong>Download</strong>: c'è <code>baldmusic-pulizia.ps1</code> (se Chrome avvisa che è un file da controllare, scegli <strong>Mantieni</strong>).</li>
-              <li>
-                Tasto destro sul file → <strong>Esegui con PowerShell</strong> (se chiede di cambiare i criteri di esecuzione, rispondi <strong>S</strong>). Sposta{" "}
-                {plural(done.length, "file", "file")} nel Cestino e alla fine chiede di premere Invio.
-              </li>
-              <li>Navidrome se ne accorge da solo; se dopo un minuto li vedi ancora, in Navidrome: icona a onda → <strong>Quick Scan</strong>.</li>
-              <li>Buttato qualcosa per sbaglio? Cestino di Windows → tasto destro → <strong>Ripristina</strong>.</li>
-            </ol>
+            <TrashSteps count={done.length} />
           ) : (
             <p className="muted">Il server non è un PC Windows: sposta a mano questi file nel cestino.</p>
           )}
@@ -228,7 +220,22 @@ function CopyButton({ label, text }: { label: string; text: string }) {
   );
 }
 
-function download(name: string, text: string) {
+/** I passi sul PC dopo aver scaricato lo script per il Cestino. */
+export function TrashSteps({ count }: { count: number }) {
+  return (
+    <ol className="steps">
+      <li>Apri la cartella <strong>Download</strong>: c'è <code>baldmusic-pulizia.ps1</code> (se Chrome avvisa che è un file da controllare, scegli <strong>Mantieni</strong>).</li>
+      <li>
+        Tasto destro sul file → <strong>Esegui con PowerShell</strong> (se chiede di cambiare i criteri di esecuzione, rispondi <strong>S</strong>). Sposta{" "}
+        {plural(count, "file", "file")} nel Cestino e alla fine chiede di premere Invio.
+      </li>
+      <li>Navidrome se ne accorge da solo; se dopo un minuto li vedi ancora, in Navidrome: icona a onda → <strong>Quick Scan</strong>.</li>
+      <li>Buttato qualcosa per sbaglio? Cestino di Windows → tasto destro → <strong>Ripristina</strong>.</li>
+    </ol>
+  );
+}
+
+export function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;

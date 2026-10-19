@@ -6,6 +6,7 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +54,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -71,7 +75,9 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.MediaId
+import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
@@ -117,6 +123,8 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
             )
         }
+        ReplayGainSetting()
+        CrossfadeSetting()
         Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds
@@ -191,6 +199,72 @@ fun SettingsScreen(vm: PlayerViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+/** Dissolvenza tra i brani, come i DJ: Spenta, 3, 6, 9 o 12 secondi. */
+@Composable
+private fun CrossfadeSetting() {
+    val settings = LocalContext.current.app.settings
+    val seconds by settings.crossfade.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Dissolvenza tra i brani", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Come i DJ: negli ultimi secondi il brano che finisce si abbassa mentre il successivo parte e sale. " +
+                "Mai tra due brani dello stesso album (dal vivo e colonne sonore continue restano attaccati) e solo quando un brano finisce da solo.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            Crossfade.CHOICES.forEach { s ->
+                FilterChip(
+                    selected = seconds == s,
+                    onClick = { settings.setCrossfade(s) },
+                    label = { Text(if (s == 0) "Spenta" else "$s s") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = androidx.compose.ui.graphics.Color.Black),
+                )
+            }
+        }
+    }
+}
+
+/** Volume uguale tra i brani: Album, Brano o Spento, e quanti brani del telefono hanno i valori. */
+@Composable
+private fun ReplayGainSetting() {
+    val context = LocalContext.current
+    val settings = context.app.settings
+    val mode by settings.replayGain.collectAsState()
+    val coverage by produceState<Pair<Int, Int>?>(null) {
+        value = runCatching { context.app.local.allTracks() }.getOrNull()?.let { all ->
+            all.count { t -> t.replayGain?.let { it.trackGain != null || it.albumGain != null } == true } to all.size
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Volume uguale tra i brani", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Abbassa i brani più forti allo stesso livello degli altri, con i valori di ReplayGain scritti nei file. " +
+                "Album: dentro un disco restano le differenze volute. Brano: ogni brano allo stesso livello, per mix e raccolte.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(ReplayGainMode.ALBUM to "Album", ReplayGainMode.TRACK to "Brano", ReplayGainMode.OFF to "Spento").forEach { (m, label) ->
+                FilterChip(
+                    selected = mode == m,
+                    onClick = { settings.setReplayGain(m) },
+                    label = { Text(label) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = androidx.compose.ui.graphics.Color.Black),
+                )
+            }
+        }
+        coverage?.takeIf { it.second > 0 }?.let { (tagged, all) ->
+            Text(
+                if (tagged == 0) "Nessuno dei $all brani del telefono ha questi valori, quindi suonano com'è. Si scrivono sul PC con Picard (plugin ReplayGain 2.0) o rsgain."
+                else "$tagged brani su $all del telefono hanno i valori; gli altri suonano com'è.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 

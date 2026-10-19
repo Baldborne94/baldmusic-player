@@ -5,6 +5,7 @@ package io.github.baldborne94.baldmusic.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -31,8 +32,10 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
+import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
 import io.github.baldborne94.baldmusic.core.library.VoiceQuery
@@ -71,16 +74,30 @@ class PlaybackService : MediaLibraryService() {
     private var listenJob: Job? = null
     private var sleepJob: Job? = null
 
+    /** Il timer di spegnimento abbassa piano il volume: si moltiplica per quello del ReplayGain. */
+    private var fade = 1f
+
+    // Dissolvenza incrociata. Poco prima della fine, il brano in corso si prepara su un
+    // secondo ExoPlayer fermo sul punto in cui partirà la sfumatura ([outgoing]); lì parte
+    // lui e si abbassa ([fadingOut]), mentre il player vero (quello della sessione, della
+    // notifica e di Android Auto) passa al brano dopo e sale ([crossIn]).
+    private lateinit var mediaSources: DefaultMediaSourceFactory
+    private val musicAttributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build()
+    private var outgoing: ExoPlayer? = null
+    private var outgoingFor = C.INDEX_UNSET
+    private var fadingOut: ExoPlayer? = null
+    private var crossJob: Job? = null
+    private var crossIn = 1f
+    private var crossSeek = false
+
     override fun onCreate() {
         super.onCreate()
         // OkHttp anche per lo streaming: stessi timeout e stessa connessione del resto dell'app.
         val dataSources = DefaultDataSource.Factory(this, OkHttpDataSource.Factory(app.http))
+        mediaSources = DefaultMediaSourceFactory(dataSources)
         player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSources))
-            .setAudioAttributes(
-                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(),
-                /* handleAudioFocus = */ true,
-            )
+            .setMediaSourceFactory(mediaSources)
+            .setAudioAttributes(musicAttributes, /* handleAudioFocus = */ true)
             // Si mette in pausa se si staccano le cuffie o il Bluetooth dell'auto.
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
@@ -107,6 +124,13 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
+        scope.launch { app.settings.replayGain.collect { applyVolume() } }
+        scope.launch {
+            while (true) {
+                delay(200)
+                watchCrossfade()
+            }
+        }
 
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
@@ -128,6 +152,8 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         // Subito, non in sottofondo: un attimo dopo il servizio non c'è più.
         saveLast(now = true)
+        endCrossfade()
+        dropOutgoing()
         scope.cancel()
         session.release()
         player.release()
@@ -180,6 +206,14 @@ class PlaybackService : MediaLibraryService() {
 
     private inner class PlayerEvents : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // Il passaggio voluto dalla dissolvenza va avanti; qualunque altro la interrompe.
+            if (crossSeek) {
+                crossSeek = false
+            } else {
+                endCrossfade()
+                dropOutgoing()
+            }
+            applyVolume()
             saveLast()
             startScrobble(mediaItem)
             startListen(mediaItem)
@@ -195,6 +229,19 @@ class PlaybackService : MediaLibraryService() {
             if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_METADATA_CHANGED)) {
                 updateWidget()
             }
+        }
+
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // Pausa durante la sfumatura: si ferma anche il brano che stava finendo.
+            if (!playWhenReady) {
+                endCrossfade()
+                dropOutgoing()
+            }
+        }
+
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            // Si è spostato il punto del brano: il brano preparato per sfumare non vale più.
+            if (reason == Player.DISCONTINUITY_REASON_SEEK && !crossSeek) dropOutgoing()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -281,22 +328,125 @@ class PlaybackService : MediaLibraryService() {
         return null
     }
 
+    /**
+     * Volume del brano in corso: ReplayGain (si abbassa e basta, mai oltre il picco) per
+     * la sfumatura del timer. Il volume del telefono resta all'utente.
+     */
+    private fun applyVolume() {
+        val rg = Loudness.volume(player.currentMediaItem?.replayGain, app.settings.replayGain.value)
+        player.volume = (rg * fade * crossIn).coerceIn(0f, 1f)
+    }
+
+    /** Ogni 200 ms: è ora di preparare il brano che finisce, o di cominciare a sfumare? */
+    private fun watchCrossfade() {
+        if (crossJob != null) return
+        val seconds = app.settings.crossfade.value
+        val current = player.currentMediaItem
+        val duration = player.duration
+        val next = player.nextMediaItemIndex
+        val ok = seconds > 0 && player.playWhenReady && current != null && duration != C.TIME_UNSET && next != C.INDEX_UNSET &&
+            player.repeatMode != Player.REPEAT_MODE_ONE && app.sleepTimer.value != BaldMusicApp.SLEEP_END_OF_TRACK &&
+            Crossfade.applies(seconds, duration, sameAlbum = current.albumId != null && current.albumId == player.getMediaItemAt(next).albumId)
+        if (!ok) {
+            dropOutgoing()
+            return
+        }
+        val start = duration - seconds * 1000L
+        val position = player.currentPosition
+        val index = player.currentMediaItemIndex
+        when {
+            position in (start - 3_000) until start && outgoingFor != index -> prepareOutgoing(current!!, start, index)
+            position >= start && outgoingFor == index -> startCrossfade(duration - position)
+        }
+    }
+
+    /** Il brano in corso, su un secondo player fermo sul punto in cui comincerà a sfumare. */
+    private fun prepareOutgoing(item: MediaItem, startMs: Long, index: Int) {
+        dropOutgoing()
+        outgoing = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSources)
+            // L'audio focus resta al player vero: questo suona solo per pochi secondi.
+            .setAudioAttributes(musicAttributes, /* handleAudioFocus = */ false)
+            .build()
+            .apply {
+                setMediaItem(item, startMs)
+                volume = player.volume
+                prepare()
+            }
+        outgoingFor = index
+    }
+
+    private fun dropOutgoing() {
+        outgoing?.release()
+        outgoing = null
+        outgoingFor = C.INDEX_UNSET
+    }
+
+    /** Il brano che finisce continua sul secondo player e si abbassa; il player vero passa al brano dopo e sale. */
+    private fun startCrossfade(lengthMs: Long) {
+        val out = outgoing ?: return
+        outgoing = null
+        outgoingFor = C.INDEX_UNSET
+        if (out.playbackState != Player.STATE_READY) {
+            // Non è pronto in tempo: passaggio normale, senza buchi.
+            out.release()
+            return
+        }
+        val outVolume = player.volume
+        out.volume = outVolume
+        out.play()
+        fadingOut = out
+        crossIn = 0f
+        crossSeek = true
+        player.seekToNextMediaItem()
+        applyVolume()
+        val total = lengthMs.coerceAtLeast(500L).toFloat()
+        crossJob = scope.launch {
+            val t0 = SystemClock.elapsedRealtime()
+            while (true) {
+                val t = (SystemClock.elapsedRealtime() - t0) / total
+                if (t >= 1f) break
+                val (o, i) = Crossfade.gains(t)
+                out.volume = outVolume * o
+                crossIn = i
+                applyVolume()
+                delay(50)
+            }
+            endCrossfade()
+        }
+    }
+
+    /** Fine (o interruzione) della sfumatura: il brano vecchio si ferma, quello nuovo a volume pieno. */
+    private fun endCrossfade() {
+        val job = crossJob
+        crossJob = null
+        fadingOut?.release()
+        fadingOut = null
+        crossIn = 1f
+        applyVolume()
+        // Chiamata anche dalla sfumatura stessa, alla fine: annullarla lì non fa danni.
+        job?.cancel()
+    }
+
     /** Timer di spegnimento: abbassa piano il volume nell'ultimo tratto, poi pausa. */
     private fun scheduleSleep(end: Long?) {
         sleepJob?.cancel()
-        player.volume = 1f
+        fade = 1f
+        applyVolume()
         if (end == null || end == BaldMusicApp.SLEEP_END_OF_TRACK) return
         sleepJob = scope.launch {
-            val fade = 10_000L
-            delay((end - System.currentTimeMillis() - fade).coerceAtLeast(0))
+            val fadeMs = 10_000L
+            delay((end - System.currentTimeMillis() - fadeMs).coerceAtLeast(0))
             while (true) {
                 val left = end - System.currentTimeMillis()
                 if (left <= 0) break
-                player.volume = (left.toFloat() / fade).coerceIn(0f, 1f)
+                fade = (left.toFloat() / fadeMs).coerceIn(0f, 1f)
+                applyVolume()
                 delay(250)
             }
             player.pause()
-            player.volume = 1f
+            fade = 1f
+            applyVolume()
             app.sleepTimer.value = null
         }
     }

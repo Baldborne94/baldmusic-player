@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Cover } from "../components/Cover";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
@@ -6,12 +6,15 @@ import { AlbumCards, Hero, LikedArt, PlayButton, PlaylistPicker, startRadio, Tra
 import { albumYear, isRealAlbum } from "../lib/albums";
 import { tileColor } from "../lib/colors";
 import { formatTotal, plural } from "../lib/format";
-import { deletePlaylist, isCollection, renamePlaylist, useLibrary } from "../lib/library";
+import { isWindowsPath, trashScript } from "../lib/cleanup";
+import { deletePlaylist, isCollection, removeManyFromPlaylist, renamePlaylist, rewritePlaylist, useLibrary } from "../lib/library";
+import { moveItem, range, sortSongs } from "../lib/playlistEdit";
 import { player, usePlayer } from "../lib/player";
 import { href, navigate } from "../lib/router";
 import { getClient } from "../lib/session";
 import type { Song } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
+import { download, TrashSteps } from "./Cleanup";
 
 const total = (songs: Song[]) => songs.reduce((t, s) => t + (s.duration ?? 0), 0);
 
@@ -182,11 +185,67 @@ export function PlaylistPage({ id }: { id: string }) {
   const fresh = useLoad(() => getClient()!.playlist(id), [id, version]);
   const playlist = fresh.data ?? pl;
   const color = useCoverColor(playlist?.coverArt, playlist?.name ?? id);
+  // Come sul telefono: selezione di più brani, riordino trascinando, ordina per titolo/artista.
+  const [mode, setMode] = useState<"none" | "select" | "reorder">("none");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [order, setOrder] = useState<Song[] | null>(null);
+  const [picker, setPicker] = useState(false);
+  const [trashed, setTrashed] = useState<number | null>(null);
+  const anchor = useRef<number | null>(null);
+  useEffect(() => {
+    setMode("none");
+    setSelected(new Set());
+    setTrashed(null);
+  }, [id]);
+  // L'ordine locale serve solo finché il server non risponde con quello nuovo.
+  useEffect(() => setOrder(null), [fresh.data]);
+
   if (loading && !playlist) return <Loading />;
   if (error || !playlist) return <ErrorState message={error ?? "Playlist non trovata"} onRetry={reload} />;
-  const songs = playlist.entry ?? [];
+  const songs = order ?? playlist.entry ?? [];
   const mine = lib.playlists.some((p) => p.id === id);
   const collection = isCollection(playlist);
+  const chosen = songs.filter((_, i) => selected.has(i));
+  const what = collection ? "raccolta" : "playlist";
+
+  const save = async (next: Song[]) => {
+    setOrder(next);
+    await rewritePlaylist(id, next.map((s) => s.id));
+    fresh.reload();
+  };
+  const switchMode = (m: typeof mode) => {
+    setMode((old) => (old === m ? "none" : m));
+    setSelected(new Set());
+    setPicker(false);
+  };
+  const toggle = (i: number, shift: boolean) => {
+    const from = anchor.current;
+    setSelected((old) => {
+      const next = new Set(old);
+      const on = !old.has(i);
+      (shift && from !== null ? range(from, i) : [i]).forEach((x) => (on ? next.add(x) : next.delete(x)));
+      return next;
+    });
+    anchor.current = i;
+  };
+  const removeChosen = async () => {
+    if (!confirm(`Togliere ${plural(chosen.length, "brano", "brani")} da questa ${what}? I file restano dove sono.`)) return;
+    await removeManyFromPlaylist(id, [...selected]);
+    setSelected(new Set());
+    fresh.reload();
+  };
+  const trashChosen = async () => {
+    const files = chosen.filter((s) => s.path && isWindowsPath(s.path));
+    if (files.length === 0) return alert("Per buttare i file serve che Navidrome mostri i percorsi veri (Impostazioni → Raccolte dalle cartelle).");
+    if (!confirm(`Spostare ${plural(files.length, "file", "file")} nel Cestino di Windows? Si prepara lo script, come nella Pulizia, e i brani escono da questa ${what}.`)) return;
+    const indexes = songs.map((s, i) => (files.includes(s) ? i : -1)).filter((i) => i >= 0);
+    await removeManyFromPlaylist(id, indexes);
+    download("baldmusic-pulizia.ps1", trashScript(files.map((s) => s.path!)));
+    setTrashed(files.length);
+    setSelected(new Set());
+    fresh.reload();
+  };
+
   return (
     <Gradient color={color}>
       <Hero
@@ -201,31 +260,98 @@ export function PlaylistPage({ id }: { id: string }) {
         label={playlist.name}
         songs={songs}
         extra={
-          mine && (
-            <>
-              <button className="icon-btn icon-btn--lg" title="Rinomina" onClick={async () => { const n = prompt("Nuovo nome", playlist.name); if (n) await renamePlaylist(id, n); fresh.reload(); }}>
-                <Icon name="pencil" size={22} />
-              </button>
-              <button
-                className="icon-btn icon-btn--lg"
-                title={collection ? "Elimina raccolta" : "Elimina playlist"}
-                onClick={async () => {
-                  const ask = collection
-                    ? `Eliminare la raccolta “${playlist.name}”? I file restano nella loro cartella e la raccolta non si ricrea da sola.`
-                    : `Eliminare “${playlist.name}”?`;
-                  if (confirm(ask)) { await deletePlaylist(id); navigate({ name: "library" }); }
-                }}
-              >
-                <Icon name="trash" size={22} />
-              </button>
-            </>
-          )
+          <>
+            <button className={`icon-btn icon-btn--lg ${mode === "select" ? "is-on" : ""}`} title="Seleziona più brani" onClick={() => switchMode("select")}>
+              <Icon name="check" size={24} />
+            </button>
+            {mine && (
+              <>
+                <button className={`icon-btn icon-btn--lg ${mode === "reorder" ? "is-on" : ""}`} title="Riordina brani (trascina la maniglia ≡)" onClick={() => switchMode("reorder")}>
+                  <Icon name="queue" size={24} />
+                </button>
+                <select
+                  className="sort-select"
+                  value=""
+                  aria-label="Ordina i brani"
+                  onChange={async (e) => {
+                    const by = e.target.value as "title" | "artist";
+                    if (by && confirm(`Ordinare la ${what} per ${by === "title" ? "titolo" : "artista"}? L'ordine di adesso si perde.`)) await save(sortSongs(songs, by));
+                  }}
+                >
+                  <option value="">Ordina…</option>
+                  <option value="title">per titolo</option>
+                  <option value="artist">per artista</option>
+                </select>
+                <button className="icon-btn icon-btn--lg" title="Rinomina" onClick={async () => { const n = prompt("Nuovo nome", playlist.name); if (n) await renamePlaylist(id, n); fresh.reload(); }}>
+                  <Icon name="pencil" size={22} />
+                </button>
+                <button
+                  className="icon-btn icon-btn--lg"
+                  title={collection ? "Elimina raccolta" : "Elimina playlist"}
+                  onClick={async () => {
+                    const ask = collection
+                      ? `Eliminare la raccolta “${playlist.name}”? I file restano nella loro cartella e la raccolta non si ricrea da sola.`
+                      : `Eliminare “${playlist.name}”?`;
+                    if (confirm(ask)) { await deletePlaylist(id); navigate({ name: "library" }); }
+                  }}
+                >
+                  <Icon name="trash" size={22} />
+                </button>
+              </>
+            )}
+          </>
         }
       />
+      {trashed !== null && (
+        <div className="panel-box">
+          <h2>Ultimo passo: sul PC</h2>
+          <TrashSteps count={trashed} />
+        </div>
+      )}
+      {mode === "reorder" && <p className="muted pad">Trascina i brani dove vuoi: l'ordine si salva appena lasci il brano.</p>}
+      {mode === "select" && (
+        <div className="select-bar">
+          <span className="select-bar__count">{chosen.length ? `${plural(chosen.length, "brano selezionato", "brani selezionati")}` : "Tocca i brani da selezionare · Maiuscolo + clic per un intervallo"}</span>
+          <button className="btn" onClick={() => setSelected(chosen.length === songs.length ? new Set() : new Set(songs.map((_, i) => i)))}>
+            {chosen.length === songs.length ? "Deseleziona tutti" : "Seleziona tutti"}
+          </button>
+          {chosen.length > 0 && (
+            <>
+              <span className="action-bar__menu">
+                <button className="btn" onClick={() => setPicker((p) => !p)}>
+                  <Icon name="plus" size={16} /> Aggiungi a…
+                </button>
+                {picker && (
+                  <div className="ctx ctx--anchored">
+                    <PlaylistPicker songs={chosen} onDone={() => { setPicker(false); setSelected(new Set()); }} />
+                  </div>
+                )}
+              </span>
+              <button className="btn" onClick={() => player.enqueue(chosen)}>
+                <Icon name="addQueue" size={16} /> In coda
+              </button>
+              {mine && (
+                <button className="btn" onClick={() => void removeChosen()}>
+                  <Icon name="close" size={16} /> Togli da questa {what}
+                </button>
+              )}
+              <button className="btn btn--danger" onClick={() => void trashChosen()}>
+                <Icon name="trash" size={16} /> Nel Cestino di Windows
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {songs.length === 0 ? (
         <p className="muted pad">{collection ? "La raccolta è vuota." : "La playlist è vuota."} Aggiungi brani dal menu ⋯ di un brano o col tasto destro.</p>
       ) : (
-        <TrackTable songs={songs} from={{ label: playlist.name, id: `playlist/${playlist.id}` }} playlistId={mine ? id : undefined} />
+        <TrackTable
+          songs={songs}
+          from={{ label: playlist.name, id: `playlist/${playlist.id}` }}
+          playlistId={mine ? id : undefined}
+          selection={mode === "select" ? { selected, toggle } : undefined}
+          onMove={mode === "reorder" ? (f, t) => void save(moveItem(songs, f, t)) : undefined}
+        />
       )}
     </Gradient>
   );

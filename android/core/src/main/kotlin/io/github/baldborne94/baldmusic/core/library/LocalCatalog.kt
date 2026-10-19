@@ -297,6 +297,7 @@ class LocalCatalog(
         streamUri = streamUri(t.id),
         albumId = ix.albumKeyOf(t)?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = ix.primary(t)?.let { MediaId(KEY, ARTIST, it).toString() },
+        replayGain = t.replayGain,
     )
 
     /** Un disco: i brani che hai, nell'ordine del disco. */

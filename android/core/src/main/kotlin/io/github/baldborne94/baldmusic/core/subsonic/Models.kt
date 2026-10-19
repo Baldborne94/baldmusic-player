@@ -18,6 +18,16 @@ data class Song(
     val duration: Int? = null,
     val coverArt: String? = null,
     val starred: String? = null,
+    /** OpenSubsonic (Navidrome): il ReplayGain letto dai tag del file. */
+    val replayGain: SongReplayGain? = null,
+)
+
+@Serializable
+data class SongReplayGain(
+    val trackGain: Float? = null,
+    val albumGain: Float? = null,
+    val trackPeak: Float? = null,
+    val albumPeak: Float? = null,
 )
 
 @Serializable

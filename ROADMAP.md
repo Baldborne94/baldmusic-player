@@ -98,9 +98,10 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 ## Fase 3 — Ascoltare bene
 
-- [ ] **ReplayGain**: impostazione *Album* (predefinita: dentro un disco le differenze volute restano), *Brano* (per mix e casuale) o *Spento*. Sul telefono dai tag letti in fase 1, nel web dal campo `replayGain` di Navidrome. Senza tag il brano suona com'è. Si abbassa e basta, mai oltre il picco: niente distorsione.
+- [x] **ReplayGain**: impostazione *Album* (predefinita: dentro un disco le differenze volute restano), *Brano* (per mix e casuale) o *Spento*. Sul telefono dai tag letti in fase 1, nel web dal campo `replayGain` di Navidrome. Senza tag il brano suona com'è. Si abbassa e basta, mai oltre il picco: niente distorsione.
 - [x] **Coda salvata per intero**: riaccendendo l'auto (o dalla notifica dopo un riavvio) riparte la stessa coda, dallo stesso punto, con casuale e ripeti.
-- [ ] **Senza pause tra i brani** (gapless) negli album dal vivo e nei concept: verificare con MP3, AAC e FLAC.
+- [x] **Dissolvenza tra i brani** (chiesta dall'utente al posto delle pause): Spenta/3/6/9/12 s, mai dentro lo stesso album, sul telefono, in Auto e sul PC.
+- [ ] **Senza pause tra i brani** (gapless) negli album dal vivo e nei concept: verificare con MP3, AAC e FLAC. Sul telefono ExoPlayer lo fa già; sul PC il brano dopo si carica in anticipo (pausa da ~25 a ~5 ms in prova, molto di più in rete). Resta da sentire a orecchio sul telefono.
 
 ## Fase 4 — Android Auto fatto bene
 
@@ -116,7 +117,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 - [ ] Tablet, poi: libreria e dettaglio affiancati, testo nel pannello di destra.
 - [x] **Raccolte anche sul PC**: le cartelle della musica di Navidrome diventano raccolte (playlist di Navidrome) come sul telefono, prima di tutto in Home e in Libreria. Serve «Mostra percorso reale» nel lettore *baldmusic* di Navidrome.
 - [x] **Pulizia anche sul PC**: anteprime e doppioni come sul telefono; il browser non tocca i file, quindi l'app prepara uno script che li sposta nel Cestino di Windows, e le raccolte passano prima alla copia tenuta.
-- [ ] **Web come il telefono**, dopo le raccolte: riordinare e ordinare le playlist, selezione di più brani, informazioni sul brano.
+- [x] **Web come il telefono**, dopo le raccolte: riordinare e ordinare le playlist, selezione di più brani, informazioni sul brano.
 - [ ] **App web sul PC**: elenchi lunghi veloci anche con decine di migliaia di brani, trascina-e-rilascia nelle playlist.
 - [ ] **App web sul tablet** (se non Android): tocchi comodi, gesti, "In riproduzione" a schermo intero.
 

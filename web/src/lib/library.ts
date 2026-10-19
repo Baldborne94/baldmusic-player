@@ -90,6 +90,18 @@ export async function removeFromPlaylist(id: string, index: number): Promise<voi
   await refreshLibrary();
 }
 
+/** Riscrive i brani di una playlist o raccolta nell'ordine nuovo: nome e commento restano. */
+export async function rewritePlaylist(id: string, songIds: string[]): Promise<void> {
+  await getClient()?.replacePlaylistSongs(id, songIds);
+  await refreshLibrary();
+}
+
+/** Toglie più brani in una volta, per posizione. */
+export async function removeManyFromPlaylist(id: string, indexes: number[]): Promise<void> {
+  await getClient()?.updatePlaylist(id, { removeIndexes: indexes });
+  await refreshLibrary();
+}
+
 export async function renamePlaylist(id: string, name: string): Promise<void> {
   await getClient()?.updatePlaylist(id, { name });
   await refreshLibrary();

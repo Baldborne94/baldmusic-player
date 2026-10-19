@@ -21,6 +21,8 @@ data class LibraryNode(
     /** Per i brani: dove portano "Vai all'album" e "Vai all'artista". */
     val albumId: String? = null,
     val artistId: String? = null,
+    /** Per i brani: il ReplayGain dei tag, per il volume uguale tra i brani. */
+    val replayGain: ReplayGain? = null,
 ) {
     enum class Kind { SOURCE, SECTION, ALBUM, ARTIST, PLAYLIST, FOLDER, TRACK, MESSAGE }
 

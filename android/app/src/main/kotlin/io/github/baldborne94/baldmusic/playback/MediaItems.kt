@@ -11,6 +11,7 @@ import androidx.media3.session.MediaConstants
 import io.github.baldborne94.baldmusic.artwork.ArtworkProvider
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.ReplayGain
 import io.github.baldborne94.baldmusic.core.library.TrackRef
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 
@@ -19,6 +20,12 @@ const val EXTRA_KIND = "io.github.baldborne94.baldmusic.KIND"
 
 const val EXTRA_ALBUM_ID = "io.github.baldborne94.baldmusic.ALBUM_ID"
 const val EXTRA_ARTIST_ID = "io.github.baldborne94.baldmusic.ARTIST_ID"
+
+/** ReplayGain del brano negli extra (dB e picchi lineari), per il volume uguale tra i brani. */
+private const val EXTRA_RG_TRACK = "io.github.baldborne94.baldmusic.RG_TRACK"
+private const val EXTRA_RG_ALBUM = "io.github.baldborne94.baldmusic.RG_ALBUM"
+private const val EXTRA_RG_TRACK_PEAK = "io.github.baldborne94.baldmusic.RG_TRACK_PEAK"
+private const val EXTRA_RG_ALBUM_PEAK = "io.github.baldborne94.baldmusic.RG_ALBUM_PEAK"
 
 /** Chiave nelle RequestMetadata: "riproduci in ordine casuale partendo da un brano a caso". */
 const val EXTRA_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
@@ -29,6 +36,12 @@ fun LibraryNode.toMediaItem(context: Context): MediaItem {
         putString(EXTRA_KIND, kind.name)
         albumId?.let { putString(EXTRA_ALBUM_ID, it) }
         artistId?.let { putString(EXTRA_ARTIST_ID, it) }
+        replayGain?.let { rg ->
+            rg.trackGain?.let { putFloat(EXTRA_RG_TRACK, it) }
+            rg.albumGain?.let { putFloat(EXTRA_RG_ALBUM, it) }
+            rg.trackPeak?.let { putFloat(EXTRA_RG_TRACK_PEAK, it) }
+            rg.albumPeak?.let { putFloat(EXTRA_RG_ALBUM_PEAK, it) }
+        }
         // Come Android Auto deve disegnare i figli di questo nodo.
         putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE, style)
         putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_PLAYABLE, MediaConstants.EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM)
@@ -63,6 +76,15 @@ fun LibraryNode.toMediaItem(context: Context): MediaItem {
         .apply { streamUri?.let { setUri(it) } }
         .build()
 }
+
+/** Il ReplayGain messo negli extra da [toMediaItem]; null se il brano non ne ha. */
+val MediaItem.replayGain: ReplayGain?
+    get() {
+        val e = mediaMetadata.extras ?: return null
+        fun f(key: String) = if (e.containsKey(key)) e.getFloat(key) else null
+        val rg = ReplayGain(f(EXTRA_RG_TRACK), f(EXTRA_RG_ALBUM), f(EXTRA_RG_TRACK_PEAK), f(EXTRA_RG_ALBUM_PEAK))
+        return rg.takeIf { it.trackGain != null || it.albumGain != null }
+    }
 
 val MediaItem.kind: Kind?
     get() = mediaMetadata.extras?.getString(EXTRA_KIND)?.let { runCatching { Kind.valueOf(it) }.getOrNull() }

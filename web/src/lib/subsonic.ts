@@ -1,4 +1,5 @@
 import SparkMD5 from "spark-md5";
+import type { ReplayGain } from "./replaygain";
 
 // Client per l'API Subsonic, quella che parla Navidrome.
 // Riferimento: https://www.subsonic.org/pages/api.jsp e
@@ -39,6 +40,8 @@ export interface Song {
   musicBrainzId?: string;
   /** Quando Navidrome ha trovato il file. */
   created?: string;
+  /** OpenSubsonic: il ReplayGain dei tag, per il volume uguale tra i brani. */
+  replayGain?: ReplayGain;
 }
 
 export interface Album {
