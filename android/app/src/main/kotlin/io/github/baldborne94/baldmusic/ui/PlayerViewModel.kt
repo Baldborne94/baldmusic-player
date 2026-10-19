@@ -102,6 +102,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             app.settings.changes.collect { libraryVersion = it }
         }
+        // C'è una versione nuova dell'app? (al massimo ogni qualche ora)
+        checkUpdates()
+    }
+
+    val updater get() = app.updater
+
+    fun checkUpdates(force: Boolean = false) {
+        viewModelScope.launch { app.updater.check(force) }
+    }
+
+    fun installUpdate(info: io.github.baldborne94.baldmusic.core.update.ReleaseInfo) {
+        viewModelScope.launch { app.updater.install(info) }
     }
 
     private fun sync(p: Player) {

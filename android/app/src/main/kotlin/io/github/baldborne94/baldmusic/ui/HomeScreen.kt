@@ -121,6 +121,9 @@ fun HomeScreen(vm: PlayerViewModel) {
             }
         }
 
+        // C'è una versione nuova dell'app.
+        item { UpdateBanner(vm) }
+
         if (needsPermission) {
             item {
                 Column(Modifier.padding(16.dp).clip(RoundedCornerShape(12.dp)).background(Surface2).padding(18.dp)) {

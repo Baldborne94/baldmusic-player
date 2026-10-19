@@ -260,6 +260,9 @@ fun AppScaffold(vm: PlayerViewModel) {
 
             infoFor?.let { (id, title) -> TrackInfoDialog(id, title, onDismiss = { infoFor = null }) }
 
+            // Dopo un aggiornamento, una volta: cosa c'è di nuovo.
+            WhatsNewDialog(vm)
+
             trashAsk?.let { ask ->
                 val n = ask.items.size
                 ConfirmDialog(

@@ -6,10 +6,10 @@ name: App Android
 
 on:
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/apk_version.py"]
   push:
     branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/apk_version.py"]
   workflow_dispatch:
 
 jobs:
@@ -22,6 +22,9 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Tutta la storia: le novità dell'APK sono le PR unite dall'ultimo pubblicato.
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -58,18 +61,27 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Numero di versione e novità per l'app (Impostazioni → Aggiornamenti). Anche
+      # nelle PR, così uno sbaglio nello script si vede prima di arrivare su main.
+      - name: Prepara version.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk baldmusic.apk
+          mkdir -p prev
+          gh release download apk-latest -p version.json -D prev --clobber || echo "Nessun version.json precedente."
+          python3 ../.github/scripts/apk_version.py --code "$GITHUB_RUN_NUMBER" --sha "$GITHUB_SHA" \
+            --apk baldmusic.apk --prev prev/version.json --out version.json --notes notes.md
+          cat notes.md
+
+      # Prima l'APK, poi version.json: l'app scarica l'APK solo quando c'è già quello nuovo.
       - name: Pubblica l'APK nella release "apk-latest"
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/release/app-release.apk baldmusic.apk
           gh release view apk-latest >/dev/null 2>&1 \
             || gh release create apk-latest --title "BaldMusic per Android" --notes "Build in corso."
           gh release upload apk-latest baldmusic.apk --clobber
-          gh release edit apk-latest --notes \
-            "APK compilato da main (commit ${GITHUB_SHA:0:7}, $(date -u '+%d/%m/%Y %H:%M UTC')).
-
-          Scarica \`baldmusic.apk\` qui sotto dal telefono e aprilo: Android chiederà di consentire l'installazione da questa fonte.
-
-          Richiede Android 8.0 o superiore."
+          gh release upload apk-latest version.json --clobber
+          gh release edit apk-latest --notes-file notes.md

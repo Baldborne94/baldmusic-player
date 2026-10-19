@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- Musica salvata sul telefono: Android 13+ usa il permesso dedicato all'audio. -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Aggiornamenti dall'app (Impostazioni → Aggiornamenti): Android chiede comunque conferma. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

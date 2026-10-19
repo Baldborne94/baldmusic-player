@@ -36,6 +36,17 @@ Per cambiare la cartella in seguito, modifica `MusicFolder` nel file `navidrome.
 
 Usa [`docker-compose.yml`](docker-compose.yml): cambia il percorso della musica e lancia `docker compose up -d`.
 
+### Raccolte dalle cartelle anche sul PC
+
+Sul telefono ogni cartella dentro `Music` è una **raccolta**; l'app web fa lo stesso con le cartelle della musica di Navidrome (le raccolte diventano playlist di Navidrome, quindi le vedi anche sugli altri dispositivi collegati al server). Per farlo deve sapere dove stanno i file, e Navidrome lo dice solo se glielo permetti, una volta:
+
+1. Apri BaldMusic nel browser e collegati, così Navidrome registra il lettore.
+2. In Navidrome (<http://localhost:4533>): menu in alto a destra → **Players** (in italiano *Lettori*).
+3. Apri la riga con client **baldmusic**, spunta **Report Real Path** (*Mostra percorso reale*) e salva.
+4. Ricarica BaldMusic: le raccolte compaiono in Home e in Libreria, e da lì funzionano anche *Pulizia* e *Brani nel cestino*.
+
+I brani nuovi di una cartella entrano da soli nella sua raccolta a ogni apertura; quelli tolti a mano non tornano e una raccolta eliminata non si ricrea (si ricrea a mano dalla Libreria).
+
 ## Sistemare i tag una volta per tutte
 
 Molti file scaricati da internet hanno il campo **album** uguale al titolo della canzone e un **anno** a caso. Il risultato è una libreria piena di "album" da un brano solo, con la copertina giusta ma il nome sbagliato, e decenni che non tornano. BaldMusic raccoglie questi brani sotto l'artista in *Singoli e brani sparsi*, ma il modo giusto per avere album completi, in ordine e con l'anno corretto è correggere i file.
@@ -49,7 +60,7 @@ Lo fa in automatico **[MusicBrainz Picard](https://picard.musicbrainz.org/)**, g
 5. Seleziona tutto e premi **Salva**. Picard riscrive i tag dentro ai file: la musica non si sposta e non si perde nulla.
 6. In Navidrome: in alto a destra, l'icona *Attività* (la linea a zig-zag) → **Scansione completa** (oppure aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
 
-Due accorgimenti che evitano i casi più comuni:
+Tre accorgimenti che evitano i casi più comuni:
 
 - **Niente raccolte né singoli.** In *Opzioni → Metadati → Pubblicazioni preferite* lascia solo *Album* tra i preferiti e metti *Raccolta*, *Singolo*, *Dal vivo* e *Remix* tra gli scoraggiati. Senza, un brano scaricato da solo finisce nel primo "Greatest Hits" che lo contiene.
 - **Mai *Cerca* su tutto.** *Cerca* abbina per titolo, non per audio, e con titoli generici sbaglia artista. Usalo solo dopo *Analizza*, sui file rimasti, con *Opzioni → Avanzate → Corrispondenze → Similarità minima per la ricerca dei file* almeno al 90%.
@@ -65,7 +76,7 @@ I file scaricati direttamente sul telefono hanno i tag del programma da cui veng
 2. Passala in Picard come sopra e salva.
 3. Ricopia i file sul telefono al posto dei vecchi (o cancella i vecchi e copia i nuovi).
 
-Al riavvio BaldMusic rilegge solo i file cambiati e la libreria si riordina. Per vedere come l'app legge un brano: menu ⋮ → **Informazioni sul brano**.
+Al riavvio BaldMusic rilegge solo i file cambiati e la libreria si riordina. Per vedere come l'app legge un brano: menu ⋮ → **Informazioni sul brano**. Per i doppioni tra cartelle e le anteprime di 30 secondi c'è **Pulizia della libreria** (Impostazioni o icona in Libreria): sul telefono i file vanno nel cestino di Android, sul PC nel Cestino di Windows, e in entrambi i casi si ripristinano da *Brani nel cestino*.
 
 ## 3. Raggiungilo da fuori casa con Tailscale
 
@@ -104,6 +115,7 @@ In auto il telefono usa i dati mobili: lascia Tailscale attivo in background (*I
 | "Wrong username or password" | Credenziali diverse da quelle create su <http://localhost:4533> |
 | La libreria è vuota | Cartella sbagliata in `MusicFolder`, oppure la scansione non è ancora finita |
 | Tanti album da un brano solo, decenni sbagliati | Tag dei file: segui [Sistemare i tag una volta per tutte](#sistemare-i-tag-una-volta-per-tutte) |
-| Brani che durano 30 secondi esatti | Sono anteprime, non la canzone intera: chi li ha scaricati ha preso solo il pezzo di prova. Vanno riscaricati; Picard di solito non riesce ad abbinarli |
+| Brani che durano 30 secondi esatti | Sono anteprime, non la canzone intera: chi li ha scaricati ha preso solo il pezzo di prova. **Pulizia della libreria** li trova e li butta nel cestino; vanno riscaricati (Picard di solito non riesce ad abbinarli) |
+| Sul PC non ci sono le raccolte | Manca *Report Real Path* nel lettore *baldmusic* di Navidrome: vedi [Raccolte dalle cartelle anche sul PC](#raccolte-dalle-cartelle-anche-sul-pc) |
 | L'app web non si collega ma quella Android sì | L'app web vuole l'indirizzo `https://…ts.net` (o `http://localhost:4533` sul PC stesso), non `http://192.168…` |
 | Chrome chiede di "accedere ad altre app e servizi su questo dispositivo" | È la richiesta per raggiungere Navidrome su `localhost`: rispondi *Consenti* |

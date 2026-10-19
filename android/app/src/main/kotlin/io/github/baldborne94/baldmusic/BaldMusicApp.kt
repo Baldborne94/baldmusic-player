@@ -12,6 +12,7 @@ import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.library.LocalSource
+import io.github.baldborne94.baldmusic.update.Updater
 import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -36,6 +37,9 @@ class BaldMusicApp : Application() {
     }
 
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
+
+    /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
+    val updater: Updater by lazy { Updater(this, http) }
 
     /** Un solo albero: lo vedono identico l'app e Android Auto. */
     val tree: LibraryTree by lazy { LibraryTree(::sources) }
