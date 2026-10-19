@@ -27,7 +27,7 @@ export function CollectionsHint({ status }: { status: CollectionsStatus }) {
     return (
       <p className="muted pad">
         Le raccolte nascono dalle cartelle, ma Navidrome non dice dove stanno i file. Si attiva una volta: in Navidrome, menu in alto a
-        destra → <strong>Lettori</strong> → la riga con applicazione <strong>baldmusic</strong> → <strong>Mostra percorso reale</strong>, salva e
+        destra → <strong>Players</strong> (Lettori) → la riga con client <strong>baldmusic</strong> → <strong>Report Real Path</strong> (Mostra percorso reale), salva e
         ricarica questa pagina.
       </p>
     );
