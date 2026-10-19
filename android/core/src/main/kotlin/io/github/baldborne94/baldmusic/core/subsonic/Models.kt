@@ -43,6 +43,8 @@ data class Album(
     // OpenSubsonic (Navidrome): tipo di uscita e anno originale, dai tag di Picard.
     val releaseTypes: List<String> = emptyList(),
     val originalReleaseDate: ItemDate? = null,
+    /** OpenSubsonic: i titoli dei dischi ("Disco 2: The Two Towers"). */
+    val discTitles: List<DiscTitle> = emptyList(),
 ) {
     /** L'anno della prima uscita, se Navidrome lo sa; altrimenti quello dell'edizione. */
     val shownYear: Int? get() = originalReleaseDate?.year?.takeIf { it > 0 } ?: year
@@ -55,6 +57,9 @@ data class Album(
 }
 
 @Serializable
+data class DiscTitle(val disc: Int = 0, val title: String = "")
+
+@Serializable
 data class ItemDate(val year: Int? = null, val month: Int? = null, val day: Int? = null)
 
 @Serializable
@@ -64,6 +69,8 @@ data class Artist(
     val albumCount: Int? = null,
     val coverArt: String? = null,
     val album: List<Album> = emptyList(),
+    /** OpenSubsonic: nome per l'ordinamento (es. "Beatles, The"), se il tag c'è. */
+    val sortName: String? = null,
 )
 
 @Serializable

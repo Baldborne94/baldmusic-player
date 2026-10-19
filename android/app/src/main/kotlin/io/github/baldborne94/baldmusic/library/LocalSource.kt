@@ -14,6 +14,7 @@ import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.LocalTrack
+import io.github.baldborne94.baldmusic.core.library.LoudnessIndex
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.MusicSource
 import kotlinx.coroutines.CoroutineScope
@@ -37,18 +38,23 @@ class LocalSource(
     private val context: Context,
     private val onTagsRead: () -> Unit,
     private val onSongs: (List<LocalTrack>) -> Unit = {},
+    /** Ascolti per brano (ID di TrackRef): gli artisti più ascoltati vanno in cima. */
+    private val plays: () -> Map<String, Int> = { emptyMap() },
 ) : MusicSource {
 
     override val key = LocalCatalog.KEY
     override val title = "Telefono"
 
-    private val catalog = LocalCatalog(streamUri = { id ->
-        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
-    })
+    private val catalog = LocalCatalog(
+        streamUri = { id -> ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString() },
+        plays = { plays() },
+    )
 
     @Volatile private var cached: Pair<Long, List<LocalTrack>>? = null
 
     private val scanner = TagScanner(context)
+    private val loudness = LoudnessScanner(context)
+    @Volatile private var loudnessScheduled = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val scanning = AtomicBoolean(false)
 
@@ -144,12 +150,46 @@ class LocalSource(
     private fun songs(): List<LocalTrack> {
         cached?.let { (at, list) -> if (System.currentTimeMillis() - at < 30_000) return list }
         val rows = rows(null, null)
-        val list = LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))
+        // Il volume misurato dall'app per i file che il ReplayGain nei tag non l'hanno.
+        val stamps = rows.associate { it.track.id to it.stamp }
+        val list = LoudnessIndex.applyTo(LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))) { t -> stamps[t.id]?.let(loudness.index::measure) }
+        if (!loudnessScheduled && toMeasure(rows).let(loudness.index::pending).isNotEmpty()) {
+            loudnessScheduled = true
+            LoudnessWorker.schedule(context)
+        }
         cached = System.currentTimeMillis() to list
         // Un elenco vuoto può voler dire permesso tolto o memoria non montata: non si tocca niente.
         if (list.isNotEmpty()) onSongs(list)
         if (scanner.index.stale(rows.map { it.stamp }).isNotEmpty() || scanner.index.size() > rows.size) scan(rows.map { it.stamp })
         return list
+    }
+
+    /** I file da misurare: tag già letti e senza ReplayGain (chi ce l'ha nei tag usa quello). */
+    private fun toMeasure(rows: List<Row>): List<FileStamp> = rows.map { it.stamp }.filter { st ->
+        val tags = scanner.index.tags(st)
+        tags != null && tags.replayGain == null
+    }
+
+    /**
+     * Misura il volume dei brani che ne hanno bisogno, finché [stop] non dice basta
+     * (lo chiama [LoudnessWorker]). Restituisce quanti ne ha misurati e quanti mancano.
+     */
+    fun measureLoudness(stop: () -> Boolean): Pair<Int, Int> {
+        if (!hasPermission()) return 0 to 0
+        val rows = rows(null, null)
+        loudness.retain(rows.mapTo(HashSet()) { it.track.id })
+        val files = toMeasure(rows)
+        val done = loudness.measure(files, { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }, stop)
+        if (done > 0) cached = null
+        loudnessScheduled = false
+        return done to loudness.index.pending(files).size
+    }
+
+    /** Per le Impostazioni: quanti brani senza ReplayGain nei tag sono già misurati, e su quanti. */
+    suspend fun loudnessStatus(): Pair<Int, Int> = withContext(Dispatchers.IO) {
+        if (!hasPermission()) return@withContext 0 to 0
+        val files = toMeasure(rows(null, null))
+        (files.size - loudness.index.pending(files).size) to files.size
     }
 
     /** Legge in sottofondo i tag dei file nuovi o cambiati; una lettura alla volta. */

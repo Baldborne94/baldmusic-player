@@ -91,14 +91,15 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).
-- [ ] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
+- [x] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
 - [ ] **Ordine alfabetico come una persona**: prima i nomi di ordinamento di Picard ("Beatles, The"); senza, `Collator` italiano (gli accenti stanno con la loro lettera), articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"), numeri in ordine naturale. Lettere-indice laterali nell'elenco artisti.
-- [ ] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente. L'**anno originale** è già usato (fase 1) per album, decenni e ordine.
+- [x] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente. L'**anno originale** è già usato (fase 1) per album, decenni e ordine.
 - [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui, verificate con la stessa libreria di prova in JSON (casi difficili: feat., raccolte, accenti, articoli, dischi multipli, album omonimi) usata dai test Kotlin.
 
 ## Fase 3 — Ascoltare bene
 
 - [x] **ReplayGain**: impostazione *Album* (predefinita: dentro un disco le differenze volute restano), *Brano* (per mix e casuale) o *Spento*. Sul telefono dai tag letti in fase 1, nel web dal campo `replayGain` di Navidrome. Senza tag il brano suona com'è. Si abbassa e basta, mai oltre il picco: niente distorsione.
+- [x] **Volume misurato sul telefono**: per i file senza ReplayGain l'app misura il volume da sola (EBU R128), una volta per file, in sottofondo mentre il telefono è in carica.
 - [x] **Coda salvata per intero**: riaccendendo l'auto (o dalla notifica dopo un riavvio) riparte la stessa coda, dallo stesso punto, con casuale e ripeti.
 - [x] **Dissolvenza tra i brani** (chiesta dall'utente al posto delle pause): Spenta/3/6/9/12 s, mai dentro lo stesso album, sul telefono, in Auto e sul PC.
 - [ ] **Senza pause tra i brani** (gapless) negli album dal vivo e nei concept: verificare con MP3, AAC e FLAC. Sul telefono ExoPlayer lo fa già; sul PC il brano dopo si carica in anticipo (pausa da ~25 a ~5 ms in prova, molto di più in rete). Resta da sentire a orecchio sul telefono.
@@ -107,9 +108,9 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Comandi vocali per le raccolte**: "Ok Google, metti (la raccolta) Movie Soundtracks su BaldMusic".
 - [ ] Prova completa con il **Desktop Head Unit** (l'emulatore di Android Auto) e in macchina, con una checklist: avvio a freddo, ripresa, ricerca vocale ("metti *artista*", "metti *album*", "metti *playlist*"), cuore, timer, telefono senza rete.
-- [ ] Elenchi lunghi: Auto mostra pochi elementi per volta; artisti e album raggruppati per lettera, "Più ascoltati" e "Ascoltati di recente" in cima.
+- [x] Elenchi lunghi: Auto mostra pochi elementi per volta; artisti e album raggruppati per lettera, "Più ascoltati" e "Ascoltati di recente" in cima.
 - [x] Tasti **casuale** e **ripeti** accanto al cuore.
-- [ ] Discografia divisa per tipo (fase 2) anche in Auto.
+- [x] Discografia divisa per tipo (fase 2) anche in Auto.
 
 ## Fase 5 — Tablet e PC
 

@@ -45,6 +45,7 @@ import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.playback.group
 
 private enum class Filter(val label: String) { COLLECTION("Raccolte"), PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti") }
 
@@ -71,7 +72,7 @@ fun LibraryScreen(vm: PlayerViewModel) {
         Filter.PLAYLIST -> playlists.orEmpty() + serverPlaylists.orEmpty()
         Filter.ALBUM -> albums.orEmpty()
         Filter.ARTIST -> artists.orEmpty()
-    }.let { if (alphabetical) it.sortedBy { i -> i.title().lowercase() } else it }
+    }.let { if (alphabetical) it.sortedBy { i -> io.github.baldborne94.baldmusic.core.library.ArtistNames.sortKey(i.title()) } else it }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
         item {
@@ -120,7 +121,15 @@ fun LibraryScreen(vm: PlayerViewModel) {
                 }
             }
         }
-        items(items, key = { it.mediaId }) { item -> ContainerRow(item) { ui.open(item.mediaId, item.title()) } }
+        // Artisti e album per lettera, come in Android Auto (solo nell'ordine della libreria, che è già alfabetico).
+        val lettered = !alphabetical && (filter == Filter.ARTIST || filter == Filter.ALBUM)
+        items.forEachIndexed { i, item ->
+            val group = item.group
+            if (lettered && group != null && (i == 0 || items[i - 1].group != group)) {
+                item(key = "lettera-$i-$group") { SectionHeader(group) }
+            }
+            item(key = item.mediaId) { ContainerRow(item) { ui.open(item.mediaId, item.title()) } }
+        }
         if (items.isEmpty() && filter == null) {
             item { Message("Crea la tua prima playlist con il + qui sopra, oppure tocca il cuore sui brani che ti piacciono.") }
         }

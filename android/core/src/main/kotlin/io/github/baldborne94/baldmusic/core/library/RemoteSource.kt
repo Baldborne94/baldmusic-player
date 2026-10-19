@@ -38,20 +38,37 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
             val (real, singles) = client.albumList("newest", 60).partition { it.isReal }
             real.map(::albumNode) + songsOf(singles.take(30)).map { songNode(it, MediaId(KEY, RECENT)) }
         }
-        ALBUMS -> client.albumList("alphabeticalByName", 500).filter { it.isReal }.map(::albumNode)
-        ARTISTS -> client.artists().map(::artistNode)
+        // Per lettera, con le stesse regole del telefono: in Android Auto ogni lettera è un'intestazione.
+        ALBUMS -> client.albumList("alphabeticalByName", 500).filter { it.isReal }.sortedBy { ArtistNames.sortKey(it.name) }
+            .map { albumNode(it).copy(group = ArtistNames.letter(it.name)) }
+        ARTISTS -> client.artists().sortedBy { ArtistNames.sortKey(it.sortName ?: it.name) }
+            .map { artistNode(it).copy(group = ArtistNames.letter(it.sortName ?: it.name)) }
         PLAYLISTS -> client.playlists().map(::playlistNode)
         STARRED -> client.starred().song.map { songNode(it, id) }
         RANDOM -> {
             val songs = if (id.id == null) client.randomSongs(100).also { lastRandom = it } else lastRandom
             songs.map { songNode(it, stableRandomId()) }
         }
-        ALBUM -> client.album(requireNotNull(id.id)).song.map { songNode(it, id.copy(parent = null)) }
+        ALBUM -> {
+            val album = client.album(requireNotNull(id.id))
+            // Su più dischi: "Disco 1", "Disco 2" (col titolo del disco se Navidrome lo sa).
+            val multiDisc = album.song.mapNotNull { it.discNumber?.takeIf { d -> d > 0 } }.distinct().size > 1
+            album.song.map { s ->
+                val disc = s.discNumber?.takeIf { it > 0 }
+                songNode(s, id.copy(parent = null)).copy(
+                    group = if (multiDisc && disc != null) LocalCatalog.discLabel(disc, album.discTitles.firstOrNull { it.disc == disc }?.title) else null,
+                )
+            }
+        }
         ARTIST -> {
-            val (real, singles) = client.artist(requireNotNull(id.id)).album.sortedByDescending { it.shownYear ?: 0 }.partition { it.isReal }
-            real.map(::albumNode) + listOfNotNull(
+            val (real, singles) = client.artist(requireNotNull(id.id)).album.partition { it.isReal }
+            // Discografia per tipo (Album, EP, Dal vivo, Colonne sonore…), ognuno dal più recente.
+            Discography.grouped(real, { it.releaseTypes }, { it.shownYear ?: 0 }, { it.name }).map { (kind, a) -> albumNode(a).copy(group = kind.title) } + listOfNotNull(
                 singles.takeIf { it.isNotEmpty() }?.let { s ->
-                    LibraryNode(MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = s.first().coverArt?.let { "$KEY/$it" })
+                    LibraryNode(
+                        MediaId(KEY, ARTIST_SINGLES, id.id).toString(), "Singoli e brani sparsi", Kind.SECTION,
+                        subtitle = count(s.size), artwork = s.first().coverArt?.let { "$KEY/$it" }, group = LocalCatalog.OTHER_GROUP,
+                    )
                 },
             )
         }

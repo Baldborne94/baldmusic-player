@@ -36,6 +36,8 @@ fun LibraryNode.toMediaItem(context: Context): MediaItem {
         putString(EXTRA_KIND, kind.name)
         albumId?.let { putString(EXTRA_ALBUM_ID, it) }
         artistId?.let { putString(EXTRA_ARTIST_ID, it) }
+        // Intestazione nell'elenco (lettera, disco, tipo di uscita): Android Auto la disegna da solo.
+        group?.let { putString(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE, it) }
         replayGain?.let { rg ->
             rg.trackGain?.let { putFloat(EXTRA_RG_TRACK, it) }
             rg.albumGain?.let { putFloat(EXTRA_RG_ALBUM, it) }
@@ -85,6 +87,10 @@ val MediaItem.replayGain: ReplayGain?
         val rg = ReplayGain(f(EXTRA_RG_TRACK), f(EXTRA_RG_ALBUM), f(EXTRA_RG_TRACK_PEAK), f(EXTRA_RG_ALBUM_PEAK))
         return rg.takeIf { it.trackGain != null || it.albumGain != null }
     }
+
+/** L'intestazione sotto cui sta nell'elenco, se c'è (vedi [LibraryNode.group]). */
+val MediaItem.group: String?
+    get() = mediaMetadata.extras?.getString(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_GROUP_TITLE)
 
 val MediaItem.kind: Kind?
     get() = mediaMetadata.extras?.getString(EXTRA_KIND)?.let { runCatching { Kind.valueOf(it) }.getOrNull() }

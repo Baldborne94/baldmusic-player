@@ -23,6 +23,11 @@ data class LibraryNode(
     val artistId: String? = null,
     /** Per i brani: il ReplayGain dei tag, per il volume uguale tra i brani. */
     val replayGain: ReplayGain? = null,
+    /**
+     * L'intestazione sotto cui sta nell'elenco: la lettera tra gli artisti, "Disco 2" in un
+     * album, "Dal vivo" nella discografia. Android Auto la mostra da solo; l'app anche.
+     */
+    val group: String? = null,
 ) {
     enum class Kind { SOURCE, SECTION, ALBUM, ARTIST, PLAYLIST, FOLDER, TRACK, MESSAGE }
 

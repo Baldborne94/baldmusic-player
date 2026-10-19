@@ -66,6 +66,7 @@ import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
+import io.github.baldborne94.baldmusic.playback.group
 import io.github.baldborne94.baldmusic.playback.kind
 
 @Composable
@@ -188,17 +189,30 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
         }
 
         // Album, playlist, artisti: in griglia, tranne dentro un artista dove sono una lista con l'anno.
+        // Le intestazioni (lettera, tipo di uscita) vengono dal gruppo di ogni elemento, come in Android Auto.
         if (containers.isNotEmpty()) {
             if (kind == Kind.ARTIST) {
-                item(span = full) { SectionHeader("Discografia") }
-                items(containers, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { c ->
-                    ContainerRow(c, subtitle = if (c.kind == Kind.SECTION) c.subtitle() else listOfNotNull(c.mediaMetadata.recordingYear?.toString(), "Album").joinToString(" · ")) { ui.open(c.mediaId, c.title()) }
+                if (containers.none { it.group != null }) item(span = full) { SectionHeader("Discografia") }
+                containers.forEachIndexed { i, c ->
+                    groupHeader(containers, i, full)
+                    item(key = c.mediaId, span = full) {
+                        ContainerRow(c, subtitle = if (c.kind == Kind.SECTION) c.subtitle() else c.mediaMetadata.recordingYear?.toString()) { ui.open(c.mediaId, c.title()) }
+                    }
                 }
             } else if (containers.all { it.kind == Kind.SECTION || it.kind == Kind.FOLDER }) {
-                items(containers, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { c -> ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                containers.forEachIndexed { i, c ->
+                    groupHeader(containers, i, full)
+                    item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                }
             } else {
-                items(containers, key = { it.mediaId }) { c ->
-                    Box(Modifier.padding(horizontal = 6.dp)) { GridCard(c) { ui.open(c.mediaId, c.title()) } }
+                containers.forEachIndexed { i, c ->
+                    groupHeader(containers, i, full)
+                    // Una sezione in mezzo alla griglia (es. "I tuoi più ascoltati" tra gli artisti) va su una riga sua.
+                    if (c.kind == Kind.SECTION) {
+                        item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                    } else {
+                        item(key = c.mediaId) { Box(Modifier.padding(horizontal = 6.dp)) { GridCard(c) { ui.open(c.mediaId, c.title()) } } }
+                    }
                 }
             }
         }
@@ -270,23 +284,27 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                 )
             }
         } else {
-            items(tracks, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
-                TrackRow(
-                    item,
-                    active = sameTrack(item.mediaId, vm.current?.mediaId),
-                    liked = lib.isLiked(item.mediaId),
-                    number = if (numbered) item.mediaMetadata.trackNumber else null,
-                    onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
-                    onMenu = { ui.trackMenu(item, playlistId) },
-                    onSwipeQueue = { vm.enqueue(item) },
-                    selected = if (selecting) item.mediaId in selected else null,
-                    // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).
-                    onLongClick = {
-                        selecting = true
-                        reordering = false
-                        toggle(item)
-                    },
-                )
+            tracks.forEachIndexed { i, item ->
+                // "Disco 2" in un album, la lettera in "Tutti i brani".
+                groupHeader(tracks, i, full)
+                item(key = item.mediaId, span = full) {
+                    TrackRow(
+                        item,
+                        active = sameTrack(item.mediaId, vm.current?.mediaId),
+                        liked = lib.isLiked(item.mediaId),
+                        number = if (numbered) item.mediaMetadata.trackNumber else null,
+                        onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
+                        onMenu = { ui.trackMenu(item, playlistId) },
+                        onSwipeQueue = { vm.enqueue(item) },
+                        selected = if (selecting) item.mediaId in selected else null,
+                        // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).
+                        onLongClick = {
+                            selecting = true
+                            reordering = false
+                            toggle(item)
+                        },
+                    )
+                }
             }
         }
 
@@ -446,4 +464,15 @@ private fun ReorderRow(item: MediaItem, modifier: Modifier, onDragStart: () -> U
                 .padding(12.dp),
         )
     }
+}
+
+/** Intestazione prima dell'elemento [i] se il suo gruppo è diverso da quello di prima. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.groupHeader(
+    list: List<MediaItem>,
+    i: Int,
+    full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan,
+) {
+    val group = list[i].group ?: return
+    if (i > 0 && list[i - 1].group == group) return
+    item(key = "gruppo-$i-$group", span = full) { SectionHeader(group) }
 }

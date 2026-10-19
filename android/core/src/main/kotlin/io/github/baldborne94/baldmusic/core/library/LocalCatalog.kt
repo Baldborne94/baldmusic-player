@@ -39,6 +39,9 @@ data class LocalTrack(
     val originalYear: Int = 0,
     val discSubtitle: String? = null,
     val replayGain: ReplayGain? = null,
+    /** Nomi di ordinamento di Picard ("Beatles, The"): decidono l'ordine alfabetico. */
+    val artistSort: String? = null,
+    val albumArtistSort: String? = null,
 ) {
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
@@ -58,7 +61,7 @@ data class LocalTrack(
             releaseTypes.takeIf { it.isNotEmpty() }?.let { "Tipo di uscita" to it.joinToString(", ") },
             "Raccolta" to yes(compilation),
             "Riconosciuto da MusicBrainz" to yes(albumMbid != null || releaseGroupMbid != null || artistMbids.isNotEmpty()),
-            replayGain?.let { rg -> "ReplayGain" to listOfNotNull(rg.trackGain?.let { "brano %+.1f dB".format(it) }, rg.albumGain?.let { "album %+.1f dB".format(it) }).joinToString(" · ") },
+            replayGain?.let { rg -> "ReplayGain" to (listOfNotNull(rg.trackGain?.let { "brano %+.1f dB".format(it) }, rg.albumGain?.let { "album %+.1f dB".format(it) }).joinToString(" · ") + if (rg.measured) " (misurato dall'app)" else "") },
             "Durata" to "%d:%02d".format(durationMs / 60_000, durationMs / 1000 % 60),
             "Cartella" to folder,
             "Tag letti dal file" to if (tagsRead) "sì" else "non ancora (valgono quelli di Android)",
@@ -88,6 +91,8 @@ data class LocalTrack(
             originalYear = t.originalYear,
             discSubtitle = t.discSubtitle,
             replayGain = t.replayGain,
+            artistSort = t.artistSort,
+            albumArtistSort = t.albumArtistSort,
         )
     }
 }
@@ -110,6 +115,8 @@ data class LocalTrack(
 class LocalCatalog(
     private val streamUri: (Long) -> String,
     private val random: Random = Random.Default,
+    /** Quante volte è stato ascoltato ogni brano, per ID di [TrackRef]: mette in cima gli artisti più ascoltati. */
+    private val plays: () -> Map<String, Int> = { emptyMap() },
 ) {
     @Volatile private var shuffled: List<LocalTrack> = emptyList()
 
@@ -143,8 +150,10 @@ class LocalCatalog(
                 newest.map { albumNode(ix, it) } + ix.loose.sortedByDescending { it.dateAdded }.take(30).map { node(ix, it, MediaId(KEY, RECENT)) }
             }
             // Anche i dischi di artisti vari: "Raccolte" sono le cartelle (vedi folderCollections).
-            ALBUMS -> ix.shownAlbums.sortedBy { it.title.lowercase() }.map { albumNode(ix, it) }
-            SINGLES -> ix.loose.sortedWith(compareBy({ it.artist?.lowercase() }, { it.shownYear }, { it.title.lowercase() })).map { node(ix, it, id.copy(parent = null)) }
+            // Per lettera: in Android Auto ogni lettera è un'intestazione, e l'elenco si scorre meglio.
+            ALBUMS -> ix.shownAlbums.sortedBy { ArtistNames.sortKey(it.title) }.map { albumNode(ix, it).copy(group = ArtistNames.letter(it.title)) }
+            SINGLES -> ix.loose.sortedWith(compareBy({ ArtistNames.sortKey(it.artist.orEmpty()) }, { it.shownYear }, { it.title.lowercase() }))
+                .map { node(ix, it, id.copy(parent = null), group = ArtistNames.letter(it.artist.orEmpty())) }
             DECADES -> all.filter { it.shownYear > 0 }.groupBy { it.shownYear / 10 * 10 }.toSortedMap(compareByDescending { it }).map { (decade, tracks) ->
                 LibraryNode(MediaId(KEY, DECADE, "$decade").toString(), decadeName(decade), Kind.SECTION, subtitle = count(tracks.size))
             }
@@ -179,31 +188,51 @@ class LocalCatalog(
             FOLDER -> all.filter { it.folder == id.id }
                 .sortedWith(compareBy({ it.album?.lowercase() }, { it.disc }, { it.track }, { it.title.lowercase() }))
                 .map { node(ix, it, id.copy(parent = null)) }
-            ARTISTS -> artists(ix, ix.artistKeys)
-            SONGS -> all.sortedBy { it.title.lowercase() }.map { node(ix, it, MediaId(KEY, SONGS)) }
+            ARTISTS -> {
+                // In cima i tuoi più ascoltati, poi tutti per lettera.
+                val top = topArtists(ix, all)
+                listOfNotNull(
+                    top.takeIf { it.size >= 3 }?.let { keys ->
+                        LibraryNode(
+                            MediaId(KEY, TOP_ARTISTS).toString(), "I tuoi più ascoltati", Kind.SECTION,
+                            subtitle = keys.take(3).joinToString(", ") { ix.name(it) },
+                            artwork = artists(ix, keys.take(1)).firstOrNull()?.artwork,
+                            gridChildren = true,
+                        )
+                    },
+                ) + artists(ix, ix.artistKeys)
+            }
+            TOP_ARTISTS -> artists(ix, topArtists(ix, all), alphabetical = false)
+            SONGS -> all.sortedBy { ArtistNames.sortKey(it.title) }.map { node(ix, it, MediaId(KEY, SONGS), group = ArtistNames.letter(it.title)) }
             SHUFFLE -> {
                 // Il mix si pesca entrando nella sezione; "last" lo ritrova identico per la coda.
                 if (id.id == null) shuffled = all.shuffled(random)
                 shuffled.map { node(ix, it, MediaId(KEY, SHUFFLE, "last")) }
             }
-            ALBUM -> ix.album(id.id)?.tracks.orEmpty().map { node(ix, it, id.copy(parent = null)) }
+            ALBUM -> {
+                val tracks = ix.album(id.id)?.tracks.orEmpty()
+                val multiDisc = tracks.map { it.disc }.filter { it > 0 }.distinct().size > 1
+                tracks.map { t -> node(ix, t, id.copy(parent = null), group = if (multiDisc && t.disc > 0) discLabel(t.disc, t.discSubtitle) else null) }
+            }
             ARTIST -> {
                 val key = ix.artistKey(id.id) ?: return emptyList()
                 val page = ix.page(key)
-                val albums = page.albums.map { albumNode(ix, it) }
+                // Discografia per tipo (Album, EP, Dal vivo, Colonne sonore…), ognuno dal più recente.
+                val albums = Discography.grouped(page.albums, { a -> a.tracks.flatMap { it.releaseTypes }.distinct() }, { a -> a.tracks.maxOf { it.shownYear } }, { it.title })
+                    .map { (kind, a) -> albumNode(ix, a).copy(group = kind.title) }
                 // Senza album, i brani si vedono subito invece che dentro una sezione.
                 val own = if (albums.isEmpty()) {
                     page.loose.map { node(ix, it, MediaId(KEY, ARTIST, key)) }
                 } else {
                     listOfNotNull(
                         page.loose.takeIf { it.isNotEmpty() }?.let { s ->
-                            LibraryNode(MediaId(KEY, ARTIST_SINGLES, key).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}")
+                            LibraryNode(MediaId(KEY, ARTIST_SINGLES, key).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}", group = OTHER_GROUP)
                         },
                     )
                 }
                 albums + own + listOfNotNull(
                     page.appearsOn.takeIf { it.isNotEmpty() }?.let { s ->
-                        LibraryNode(MediaId(KEY, ARTIST_APPEARS, key).toString(), "Compare in", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}")
+                        LibraryNode(MediaId(KEY, ARTIST_APPEARS, key).toString(), "Compare in", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}", group = OTHER_GROUP)
                     },
                 )
             }
@@ -262,7 +291,18 @@ class LocalCatalog(
         year = a.tracks.maxOf { it.shownYear }.takeIf { it > 0 },
     )
 
-    private fun artists(ix: Index, keys: Collection<String>): List<LibraryNode> = keys.mapNotNull { key ->
+    /** Gli artisti più ascoltati (somma degli ascolti dei loro brani), al massimo 20. */
+    private fun topArtists(ix: Index, all: List<LocalTrack>): List<String> {
+        val counts = plays().takeIf { it.isNotEmpty() } ?: return emptyList()
+        val byArtist = HashMap<String, Int>()
+        all.forEach { t ->
+            val n = counts[ref(t).id] ?: return@forEach
+            ix.primary(t)?.let { byArtist.merge(it, n, Int::plus) }
+        }
+        return byArtist.entries.filter { it.key in ix.artistKeys }.sortedByDescending { it.value }.take(20).map { it.key }
+    }
+
+    private fun artists(ix: Index, keys: Collection<String>, alphabetical: Boolean = true): List<LibraryNode> = keys.mapNotNull { key ->
         val page = ix.page(key)
         val first = page.albums.firstOrNull()?.tracks?.first() ?: page.loose.firstOrNull() ?: page.appearsOn.firstOrNull() ?: return@mapNotNull null
         val songs = page.songs
@@ -276,13 +316,14 @@ class LocalCatalog(
             ).joinToString(" · "),
             artwork = "$KEY/${first.albumId}",
             gridChildren = true,
-        )
-    }.sortedBy { it.title.lowercase() }
+            group = ArtistNames.letter(ix.sortName(key)),
+        ) to ArtistNames.sortKey(ix.sortName(key))
+    }.let { list -> if (alphabetical) list.sortedBy { it.second } else list }.map { it.first }
 
     /** Il brano come nodo della libreria, col contenitore da cui è stato scelto. */
     fun node(t: LocalTrack, parent: MediaId?, all: List<LocalTrack>): LibraryNode = node(index(all), t, parent)
 
-    private fun node(ix: Index, t: LocalTrack, parent: MediaId?) = LibraryNode(
+    private fun node(ix: Index, t: LocalTrack, parent: MediaId?, group: String? = null) = LibraryNode(
         mediaId = MediaId.track(KEY, "${t.id}", parent).toString(),
         title = t.title,
         kind = Kind.TRACK,
@@ -298,6 +339,7 @@ class LocalCatalog(
         albumId = ix.albumKeyOf(t)?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = ix.primary(t)?.let { MediaId(KEY, ARTIST, it).toString() },
         replayGain = t.replayGain,
+        group = group,
     )
 
     /** Un disco: i brani che hai, nell'ordine del disco. */
@@ -332,6 +374,7 @@ class LocalCatalog(
         private val names = HashMap<String, MutableMap<String, Int>>()
         private val credits = HashMap<Long, List<String>>()
         private val albumKeys = HashMap<Long, String>()
+        private val sortNames = HashMap<String, String>()
         val albums = LinkedHashMap<String, Album>()
 
         init {
@@ -358,6 +401,8 @@ class LocalCatalog(
                 val named = t.artists.ifEmpty { t.artist?.let { ArtistNames.split(it, known) }.orEmpty() }
                 val ids = t.artistMbids.takeIf { it.size == named.size }
                 val main = named.mapIndexed { i, n -> keyOf(n, ids?.get(i)) }
+                // Il nome di ordinamento vale solo per un artista da solo (con più artisti non si sa di chi è).
+                if (main.size == 1) t.artistSort?.takeIf { it.isNotBlank() }?.let { sortNames.putIfAbsent(main[0], it) }
                 val guests = ArtistNames.featuredInTitle(t.title).map { keyOf(it, null) }
                 credits[t.id] = (main + guests).distinct()
             }
@@ -386,6 +431,7 @@ class LocalCatalog(
                     albumArtist != null -> keyOf(ArtistNames.split(albumArtist, known).first(), first.albumArtistMbids.firstOrNull())
                     else -> primaries.firstOrNull()
                 }
+                if (owner != null && albumArtist != null) sorted.firstNotNullOfOrNull { it.albumArtistSort?.takeIf(String::isNotBlank) }?.let { sortNames[owner] = it }
                 albums[key] = Album(key, first.album ?: "", owner, various, sorted)
             }
         }
@@ -410,6 +456,9 @@ class LocalCatalog(
 
         /** Il nome più usato per quell'artista. */
         fun name(key: String): String = names[key]?.maxByOrNull { it.value }?.key ?: key.substringAfter(':')
+
+        /** Il nome su cui ordinare: quello di ordinamento di Picard se c'è, altrimenti il nome. */
+        fun sortName(key: String): String = sortNames[key] ?: name(key)
 
         /** Un album dal suo ID; un numero è un vecchio ID di MediaStore. */
         fun album(id: String?): Album? {
@@ -461,6 +510,13 @@ class LocalCatalog(
         const val ARTIST = "artist"
         const val ARTIST_SINGLES = "artistsingles"
         const val ARTIST_APPEARS = "artistappears"
+        const val TOP_ARTISTS = "topartists"
+
+        /** Intestazione di "Singoli e brani sparsi" e "Compare in" nella pagina di un artista. */
+        const val OTHER_GROUP = "Altro"
+
+        /** L'intestazione di un disco in un album su più dischi: "Disco 2 · The Two Towers". */
+        fun discLabel(disc: Int, title: String?) = "Disco $disc" + (title?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
         const val SINGLES = "singles"
 
         private fun count(n: Int) = if (n == 1) "1 brano" else "$n brani"

@@ -21,6 +21,26 @@ object ArtistNames {
 
     fun isVarious(name: String?) = name != null && key(name) in variousNames
 
+    // Articoli che non contano per l'ordine alfabetico: "The Beatles" sta sotto la B, "Il Volo" sotto la V.
+    private val article = Regex("^(?:(?:the|il|lo|la|i|gli|le)\\s+|l['’]\\s*)", RegexOption.IGNORE_CASE)
+
+    /**
+     * La chiave per ordinare come una persona: senza articolo davanti, senza accenti
+     * (la "È" sta con la "E") e senza maiuscole. Con il nome di ordinamento di Picard
+     * ("Beatles, The") si usa quello.
+     */
+    fun sortKey(name: String): String {
+        val trimmed = name.trim()
+        val stripped = article.find(trimmed)?.let { trimmed.substring(it.range.last + 1) }?.takeIf { it.isNotBlank() } ?: trimmed
+        return key(stripped)
+    }
+
+    /** La lettera dell'indice: A–Z, oppure "#" per numeri, simboli e altri alfabeti. */
+    fun letter(name: String): String {
+        val c = sortKey(name).firstOrNull() ?: return "#"
+        return if (c in 'a'..'z') c.uppercase() else "#"
+    }
+
     private val featuring = Regex("\\s+(?:feat\\.?|ft\\.?|featuring)\\s+", RegexOption.IGNORE_CASE)
     private val spacedSeparators = Regex("\\s*;\\s*|\\s+/\\s+")
     private val inTitle = Regex("[(\\[]\\s*(?:feat\\.?|ft\\.?|featuring)\\s+([^)\\]]+)[)\\]]", RegexOption.IGNORE_CASE)
