@@ -99,6 +99,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 ## Fase 3 — Ascoltare bene
 
 - [x] **ReplayGain**: impostazione *Album* (predefinita: dentro un disco le differenze volute restano), *Brano* (per mix e casuale) o *Spento*. Sul telefono dai tag letti in fase 1, nel web dal campo `replayGain` di Navidrome. Senza tag il brano suona com'è. Si abbassa e basta, mai oltre il picco: niente distorsione.
+- [x] **Volume misurato sul telefono**: per i file senza ReplayGain l'app misura il volume da sola (EBU R128), una volta per file, in sottofondo mentre il telefono è in carica.
 - [x] **Coda salvata per intero**: riaccendendo l'auto (o dalla notifica dopo un riavvio) riparte la stessa coda, dallo stesso punto, con casuale e ripeti.
 - [x] **Dissolvenza tra i brani** (chiesta dall'utente al posto delle pause): Spenta/3/6/9/12 s, mai dentro lo stesso album, sul telefono, in Auto e sul PC.
 - [ ] **Senza pause tra i brani** (gapless) negli album dal vivo e nei concept: verificare con MP3, AAC e FLAC. Sul telefono ExoPlayer lo fa già; sul PC il brano dopo si carica in anticipo (pausa da ~25 a ~5 ms in prova, molto di più in rete). Resta da sentire a orecchio sul telefono.

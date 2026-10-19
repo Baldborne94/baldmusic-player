@@ -82,6 +82,7 @@ import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.library.LocalSource
+import io.github.baldborne94.baldmusic.library.LoudnessWorker
 import io.github.baldborne94.baldmusic.playback.kind
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -234,15 +235,13 @@ private fun ReplayGainSetting() {
     val context = LocalContext.current
     val settings = context.app.settings
     val mode by settings.replayGain.collectAsState()
-    val coverage by produceState<Pair<Int, Int>?>(null) {
-        value = runCatching { context.app.local.allTracks() }.getOrNull()?.let { all ->
-            all.count { t -> t.replayGain?.let { it.trackGain != null || it.albumGain != null } == true } to all.size
-        }
-    }
+    // Brani senza ReplayGain nei tag: quanti ne ha già misurati l'app, su quanti.
+    val measured by produceState<Pair<Int, Int>?>(null) { value = runCatching { context.app.local.loudnessStatus() }.getOrNull() }
+    var measuringNow by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Volume uguale tra i brani", fontWeight = FontWeight.SemiBold)
         Text(
-            "Abbassa i brani più forti allo stesso livello degli altri, con i valori di ReplayGain scritti nei file. " +
+            "Abbassa i brani più forti allo stesso livello degli altri, con il ReplayGain scritto nei file o, se manca, il volume misurato dall'app. " +
                 "Album: dentro un disco restano le differenze volute. Brano: ogni brano allo stesso livello, per mix e raccolte.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
@@ -257,13 +256,23 @@ private fun ReplayGainSetting() {
                 )
             }
         }
-        coverage?.takeIf { it.second > 0 }?.let { (tagged, all) ->
+        measured?.let { (done, total) ->
             Text(
-                if (tagged == 0) "Nessuno dei $all brani del telefono ha questi valori, quindi suonano com'è. Si scrivono sul PC con Picard (plugin ReplayGain 2.0) o rsgain."
-                else "$tagged brani su $all del telefono hanno i valori; gli altri suonano com'è.",
+                when {
+                    total == 0 -> "Tutti i brani del telefono hanno il volume nei tag."
+                    done == total -> "Per i $total brani senza tag il volume l'ha misurato l'app."
+                    measuringNow -> "Misura in corso: $done su $total. Puoi usare il telefono intanto."
+                    else -> "Volume misurato per $done brani su $total senza tag: gli altri si misurano da soli mentre il telefono è in carica."
+                },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (total > done && !measuringNow) {
+                OutlinedButton(onClick = {
+                    LoudnessWorker.schedule(context, now = true)
+                    measuringNow = true
+                }) { Text("Misura adesso (consuma batteria)") }
+            }
         }
     }
 }

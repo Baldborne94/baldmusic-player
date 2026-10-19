@@ -73,4 +73,6 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     // Colori delle copertine per sfondi e mini-player.
     implementation("androidx.palette:palette-ktx:1.0.0")
+    // Misura del volume dei brani in sottofondo, quando il telefono è in carica.
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
 }

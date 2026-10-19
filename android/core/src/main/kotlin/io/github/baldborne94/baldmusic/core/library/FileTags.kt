@@ -18,6 +18,8 @@ data class ReplayGain(
     val albumGain: Float? = null,
     val trackPeak: Float? = null,
     val albumPeak: Float? = null,
+    /** Misurato dall'app (i file non avevano il tag), non letto dal file. */
+    val measured: Boolean = false,
 )
 
 /** I tag di un file che servono a BaldMusic; vuoti se il file non si è potuto leggere. */

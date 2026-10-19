@@ -61,7 +61,7 @@ data class LocalTrack(
             releaseTypes.takeIf { it.isNotEmpty() }?.let { "Tipo di uscita" to it.joinToString(", ") },
             "Raccolta" to yes(compilation),
             "Riconosciuto da MusicBrainz" to yes(albumMbid != null || releaseGroupMbid != null || artistMbids.isNotEmpty()),
-            replayGain?.let { rg -> "ReplayGain" to listOfNotNull(rg.trackGain?.let { "brano %+.1f dB".format(it) }, rg.albumGain?.let { "album %+.1f dB".format(it) }).joinToString(" · ") },
+            replayGain?.let { rg -> "ReplayGain" to (listOfNotNull(rg.trackGain?.let { "brano %+.1f dB".format(it) }, rg.albumGain?.let { "album %+.1f dB".format(it) }).joinToString(" · ") + if (rg.measured) " (misurato dall'app)" else "") },
             "Durata" to "%d:%02d".format(durationMs / 60_000, durationMs / 1000 % 60),
             "Cartella" to folder,
             "Tag letti dal file" to if (tagsRead) "sì" else "non ancora (valgono quelli di Android)",
