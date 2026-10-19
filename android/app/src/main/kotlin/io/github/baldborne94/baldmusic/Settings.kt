@@ -2,6 +2,7 @@ package io.github.baldborne94.baldmusic
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,18 @@ class Settings(context: Context) {
     fun setReplayGain(mode: ReplayGainMode) {
         prefs.edit { putString(KEY_REPLAY_GAIN, mode.name) }
         _replayGain.value = mode
+    }
+
+    private val _crossfade = MutableStateFlow(
+        prefs.getInt(KEY_CROSSFADE, Crossfade.DEFAULT_SECONDS).takeIf { it in Crossfade.CHOICES } ?: Crossfade.DEFAULT_SECONDS,
+    )
+
+    /** Dissolvenza incrociata tra i brani, in secondi; 0 = spenta. */
+    val crossfade: StateFlow<Int> = _crossfade.asStateFlow()
+
+    fun setCrossfade(seconds: Int) {
+        prefs.edit { putInt(KEY_CROSSFADE, seconds) }
+        _crossfade.value = seconds
     }
 
     /** Qualcosa è cambiato (server, permessi): la libreria va riletta. */
@@ -83,5 +96,6 @@ class Settings(context: Context) {
         const val KEY_LAST_POS = "last_position"
         const val KEY_LYRICS = "lyrics_online"
         const val KEY_REPLAY_GAIN = "replay_gain"
+        const val KEY_CROSSFADE = "crossfade"
     }
 }

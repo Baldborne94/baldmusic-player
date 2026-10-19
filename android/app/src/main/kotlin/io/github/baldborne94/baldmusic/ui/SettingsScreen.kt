@@ -6,6 +6,7 @@ import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -74,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
@@ -122,6 +124,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
             )
         }
         ReplayGainSetting()
+        CrossfadeSetting()
         Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds
@@ -196,6 +199,32 @@ fun SettingsScreen(vm: PlayerViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
+    }
+}
+
+/** Dissolvenza tra i brani, come i DJ: Spenta, 3, 6, 9 o 12 secondi. */
+@Composable
+private fun CrossfadeSetting() {
+    val settings = LocalContext.current.app.settings
+    val seconds by settings.crossfade.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Dissolvenza tra i brani", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Come i DJ: negli ultimi secondi il brano che finisce si abbassa mentre il successivo parte e sale. " +
+                "Mai tra due brani dello stesso album (dal vivo e colonne sonore continue restano attaccati) e solo quando un brano finisce da solo.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            Crossfade.CHOICES.forEach { s ->
+                FilterChip(
+                    selected = seconds == s,
+                    onClick = { settings.setCrossfade(s) },
+                    label = { Text(if (s == 0) "Spenta" else "$s s") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = androidx.compose.ui.graphics.Color.Black),
+                )
+            }
+        }
     }
 }
 
