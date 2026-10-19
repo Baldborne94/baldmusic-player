@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import androidx.core.content.edit
 import io.github.baldborne94.baldmusic.core.library.Backup
 import io.github.baldborne94.baldmusic.core.library.LibraryBackup
+import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.RestorePlan
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.library.LocalSource
@@ -91,8 +92,14 @@ class Backups(private val context: Context, private val userData: UserData, priv
     /** La copia in Download/BaldMusic, sovrascritta ogni volta. */
     private suspend fun writeAuto() {
         if (Build.VERSION.SDK_INT < 29 || !worthSaving(userData.value)) return
+        // Senza i file del telefono (permesso tolto, memoria non montata) il backup non saprebbe
+        // ritrovare i brani su un altro telefono: si tiene quello di prima.
+        if (!local.hasPermission()) return
+        val tracks = local.allTracks()
+        val localIds = userData.value.let { lib -> lib.liked + lib.playlists.flatMap { it.tracks } }.any { it.id.startsWith("${LocalCatalog.KEY}/") }
+        if (tracks.isEmpty() && localIds) return
         val result = runCatching {
-            val text = snapshot().toByteArray()
+            val text = LibraryBackup.encode(LibraryBackup.create(userData.value, tracks, System.currentTimeMillis())).toByteArray()
             val resolver = context.contentResolver
             // Il file scritto da questa installazione; dopo una reinstallazione se ne crea uno nuovo.
             val saved = prefs.getString(KEY_URI, null)?.let(Uri::parse)

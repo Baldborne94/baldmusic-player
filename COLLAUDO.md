@@ -64,10 +64,11 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-3 | Durante una dissolvenza premi pausa, poi «avanti», poi trascina la barra | La dissolvenza si interrompe subito, niente due brani insieme |
 | A-4 | Volume uguale: Album / Brano / Spento con brani vecchi e recenti | Con Album o Brano i brani vecchi e nuovi hanno volume simile; mai distorsione |
 | A-5 | Impostazioni → «Misura adesso», poi lascia il telefono in carica | Il numero di brani misurati cresce; dopo, i brani scaricati hanno volume simile |
-| A-6 | Timer di spegnimento: 15 minuti e «fine brano» | Si abbassa e si ferma al momento giusto |
+| A-6 | Timer di spegnimento: 15 minuti e «fine brano», anche con «Ripeti il brano» e sull'ultimo brano della coda | Si abbassa e si ferma al momento giusto; finita la coda il timer si spegne e la volta dopo la musica non si ferma da sola |
 | A-7 | Cuffie Bluetooth: tasti play/pausa/avanti | Funzionano anche con l'app chiusa |
-| A-8 | Telefonata o sveglia durante l'ascolto | La musica si ferma e riparte dopo |
-| A-9 | Testo: «In riproduzione» → microfono | Testo sincronizzato; toccando una riga si salta lì |
+| A-8 | Telefonata, sveglia o «Ok Google» durante l'ascolto, anche nel mezzo di una dissolvenza | La musica si ferma tutta (niente brano che sfuma sotto la chiamata) e riparte dopo |
+| A-12 | Casuale su un album di 10 brani con «Ripeti» spento | Suonano tutti e 10, partendo da quello scelto |
+| A-9 | Testo: «In riproduzione» → microfono; poi lo stesso senza rete e di nuovo con la rete | Testo sincronizzato; toccando una riga si salta lì; senza rete «non disponibile», tornata la rete il testo arriva |
 | A-10 | Radio da un brano (⋮ → Radio) | Parte il brano e poi musica simile |
 | A-11 | Coda: scorri un brano a destra, sposta su/giù, «Svuota» | La coda cambia come atteso e si salva |
 
@@ -75,7 +76,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
-| P-1 | Pulizia: un doppione tra due cartelle → «Butta le copie doppie» | Conferma dell'app e poi di Android; il file va nel cestino; le raccolte che lo avevano hanno ancora il brano (la copia tenuta) |
+| P-1 | Pulizia: un doppione tra due cartelle → «Butta le copie doppie»; una seconda volta ruota il telefono mentre è aperta la finestra di Android | Conferma dell'app e poi di Android; il file va nel cestino; le raccolte che lo avevano hanno ancora il brano (la copia tenuta), anche dopo la rotazione |
 | P-2 | Pulizia: anteprime di 30 s | Elencate solo brani da 25–35 s |
 | P-3 | Brani nel cestino → ripristina un doppione | Il file torna nella sua cartella e nella sua raccolta, al posto della copia che lo aveva sostituito |
 | P-4 | Elimina una raccolta «con i brani dal telefono» | Doppia conferma; i file nel cestino di Android (recuperabili 30 giorni) |
@@ -92,6 +93,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | B-4 | Disinstalla, reinstalla, consenti la musica | In Home «Hai già usato BaldMusic?»; «Ripristina» → scegli il file in `Download/BaldMusic` → torna tutto |
 | B-5 | Su un altro telefono o tablet con gli stessi file | Il ripristino ritrova i brani anche se il telefono è diverso; quelli che mancano sono elencati |
 | B-6 | «Ripristina…» con un file qualsiasi (una foto, un testo) | «Questo file non è un backup di BaldMusic», nessun cambiamento |
+| B-7 | Telefono nuovo configurato col trasferimento di Android (o dal backup di Google) | Le impostazioni ci sono; preferiti e playlist no (non puntano a brani sbagliati): in Home compare «Hai già usato BaldMusic?» per ripristinarli dal backup |
 
 ### Aggiornamenti (dopo modifiche a aggiornamenti o alla CI)
 
@@ -100,7 +102,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | U-1 | Impostazioni → Aggiornamenti → «Controlla aggiornamenti» senza versioni nuove | «Hai già l'ultima versione ✓» |
 | U-2 | Senza internet | «Non riesco a controllare: serve internet», nessun errore strano |
 | U-3 | Con una versione nuova: «Aggiorna» la prima volta | Spiega «Consenti da questa fonte», apre le impostazioni; tornando, scarica con la percentuale e chiede conferma ad Android |
-| U-4 | Annulla la conferma di Android | Torna «Aggiorna», si può riprovare |
+| U-4 | Annulla la conferma di Android; un'altra volta esci con «indietro» durante il download e riapri | Torna «Aggiorna», si può riprovare; il download va avanti o finisce, non resta fermo a metà |
 | U-5 | «Più tardi» | L'avviso in Home sparisce fino alla versione dopo; in Impostazioni resta |
 | U-6 | Dopo l'aggiornamento | «Novità di BaldMusic» una volta sola, con le novità di tutte le versioni saltate |
 
@@ -118,7 +120,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
-| C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto |
+| C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto; con brani del server in coda e il PC spento riparte in pochi secondi con i soli brani del telefono |
 | C-2 | Schede La tua musica / Telefono / Server | Si aprono; raccolte per prime; elenchi lunghi divisi per lettera |
 | C-3 | Cuore, casuale, ripeti nella barra | Funzionano e si vedono nell'app |
 | C-4 | «Ok Google, metti la raccolta Movie Soundtracks su BaldMusic» | Suona tutta la raccolta |

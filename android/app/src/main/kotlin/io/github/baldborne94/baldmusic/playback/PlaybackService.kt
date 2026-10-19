@@ -90,6 +90,9 @@ class PlaybackService : MediaLibraryService() {
     private var crossIn = 1f
     private var crossSeek = false
 
+    /** Coda appena impostata: col casuale deve partire dal brano scelto e passare da tutti gli altri. */
+    private var shuffleFromCurrent = false
+
     override fun onCreate() {
         super.onCreate()
         // OkHttp anche per lo streaming: stessi timeout e stessa connessione del resto dell'app.
@@ -192,8 +195,14 @@ class PlaybackService : MediaLibraryService() {
     /** La coda salvata, coi brani che si ritrovano ancora; null se non c'è niente da riprendere. */
     private suspend fun savedQueue(): MediaItemsWithStartPosition? {
         val snapshot = QueueSnapshot.fromJson(kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { queueFile.readText() }.getOrNull() }) ?: return null
+        // Server spento o fuori rete (Tailscale attivo, PC spento): ogni brano aspetterebbe il suo
+        // timeout e la ripresa in auto resterebbe ferma per minuti. Si prova una volta sola.
+        val remote = "${RemoteSource.KEY}/"
+        val reachable = snapshot.ids.none { it.startsWith(remote) } ||
+            kotlinx.coroutines.withTimeoutOrNull(3_000) { runCatching { app.subsonic()?.ping() }.isSuccess } == true
+        val ids = if (reachable) snapshot.ids else snapshot.ids.filterNot { it.startsWith(remote) }
         // Pochi alla volta: i brani del server chiedono ognuno una chiamata.
-        val found = snapshot.ids.chunked(20).flatMap { chunk ->
+        val found = ids.chunked(20).flatMap { chunk ->
             coroutineScope { chunk.map { id -> async { runCatching { tree.resolve(id) }.getOrNull() } }.awaitAll() }
         }.filterNotNull()
         if (found.isEmpty()) return null
@@ -201,6 +210,7 @@ class PlaybackService : MediaLibraryService() {
         val position = if (found[index].mediaId == snapshot.currentId) snapshot.positionMs else 0L
         player.shuffleModeEnabled = snapshot.shuffle
         player.repeatMode = snapshot.repeat
+        shuffleFromCurrent = true
         return MediaItemsWithStartPosition(found.toItems(), index, position)
     }
 
@@ -218,8 +228,9 @@ class PlaybackService : MediaLibraryService() {
             startScrobble(mediaItem)
             startListen(mediaItem)
             updateLikeButton()
-            // Timer "a fine brano": il brano è finito da solo, ci si ferma qui.
-            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK) {
+            // Timer "a fine brano": il brano è finito da solo (anche se si ripete), ci si ferma qui.
+            val ended = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+            if (ended && app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK) {
                 player.pause()
                 app.sleepTimer.value = null
             }
@@ -228,6 +239,20 @@ class PlaybackService : MediaLibraryService() {
         override fun onEvents(player: Player, events: Player.Events) {
             if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_METADATA_CHANGED)) {
                 updateWidget()
+            }
+        }
+
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            // Finita la coda col timer "a fine brano": è già fermo, il timer non deve restare armato.
+            if (playbackState == Player.STATE_ENDED && app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK) app.sleepTimer.value = null
+        }
+
+        override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+            // Chiamata, Assistente, navigatore: il player si sospende senza andare in pausa, ma il
+            // brano che sfuma (senza audio focus) continuerebbe sopra. Si ferma anche lui.
+            if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) {
+                endCrossfade()
+                dropOutgoing()
             }
         }
 
@@ -250,10 +275,17 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             // Brani aggiunti, tolti o spostati nella coda.
-            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) saveLast()
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                if (shuffleFromCurrent) {
+                    shuffleFromCurrent = false
+                    if (player.shuffleModeEnabled) shuffleStartingHere()
+                }
+                saveLast()
+            }
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            if (shuffleModeEnabled) shuffleStartingHere()
             updateLikeButton()
             saveLast()
         }
@@ -669,6 +701,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             val (queue, index) = tree.queueFor(single.mediaId)
+            shuffleFromCurrent = true
             val shuffle = single.requestMetadata.extras?.getBoolean(EXTRA_SHUFFLE) == true
             val start = if (shuffle && queue.isNotEmpty()) queue.indices.random() else index
             MediaItemsWithStartPosition(queue.toItems(), start, startPositionMs)
@@ -692,10 +725,24 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
             savedQueue()?.let { return@future it }
             val (mediaId, position) = app.settings.last() ?: throw UnsupportedOperationException("Niente da riprendere")
+            shuffleFromCurrent = true
             val (queue, index) = tree.queueFor(mediaId)
             if (queue.isEmpty()) throw UnsupportedOperationException("Brano non più disponibile")
             MediaItemsWithStartPosition(queue.toItems(), index, position)
         }
+    }
+
+    /**
+     * Ordine casuale che parte dal brano in corso: ExoPlayer ne pesca uno qualunque, e con
+     * "ripeti" spento i brani che nell'ordine stanno prima di quello in corso non suonerebbero mai.
+     */
+    private fun shuffleStartingHere() {
+        val count = player.mediaItemCount
+        val current = player.currentMediaItemIndex
+        if (count < 2 || current !in 0 until count) return
+        if (player.currentTimeline.getFirstWindowIndex(true) == current) return
+        val order = intArrayOf(current) + (0 until count).filter { it != current }.shuffled().toIntArray()
+        player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order, System.nanoTime()))
     }
 
     private suspend fun voiceSearch(query: String): List<MediaItem> {

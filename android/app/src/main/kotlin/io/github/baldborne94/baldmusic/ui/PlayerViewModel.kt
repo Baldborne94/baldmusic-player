@@ -109,11 +109,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val updater get() = app.updater
 
     fun checkUpdates(force: Boolean = false) {
-        viewModelScope.launch { app.updater.check(force) }
+        app.updater.scope.launch { app.updater.check(force) }
     }
 
     fun installUpdate(info: io.github.baldborne94.baldmusic.core.update.ReleaseInfo) {
-        viewModelScope.launch { app.updater.install(info) }
+        app.updater.scope.launch { app.updater.install(info) }
     }
 
     private fun sync(p: Player) {

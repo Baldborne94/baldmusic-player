@@ -14,7 +14,7 @@ import java.security.MessageDigest
  * Testi dei brani da LRCLIB, con cache su disco: un testo trovato resta
  * disponibile anche offline, e uno mancante non viene richiesto di continuo.
  */
-class LyricsRepository(context: Context, http: OkHttpClient) {
+class LyricsRepository(private val context: Context, http: OkHttpClient) {
 
     private val client = LrcLibClient(http)
     private val dir = File(context.filesDir, "testi").apply { mkdirs() }
@@ -34,13 +34,22 @@ class LyricsRepository(context: Context, http: OkHttpClient) {
                 // Un testo che non c'era si ricerca dopo una settimana: l'archivio cresce.
                 missing.exists() && System.currentTimeMillis() - missing.lastModified() < WEEK_MS -> null
                 !online -> return@withContext null
+                // Senza rete LRCLIB "non trova" niente: non va segnato come testo che non esiste.
+                !hasInternet() -> return@withContext null
                 else -> client.find(artist, title, album, durationMs?.let { (it / 1000).toInt() }).also {
-                    if (it != null) cached.writeText(json.encodeToString(Lyrics.serializer(), it)) else missing.writeText("")
+                    if (it != null) cached.writeText(json.encodeToString(Lyrics.serializer(), it))
+                    else if (hasInternet()) missing.writeText("")
                 }
             }
         }
-        if (lyrics != null || online) synchronized(memory) { memory[key] = lyrics }
+        if (lyrics != null || (online && hasInternet())) synchronized(memory) { memory[key] = lyrics }
         return lyrics
+    }
+
+    /** C'è una rete che arriva davvero a internet (non solo il Wi‑Fi senza connessione). */
+    private fun hasInternet(): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
+        return cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     }
 
     private fun hash(s: String) = MessageDigest.getInstance("SHA-1").digest(s.lowercase().toByteArray())

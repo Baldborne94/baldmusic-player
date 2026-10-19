@@ -36,7 +36,10 @@ class LoudnessScanner(private val context: Context) {
         var done = 0
         for (stamp in pending) {
             if (stop()) break
-            index.put(stamp, runCatching { decode(uriOf(stamp.id), stop) }.onFailure { Log.w(TAG, "Volume non misurato: ${stamp.id}", it) }.getOrNull())
+            val measured = runCatching { decode(uriOf(stamp.id), stop) }.onFailure { Log.w(TAG, "Volume non misurato: ${stamp.id}", it) }.getOrNull()
+            // Fermato a metà (carica staccata, tempo finito): il file resta da misurare, non "non misurabile".
+            if (stop()) break
+            index.put(stamp, measured)
             done++
             // Si salva ogni tanto: se il lavoro si ferma a metà non si riparte da zero.
             if (done % 10 == 0) save()
