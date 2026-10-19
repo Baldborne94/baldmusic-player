@@ -86,6 +86,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Raccolte più comode**: riordinare trascinando, ordinare per titolo o artista, selezione multipla (aggiungi, togli, elimina), copertina a mosaico.
 
+- [x] **Brani nel cestino**: ripescare i brani buttati (entro 30 giorni) e rimetterli al loro posto nelle raccolte.
+
 ## Fase 2 — L'ordine giusto
 
 - [ ] **Brani di un album**: disco → traccia (dai tag; il numero nel nome del file solo come ripiego).

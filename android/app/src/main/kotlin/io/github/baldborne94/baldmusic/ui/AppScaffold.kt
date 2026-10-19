@@ -73,6 +73,7 @@ sealed interface Screen {
     data object Settings : Screen
     data object Stats : Screen
     data object Cleanup : Screen
+    data object Trash : Screen
 }
 
 /** Le azioni comuni che ogni schermata può chiedere, senza passarle di mano in mano. */
@@ -164,6 +165,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                         Screen.Settings -> SettingsPage(vm)
                         Screen.Stats -> StatsScreen(vm)
                         Screen.Cleanup -> CleanupScreen(vm)
+                        Screen.Trash -> TrashScreen(vm)
                     }
                 }
                 MiniPlayer(vm, liked = vm.isLiked(lib, vm.current), onOpen = { nowPlaying = true })

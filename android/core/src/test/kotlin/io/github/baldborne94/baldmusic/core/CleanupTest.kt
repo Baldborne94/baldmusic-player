@@ -72,4 +72,33 @@ class CleanupTest {
         val lib = UserLibrary().syncFolders(listOf(FolderCollection("Music/A", "A", listOf(TrackRef("local/track/1", "X")))), setOf("local/track/1"), 1) { "a" }
         assertTrue(lib.mergeTracks(emptyMap()) === lib)
     }
+
+    @Test
+    fun `un doppione ripescato dal cestino torna al suo posto nella raccolta`() {
+        val keep = t("In the End", "Linkin Park", 216_000, "Music/Linkin Park")
+        val gone = t("In the End", "Linkin Park", 216_000, "Music/90s Metal Classics")
+        val numb = t("Numb", "Linkin Park", 185_000, "Music/90s Metal Classics")
+        val present = { list: List<LocalTrack> -> list.mapTo(HashSet()) { LocalCatalog.ref(it).id } }
+        var lib = UserLibrary().syncFolders(LocalCatalog.folderCollections(listOf(gone, numb, keep)), present(listOf(gone, numb, keep)), 1) { "c${next++}" }
+        // Pulizia: la copia in "90s Metal Classics" va nel cestino e la raccolta passa a quella tenuta.
+        lib = lib.mergeTracks(mapOf(LocalCatalog.ref(gone).id to LocalCatalog.ref(keep))).forgetTracks(listOf(LocalCatalog.ref(gone).id))
+        lib = lib.syncFolders(LocalCatalog.folderCollections(listOf(numb, keep)), present(listOf(numb, keep)), 2) { "x" }
+        val metal = { l: UserLibrary -> l.collections.first { it.name == "90s Metal Classics" }.tracks.map { it.id } }
+        assertEquals(listOf(LocalCatalog.ref(keep).id, LocalCatalog.ref(numb).id), metal(lib))
+        // Ripescata: l'allineamento la rimette in fondo, il ripristino al suo posto al posto della copia.
+        val all = listOf(gone, numb, keep)
+        lib = lib.syncFolders(LocalCatalog.folderCollections(all), present(all), 3) { "y" }
+        lib = LibraryCleanup.restoreInto(lib, listOf(gone), all)
+        assertEquals(listOf(LocalCatalog.ref(gone).id, LocalCatalog.ref(numb).id), metal(lib))
+        // La raccolta "Linkin Park" non cambia.
+        assertEquals(listOf(LocalCatalog.ref(keep).id), lib.collections.first { it.name == "Linkin Park" }.tracks.map { it.id })
+    }
+
+    @Test
+    fun `un brano ripescato senza sostituti resta dove lo mette la cartella`() {
+        val a = t("A", "x", 200_000, "Music/X")
+        val b = t("B", "x", 210_000, "Music/X")
+        val lib = UserLibrary().syncFolders(LocalCatalog.folderCollections(listOf(a, b)), setOf(LocalCatalog.ref(a).id, LocalCatalog.ref(b).id), 1) { "c" }
+        assertTrue(LibraryCleanup.restoreInto(lib, listOf(b), listOf(a, b)) == lib)
+    }
 }

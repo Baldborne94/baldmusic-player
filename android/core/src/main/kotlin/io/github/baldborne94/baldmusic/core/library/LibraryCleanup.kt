@@ -40,6 +40,41 @@ object LibraryCleanup {
             }
             .sortedWith(compareBy({ it.keep.artist?.lowercase() }, { it.keep.title.lowercase() }))
 
+    /** Stesso brano: stesso artista e titolo (senza maiuscole e accenti) e durata quasi uguale. */
+    fun sameSong(a: LocalTrack, b: LocalTrack) =
+        ArtistNames.key(a.artist.orEmpty()) == ArtistNames.key(b.artist.orEmpty()) &&
+            ArtistNames.key(a.title) == ArtistNames.key(b.title) &&
+            abs(a.durationMs - b.durationMs) <= SAME_LENGTH_MS
+
+    /**
+     * Brani ripescati dal cestino: tornano al loro posto nella raccolta della loro cartella.
+     * Se lì c'è la copia che li aveva sostituiti (un doppione da un'altra cartella, messo
+     * dalla pulizia), il brano riprende la sua posizione e la copia esce dalla raccolta.
+     * Se invece la raccolta non ha sostituti, ci pensa l'allineamento con le cartelle.
+     * [all] sono tutti i brani del telefono, ripescati compresi.
+     */
+    fun restoreInto(lib: UserLibrary, restored: List<LocalTrack>, all: List<LocalTrack>): UserLibrary {
+        val byId = all.associateBy { LocalCatalog.ref(it).id }
+        var out = lib
+        restored.forEach { t ->
+            val folder = LocalCatalog.collectionFolder(t.folder) ?: return@forEach
+            val ref = LocalCatalog.ref(t)
+            out = out.copy(
+                playlists = out.playlists.map { pl ->
+                    if (pl.folder != folder) return@map pl
+                    val substitute = pl.tracks.firstOrNull { r ->
+                        val s = byId[r.id]
+                        r.id != ref.id && s != null && LocalCatalog.collectionFolder(s.folder) != folder && sameSong(s, t)
+                    } ?: return@map pl
+                    val tracks = pl.tracks.filter { it.id != ref.id }.toMutableList()
+                    tracks[tracks.indexOfFirst { it.id == substitute.id }] = ref
+                    pl.copy(tracks = tracks, removed = pl.removed - ref.id)
+                },
+            )
+        }
+        return out
+    }
+
     /** Divide i brani con lo stesso nome in gruppi di durata simile (una versione live non è un doppione). */
     private fun byLength(sameName: List<LocalTrack>): List<List<LocalTrack>> {
         val groups = mutableListOf<MutableList<LocalTrack>>()

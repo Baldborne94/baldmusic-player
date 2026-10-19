@@ -69,6 +69,8 @@ class UserData(context: Context) {
     fun deletePlaylist(id: String, ignoreFolder: Boolean = true) = update { it.deletePlaylist(id, ignoreFolder) }
     fun forgetTracks(trackIds: Collection<String>) = update { it.forgetTracks(trackIds) }
     fun mergeTracks(replacements: Map<String, TrackRef>) = update { it.mergeTracks(replacements) }
+    fun restoreInto(restored: List<io.github.baldborne94.baldmusic.core.library.LocalTrack>, all: List<io.github.baldborne94.baldmusic.core.library.LocalTrack>) =
+        update { io.github.baldborne94.baldmusic.core.library.LibraryCleanup.restoreInto(it, restored, all) }
     fun addToPlaylist(id: String, tracks: List<TrackRef>) = update { it.addToPlaylist(id, tracks) }
     fun removeFromPlaylist(id: String, trackId: String) = update { it.removeFromPlaylist(id, trackId) }
     fun removeFromPlaylist(id: String, trackIds: Collection<String>) = update { lib -> trackIds.fold(lib) { l, t -> l.removeFromPlaylist(id, t) } }
