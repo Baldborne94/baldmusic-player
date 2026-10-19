@@ -52,9 +52,10 @@ class PersonalSource(private val library: () -> UserLibrary) : MusicSource {
     override suspend fun track(id: MediaId): LibraryNode? = null
 
     override suspend fun search(query: String): List<LibraryNode> {
-        val q = query.trim().lowercase()
+        // Come nel resto della ricerca: maiuscole, accenti e apostrofi diversi non contano.
+        val q = ArtistNames.key(query)
         if (q.isEmpty()) return emptyList()
-        return library().playlists.filter { it.name.lowercase().contains(q) }.map(::playlistNode)
+        return library().playlists.filter { ArtistNames.key(it.name).contains(q) }.map(::playlistNode)
     }
 
     private fun section(kind: String, title: String, grid: Boolean = false, subtitle: String? = null) =

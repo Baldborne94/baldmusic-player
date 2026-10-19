@@ -123,6 +123,9 @@ class LocalCatalog(
     /** Le radio già pescate: riaprendole (o ricostruendo la coda) restano uguali. */
     private val radios = ConcurrentHashMap<Long, List<LocalTrack>>()
 
+    /** I mix degli artisti, per nome: a parte dalle radio, così la chiave di un mix non è mai l'ID di un brano. */
+    private val artistMixes = ConcurrentHashMap<String, List<LocalTrack>>()
+
     @Volatile private var indexed: Index? = null
 
     /** L'indice di artisti e album, ricalcolato solo quando cambia l'elenco dei brani. */
@@ -174,7 +177,8 @@ class LocalCatalog(
             }
             RADIO -> {
                 val seed = id.id?.toLongOrNull()?.let { sid -> all.firstOrNull { it.id == sid } }
-                if (seed == null) emptyList() else radios.getOrPut(seed.id) { radio(ix, seed, all) }.map { node(ix, it, id.copy(parent = null)) }
+                // I file buttati nel frattempo escono; il resto resta uguale per ricostruire la coda.
+                if (seed == null) emptyList() else radios.getOrPut(seed.id) { radio(ix, seed, all) }.filter(ix::has).map { node(ix, it, id.copy(parent = null)) }
             }
             ARTIST_MIX -> {
                 val name = id.id
@@ -183,7 +187,7 @@ class LocalCatalog(
                     all.filter { t -> ix.credits(t).any { ArtistNames.key(ix.name(it)) == key } || t.artist.equals(n, ignoreCase = true) }.randomOrNull(random)
                 }
                 if (name == null || seed == null) emptyList()
-                else radios.getOrPut(-name.lowercase().hashCode().toLong() - 1) { radio(ix, seed, all).drop(1).shuffled(random) }.map { node(ix, it, id.copy(parent = null)) }
+                else artistMixes.getOrPut(ArtistNames.key(name)) { radio(ix, seed, all).drop(1).shuffled(random) }.filter(ix::has).map { node(ix, it, id.copy(parent = null)) }
             }
             FOLDER -> all.filter { it.folder == id.id }
                 .sortedWith(compareBy({ it.album?.lowercase() }, { it.disc }, { it.track }, { it.title.lowercase() }))
@@ -207,7 +211,7 @@ class LocalCatalog(
             SHUFFLE -> {
                 // Il mix si pesca entrando nella sezione; "last" lo ritrova identico per la coda.
                 if (id.id == null) shuffled = all.shuffled(random)
-                shuffled.map { node(ix, it, MediaId(KEY, SHUFFLE, "last")) }
+                shuffled.filter(ix::has).map { node(ix, it, MediaId(KEY, SHUFFLE, "last")) }
             }
             ALBUM -> {
                 val tracks = ix.album(id.id)?.tracks.orEmpty()
@@ -371,6 +375,7 @@ class LocalCatalog(
 
     /** Artisti e album ricavati dai brani, calcolati una volta per elenco. */
     private class Index(val tracks: List<LocalTrack>) {
+        private val ids: Set<Long> = tracks.mapTo(HashSet()) { it.id }
         private val names = HashMap<String, MutableMap<String, Int>>()
         private val credits = HashMap<Long, List<String>>()
         private val albumKeys = HashMap<Long, String>()
@@ -461,6 +466,9 @@ class LocalCatalog(
             .filterNot { it == "mb:${ArtistNames.VARIOUS_MBID}" || ArtistNames.isVarious(name(it)) }
 
         fun credits(t: LocalTrack): List<String> = credits[t.id].orEmpty()
+
+        /** Se il brano è ancora sul telefono. */
+        fun has(t: LocalTrack): Boolean = t.id in ids
 
         /** L'artista principale del brano: dove porta "Vai all'artista". */
         fun primary(t: LocalTrack): String? = credits[t.id]?.firstOrNull()

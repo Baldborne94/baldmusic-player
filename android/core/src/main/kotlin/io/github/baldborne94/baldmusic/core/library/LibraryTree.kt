@@ -61,7 +61,8 @@ class LibraryTree(
         val parent = id.parent
         if (parent != null) {
             val siblings = playableIn(parent.toString())
-            val index = siblings.indexOfFirst { MediaId.parse(it.mediaId)?.id == id.id }
+            // Stessa sorgente e stesso ID: una playlist può avere "local/track/5" e "remote/track/5".
+            val index = siblings.indexOfFirst { MediaId.parse(it.mediaId)?.let { s -> s.source == id.source && s.id == id.id } == true }
             if (index >= 0) return siblings to index
         }
         val single = source(id.source)?.track(id) ?: return emptyList<LibraryNode>() to 0
