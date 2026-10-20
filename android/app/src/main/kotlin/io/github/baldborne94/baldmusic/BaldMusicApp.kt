@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.library.LibraryTree
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
+import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.MusicSource
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
@@ -71,7 +72,11 @@ class BaldMusicApp : Application() {
             acoustIdKey = { settings.acoustIdKey },
         )
         userData = UserData(this)
-        personal = PersonalSource { userData.value }
+        personal = PersonalSource(
+            library = { userData.value },
+            // I mix per decennio vengono dai decenni della musica del telefono.
+            decades = { local.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES)) },
+        )
         backups.start()
     }
 

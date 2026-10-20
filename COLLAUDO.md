@@ -35,6 +35,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | T-4 | Togli un brano da una raccolta (⋮ → Togli), riapri l'app | Non torna |
 | T-5 | Elimina una raccolta (non i file), riapri l'app | Non si ricrea; i file sono ancora sul telefono |
 | T-6 | Crea una cartella nuova in `Music` con dei file | Diventa una raccolta nuova |
+| T-6b | Rinomina una cartella-raccolta col gestore file (es. `Music/Disney` → `Music/Disney Italia`), riapri l'app | Nessuna raccolta vuota o doppia: la stessa raccolta ha il nome nuovo, lo stesso ordine e i cuori dei suoi brani; se l'avevi rinominata tu, tiene il tuo nome |
+| T-6c | Sposta una cartella-raccolta dentro un'altra (es. `Music/Film/Disney`), o copiala dal PC e cancella la vecchia | Come T-6b; i brani piaciuti e i più ascoltati restano (anche se Android dà ai file ID nuovi) |
 | T-7 | Libreria → Album | Solo dischi con almeno due brani; nessun «album» da un brano solo |
 | T-8 | Apri un artista | Album per tipo (Album, EP, Dal vivo…) dal più recente; «Singoli e brani sparsi»; «Compare in» se è ospite altrove |
 | T-9 | Un brano «A feat. B» | Sta sotto A; B lo ha in «Compare in» |
@@ -54,6 +56,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | R-4 | «Ordina per titolo», poi «per artista» | Ordine alfabetico corretto (articoli ignorati) |
 | R-5 | Copertina di una raccolta con brani di 4+ dischi | Mosaico 2×2; anche in Android Auto |
 | R-6 | Rinomina una raccolta | Il nome nuovo resta; la raccolta continua a ricevere i brani nuovi della cartella |
+| R-7 | Home → I tuoi mix, dopo qualche settimana di ascolti | «Riscopri» (brani ascoltati spesso e non sentiti da due mesi, o piaciuti e mai sentiti di recente) e «Per la macchina» (i più ascoltati e i preferiti); nello stesso giorno lo stesso mix ha lo stesso ordine, il giorno dopo cambia |
 
 ### Ascolto (dopo modifiche a riproduzione, volume, dissolvenza)
 
@@ -98,6 +101,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | N-9 | Passa una cartella da Picard e ricopiala sul telefono | Quei brani usano i tag di Picard (non più le proposte) |
 | N-10 | Senza rete durante il riconoscimento | Si ferma con «Niente connessione», riprende da solo quando torna la rete in carica |
 | N-11 | Salute della libreria dopo aver applicato | Molti meno brani da sistemare; il link «Riconosci dal suono» porta qui |
+| N-12 | Dopo «Applica», guarda album e brani riconosciuti (anche in Android Auto) | La copertina vera del disco da Cover Art Archive; senza rete o per un disco senza copertina nell'archivio resta quella del file |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 
@@ -145,6 +149,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | C-7 | Copertine | Si vedono, anche i mosaici delle raccolte |
 | C-8 | Telefono senza rete | La musica del telefono funziona; quella del server dice che non c'è rete, senza bloccare |
 | C-9 | Timer di spegnimento impostato dal telefono mentre sei in Auto | Si abbassa e si ferma |
+| C-10 | La tua musica → I tuoi mix | Gli stessi mix della Home: Riscopri e Per la macchina (con abbastanza ascolti), Mix casuale, mix degli artisti più ascoltati, dei decenni; ognuno parte e ha la sua copertina |
 
 ## PC (sito nel browser)
 

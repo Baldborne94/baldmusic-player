@@ -37,7 +37,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 
 ## Cosa fa l'app Android (telefono e tablet)
 
-- **Home** con accessi rapidi, raccolte, ascoltati di recente, i tuoi mix, aggiunti di recente, più ascoltati.
+- **Home** con accessi rapidi, raccolte, ascoltati di recente, i tuoi mix (Riscopri, Per la macchina, mix degli artisti e dei decenni: gli stessi in Android Auto), aggiunti di recente, più ascoltati.
 - **Brani che ti piacciono**, **playlist** e **raccolte**, per la musica del telefono e del server. Pressione lunga su un brano per selezionarne più di uno.
 - **Artisti riconosciuti** dai tag (anche "A feat. B"), album veri separati da singoli e brani sparsi, discografia per tipo (Album, EP, Dal vivo, Colonne sonore, Compilation), album su più dischi, elenchi con le lettere A–Z.
 - **Volume uguale tra i brani**: ReplayGain dai tag e, per i file che non l'hanno, volume misurato dall'app mentre il telefono è in carica.

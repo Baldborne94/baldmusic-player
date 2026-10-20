@@ -51,6 +51,7 @@ class ArtworkProvider : ContentProvider() {
         if (file.exists() && file.length() > 0L) return file
         // Chi chiama è Android Auto (un'altra app): le letture verso MediaStore
         // e la rete devono partire con l'identità di BaldMusic.
+        if (source == LocalCatalog.COVER) return cover(ctx, id, file)
         val token = Binder.clearCallingIdentity()
         val ok = try {
             when (source) {
@@ -65,6 +66,47 @@ class ArtworkProvider : ContentProvider() {
             Binder.restoreCallingIdentity(token)
         }
         return file.takeIf { ok }
+    }
+
+    /**
+     * La copertina vera di un brano riconosciuto: "<gruppo MusicBrainz>~<album di Android>".
+     * Se Cover Art Archive non ce l'ha, si tiene per sempre quella del file; senza rete si
+     * mostra quella del file ma non si ricorda, così la prossima volta si riprova.
+     */
+    private fun cover(ctx: Context, id: String, out: File): File? {
+        val mbid = id.substringBefore('~')
+        val albumId = id.substringAfter('~', "")
+        val token = Binder.clearCallingIdentity()
+        val found = try {
+            fetchCover(ctx, mbid, out)
+        } catch (e: Exception) {
+            null
+        } finally {
+            Binder.restoreCallingIdentity(token)
+        }
+        return when (found) {
+            true -> out
+            false -> cached(ctx, LocalCatalog.KEY, albumId)?.let { local ->
+                runCatching { writeAtomically(out) { stream -> local.inputStream().use { it.copyTo(stream) }; true } }
+                local
+            }
+            null -> cached(ctx, LocalCatalog.KEY, albumId)
+        }
+    }
+
+    /** true = scaricata, false = l'archivio non ce l'ha, null = non si sa (rete, errore). */
+    private fun fetchCover(ctx: Context, mbid: String, out: File): Boolean? {
+        if (!Regex("[0-9a-fA-F-]{36}").matches(mbid)) return false
+        // Cover Art Archive chiede di dire chi siamo.
+        val request = Request.Builder()
+            .url("https://coverartarchive.org/release-group/$mbid/front-500")
+            .header("User-Agent", "BaldMusic (https://github.com/Baldborne94/baldmusic-player)")
+            .build()
+        ctx.app.http.newCall(request).execute().use { res ->
+            if (res.code == 404) return false
+            if (!res.isSuccessful) return null
+            return writeAtomically(out) { res.body.byteStream().copyTo(it); true }.takeIf { it }
+        }
     }
 
     /** Mosaico 2×2 per playlist e raccolte: "local/1,local/2,…" sono le quattro copertine. */

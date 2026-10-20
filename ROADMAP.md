@@ -82,6 +82,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 - [x] **Pulizia della libreria**: doppioni tra le cartelle (si tiene una copia, le raccolte non perdono il brano) e anteprime di 30 secondi, da buttare nel cestino.
 
+- [x] **Raccolte che seguono le cartelle**: rinominando o spostando una cartella sul telefono la raccolta resta la stessa (nome, ordine, cuori e ascolti), anche se Android dà ai file ID nuovi.
 - [x] **Raccolte più comode**: riordinare trascinando, ordinare per titolo o artista, selezione multipla (aggiungi, togli, elimina), copertina a mosaico.
 
 - [x] **Brani nel cestino**: ripescare i brani buttati (entro 30 giorni) e rimetterli al loro posto nelle raccolte.
@@ -133,6 +134,8 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 ## Fase 7 — Rifinitura
 
 - [x] **Riconoscere i brani dal suono**: per i file mai passati da Picard l'app calcola l'impronta acustica (Chromaprint, come fpcalc) e chiede ad AcoustID titolo, artista, album, anno e traccia veri da MusicBrainz; le proposte si controllano cartella per cartella e valgono solo applicate, senza toccare i file.
+- [x] **Copertine vere per i brani riconosciuti**: dopo «Applica» album e brani mostrano la copertina del disco da Cover Art Archive (senza rete, o se l'archivio non ce l'ha, quella del file).
+- [x] **I tuoi mix anche in Android Auto**: «Riscopri» (brani che ti piacevano e non senti da due mesi), «Per la macchina» (i tuoi preferiti di sempre), mix casuale, degli artisti più ascoltati e dei decenni, uguali in Home e in Auto; cambiano ogni giorno.
 - [x] **Salute della libreria**: cartella per cartella, i file con tag da sistemare (album diverso per ogni brano, senza album, unico brano del disco, numero di traccia mancante o doppio, anno mancante o 1970) e perché un brano è tra gli sparsi; quanti non sono mai passati da Picard. I **brani di 30 secondi** li trova la Pulizia.
 - [x] **Backup della tua musica**: preferiti, playlist, raccolte e ascolti in un file (a mano, o in automatico in Download/BaldMusic, che resta dopo la disinstallazione); su un telefono nuovo i brani si ritrovano per cartella, titolo e durata.
 - [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.
