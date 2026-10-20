@@ -67,6 +67,8 @@ class BaldMusicApp : Application() {
             // Le cartelle diventano raccolte, e restano allineate ai file.
             onSongs = { songs -> userData.syncFolders(LocalCatalog.folderCollections(songs), songs.mapTo(HashSet()) { LocalCatalog.ref(it).id }) },
             plays = { userData.value.plays.mapValues { it.value.count } },
+            http = http,
+            acoustIdKey = { settings.acoustIdKey },
         )
         userData = UserData(this)
         personal = PersonalSource { userData.value }

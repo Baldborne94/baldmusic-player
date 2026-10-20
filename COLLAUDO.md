@@ -83,6 +83,22 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-5 | Salute della libreria | Le cartelle con album diversi per ogni brano in cima; numeri plausibili; tocco su un brano = i suoi tag; «Condividi l'elenco» manda il testo |
 | P-6 | Sistema una cartella con Picard sul PC e ricopiala | Dopo la rilettura gli album si formano e la cartella sparisce (o scende) dalla Salute |
 
+### Riconoscere i brani (dopo modifiche al riconoscimento)
+
+| # | Cosa fare | Cosa deve succedere |
+|---|-----------|---------------------|
+| N-1 | Impostazioni → Riconosci i brani, senza chiave | Spiega come avere la chiave; «Crea la chiave» apre acoustid.org; «Riconosci adesso» non c'è finché manca |
+| N-2 | Metti una chiave sbagliata e «Riconosci adesso» | Si ferma subito con «La chiave di AcoustID non vale» |
+| N-3 | Chiave giusta, «Riconosci adesso», poi esci dalla schermata | Il numero «ascoltati» cresce anche fuori dalla schermata; in un paio di secondi a brano |
+| N-4 | Una cartella-album scaricata coi tag sbagliati | Le proposte di quei brani hanno tutte lo stesso album, con numeri di traccia e anno giusti |
+| N-5 | La cartella Disney Italia | Ogni brano col suo film (colonna sonora), non una raccolta qualunque; titoli in italiano |
+| N-6 | «Applica quelli sicuri», poi Libreria → Album | Gli album riconosciuti compaiono tra gli album, coi brani in ordine; spariscono dai «brani sparsi»; i file sul telefono non sono cambiati |
+| N-7 | Tocca un brano proposto e scegli un altro disco | Va su quel disco ed è applicato |
+| N-8 | Applicati → «Annulla» su una cartella | Tornano i tag del file e le proposte tornano «da controllare» |
+| N-9 | Passa una cartella da Picard e ricopiala sul telefono | Quei brani usano i tag di Picard (non più le proposte) |
+| N-10 | Senza rete durante il riconoscimento | Si ferma con «Niente connessione», riprende da solo quando torna la rete in carica |
+| N-11 | Salute della libreria dopo aver applicato | Molti meno brani da sistemare; il link «Riconosci dal suono» porta qui |
+
 ### Backup (dopo modifiche a backup o alla tua musica)
 
 | # | Cosa fare | Cosa deve succedere |

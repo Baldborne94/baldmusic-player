@@ -1,0 +1,57 @@
+{
+  "status": "ok",
+  "results": [
+    {
+      "id": "a1b2c3d4-0000-4000-8000-000000000001",
+      "score": 0.97,
+      "recordings": [
+        {
+          "id": "rec-numb",
+          "title": "Numb",
+          "duration": 185.6,
+          "artists": [{"id": "f59c5520-5f46-4d2c-b2c4-822eabf53419", "name": "Linkin Park"}],
+          "releasegroups": [
+            {
+              "id": "rg-greatest",
+              "title": "Greatest Hits of the 2000s",
+              "type": "Album",
+              "secondarytypes": ["Compilation"],
+              "artists": [{"id": "89ad4ac3-39f7-470e-963a-56509c546377", "name": "Various Artists"}],
+              "releases": [{"id": "rel-gh", "date": {"year": 2009}, "medium_count": 2, "mediums": [{"position": 2, "track_count": 20, "tracks": [{"position": 7, "title": "Numb"}]}]}]
+            },
+            {
+              "id": "rg-meteora",
+              "title": "Meteora",
+              "type": "Album",
+              "artists": [{"id": "f59c5520-5f46-4d2c-b2c4-822eabf53419", "name": "Linkin Park"}],
+              "releases": [
+                {"id": "rel-meteora-deluxe", "date": {"year": 2013, "month": 1}, "medium_count": 2, "mediums": [{"position": 1, "track_count": 13, "tracks": [{"position": 13, "title": "Numb"}]}]},
+                {"id": "rel-meteora", "country": "US", "date": {"year": 2003, "month": 3, "day": 25}, "medium_count": 1, "mediums": [{"position": 1, "format": "CD", "track_count": 13, "tracks": [{"position": 13, "title": "Numb", "artists": [{"id": "f59c5520-5f46-4d2c-b2c4-822eabf53419", "name": "Linkin Park"}]}]}]}
+              ]
+            },
+            {
+              "id": "rg-live",
+              "title": "Live in Texas",
+              "type": "Album",
+              "secondarytypes": ["Live"],
+              "artists": [{"id": "f59c5520-5f46-4d2c-b2c4-822eabf53419", "name": "Linkin Park"}],
+              "releases": [{"id": "rel-live", "date": {"year": 2003}, "mediums": [{"position": 1, "tracks": [{"position": 10, "title": "Numb"}]}]}]
+            },
+            {
+              "id": "rg-single",
+              "title": "Numb",
+              "type": "Single",
+              "artists": [{"id": "f59c5520-5f46-4d2c-b2c4-822eabf53419", "name": "Linkin Park"}],
+              "releases": [{"id": "rel-single", "date": {"year": 2003, "month": 9}, "mediums": [{"position": 1, "tracks": [{"position": 1, "title": "Numb"}]}]}]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "score": 0.41,
+      "recordings": [{"id": "rec-altro", "title": "Altro", "duration": 185.0, "releasegroups": [{"id": "rg-x", "title": "X", "type": "Album"}]}]
+    }
+  ]
+}

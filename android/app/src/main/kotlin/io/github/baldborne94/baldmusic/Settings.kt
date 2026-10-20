@@ -47,6 +47,20 @@ class Settings(context: Context) {
         _crossfade.value = seconds
     }
 
+    /** La chiave dell'applicazione su AcoustID (acoustid.org/new-application) per riconoscere i brani dal suono. */
+    var acoustIdKey: String?
+        get() = prefs.getString(KEY_ACOUSTID, null)?.takeIf { it.isNotBlank() }
+        set(value) {
+            prefs.edit { if (value.isNullOrBlank()) remove(KEY_ACOUSTID) else putString(KEY_ACOUSTID, value.trim()) }
+        }
+
+    /** Perché l'ultimo riconoscimento si è fermato (chiave sbagliata, niente rete); null se è andato bene. */
+    var recognitionProblem: String?
+        get() = prefs.getString(KEY_RECOGNITION_PROBLEM, null)
+        set(value) {
+            prefs.edit { if (value == null) remove(KEY_RECOGNITION_PROBLEM) else putString(KEY_RECOGNITION_PROBLEM, value) }
+        }
+
     /** Qualcosa è cambiato (server, permessi): la libreria va riletta. */
     fun touch() {
         _changes.value++
@@ -97,5 +111,7 @@ class Settings(context: Context) {
         const val KEY_LYRICS = "lyrics_online"
         const val KEY_REPLAY_GAIN = "replay_gain"
         const val KEY_CROSSFADE = "crossfade"
+        const val KEY_ACOUSTID = "acoustid_key"
+        const val KEY_RECOGNITION_PROBLEM = "recognition_problem"
     }
 }
