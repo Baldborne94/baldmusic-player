@@ -125,6 +125,8 @@ fun HomeScreen(vm: PlayerViewModel) {
         item { UpdateBanner(vm) }
         // App appena installata o telefono nuovo: la tua musica si riprende dal backup.
         item { RestoreBanner(vm) }
+        // L'app si è chiusa da sola: proponi di mandare il resoconto.
+        item { CrashBanner() }
 
         if (needsPermission) {
             item {

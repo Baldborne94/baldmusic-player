@@ -75,6 +75,9 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-10 | Radio da un brano (⋮ → Radio) | Parte il brano e poi musica simile |
 | A-11 | Coda: scorri un brano a destra, sposta su/giù, «Svuota» | La coda cambia come atteso e si salva |
 | A-13 | Impostazioni → Testi da internet → «Scarica adesso», aspetta qualche minuto; poi modalità aereo col Wi‑Fi spento e apri il testo di un brano ascoltato spesso, di un preferito, di una raccolta | Il numero dei «testi salvati» cresce; senza rete i testi ci sono. Senza toccare niente lo stesso succede da solo di notte in carica col Wi‑Fi |
+| A-14 | Metti un album, salta all'ultimo brano e lascialo finire (Continua ad ascoltare attivo, ripeti spento) | Quando parte l'ultimo brano la coda si allunga con brani simili (stesso artista, periodo o cartella); finito l'album la musica continua, con la dissolvenza |
+| A-15 | Lo stesso con ripeti attivo, con il timer «a fine brano», con Continua ad ascoltare spento | Non si aggiunge niente: ripete / si ferma / si ferma a fine coda |
+| A-16 | Casuale su una raccolta, arriva all'ultimo brano | I brani aggiunti suonano dopo, non tornano quelli già sentiti |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 
@@ -126,6 +129,16 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | U-4 | Annulla la conferma di Android; un'altra volta esci con «indietro» durante il download e riapri | Torna «Aggiorna», si può riprovare; il download va avanti o finisce, non resta fermo a metà |
 | U-5 | «Più tardi» | L'avviso in Home sparisce fino alla versione dopo; in Impostazioni resta |
 | U-6 | Dopo l'aggiornamento | «Novità di BaldMusic» una volta sola, con le novità di tutte le versioni saltate |
+
+### Segnala un problema (dopo modifiche al resoconto)
+
+| # | Cosa fare | Cosa deve succedere |
+|---|-----------|---------------------|
+| P-1 | Impostazioni → «Segnala un problema» | Si apre la scelta di Android (mail, WhatsApp, Telegram…) con un testo: data, versione dell'app, telefono, «Nessuna chiusura improvvisa salvata», il registro dell'app |
+| P-2 | Un brano del server col PC spento, poi «Segnala un problema» | Nel resoconto, tra gli «Ultimi problemi annotati», l'errore di riproduzione col titolo del brano; negli indirizzi niente `t=`, `s=`, `u=` con valori (si vede `t=…`) |
+| P-3 | Dopo una chiusura improvvisa dell'app, riaprila | In Home «BaldMusic si è chiusa da sola» con «Manda il resoconto» e «Non ora»; dopo uno dei due non ricompare fino alla prossima chiusura |
+
+Il resoconto mandalo a chi sviluppa l'app (o incollalo nella conversazione con Claude): dice cosa correggere.
 
 ## Tablet
 
@@ -195,6 +208,8 @@ dell'unità principale sul telefono.
 | C-13 | Con la manopola (`-i rotary`): sfoglia, apri, torna indietro, metti in pausa | Si arriva a tutto senza toccare lo schermo |
 | C-14 | Voce: «metti Brani che ti piacciono su BaldMusic», «metti Per la macchina su BaldMusic» | Suonano i preferiti / il mix |
 | C-15 | Togli il cavo durante l'ascolto, ricollega | Si ferma; ricollegando riparte dallo stesso punto |
+| C-16 | Tasto del timer nella barra (accanto a cuore, casuale, ripeti): toccalo più volte | Spento → «Si ferma tra 15 min» → 30 → 60 → «Si ferma a fine brano» → spento; il nome scende coi minuti; a tempo scaduto sfuma e si ferma; nell'app si vede lo stesso timer |
+| C-17 | Finisce una raccolta mentre guidi | La musica continua con brani simili (Continua ad ascoltare) |
 
 ## PC (sito nel browser)
 

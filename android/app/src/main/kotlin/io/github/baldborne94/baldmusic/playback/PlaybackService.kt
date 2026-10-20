@@ -31,6 +31,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.R
+import io.github.baldborne94.baldmusic.core.library.Autoplay
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -40,6 +42,7 @@ import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
 import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.library.SleepTimer
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
@@ -126,7 +129,21 @@ class PlaybackService : MediaLibraryService() {
                 updateLikeButton()
             }
         }
-        scope.launch { app.sleepTimer.collect { scheduleSleep(it) } }
+        scope.launch {
+            app.sleepTimer.collect {
+                scheduleSleep(it)
+                updateLikeButton()
+                continueAfterQueue()
+            }
+        }
+        // Il tasto del timer dice quanto manca: si aggiorna ogni mezzo minuto mentre il timer corre.
+        scope.launch {
+            while (true) {
+                delay(30_000)
+                val end = app.sleepTimer.value
+                if (end != null && end != BaldMusicApp.SLEEP_END_OF_TRACK) updateLikeButton()
+            }
+        }
         scope.launch { app.settings.replayGain.collect { applyVolume() } }
         scope.launch {
             while (true) {
@@ -234,6 +251,7 @@ class PlaybackService : MediaLibraryService() {
                 player.pause()
                 app.sleepTimer.value = null
             }
+            continueAfterQueue()
         }
 
         override fun onEvents(player: Player, events: Player.Events) {
@@ -273,6 +291,15 @@ class PlaybackService : MediaLibraryService() {
             if (!isPlaying) saveLast()
         }
 
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            // Un brano che non parte non chiude l'app, ma va nel resoconto di "Segnala un problema".
+            val item = player.currentMediaItem
+            app.problems.note(
+                "Riproduzione: ${error.errorCodeName} ${error.message.orEmpty()} ${error.cause?.let { "(${it.javaClass.simpleName}: ${it.message})" }.orEmpty()} " +
+                    "su «${item?.mediaMetadata?.title ?: "?"}» [${item?.mediaId ?: "?"}]",
+            )
+        }
+
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             // Brani aggiunti, tolti o spostati nella coda.
             if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
@@ -281,6 +308,7 @@ class PlaybackService : MediaLibraryService() {
                     if (player.shuffleModeEnabled) shuffleStartingHere()
                 }
                 saveLast()
+                continueAfterQueue()
             }
         }
 
@@ -293,6 +321,7 @@ class PlaybackService : MediaLibraryService() {
         override fun onRepeatModeChanged(repeatMode: Int) {
             updateLikeButton()
             saveLast()
+            continueAfterQueue()
         }
     }
 
@@ -504,7 +533,7 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    /** Cuore, casuale e ripeti accanto ai comandi: nella notifica e in Android Auto. */
+    /** Cuore, casuale, ripeti e timer accanto ai comandi: nella notifica e in Android Auto. */
     private fun updateLikeButton() {
         val item = player.currentMediaItem
         val liked = item != null && app.userData.isLiked(item.mediaId)
@@ -532,7 +561,13 @@ class PlaybackService : MediaLibraryService() {
             )
             .setSessionCommand(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
             .build()
-        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(heart, shuffle, repeat))
+        // Timer di spegnimento anche dall'auto: un tocco per passo (SleepTimer), il nome dice quanto manca.
+        val timer = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+            .setCustomIconResId(R.drawable.ic_timer)
+            .setDisplayName(SleepTimer.label(app.sleepTimer.value, System.currentTimeMillis()))
+            .setSessionCommand(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
+            .build()
+        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(heart, shuffle, repeat, timer))
     }
 
     private fun rootItem(id: String) = MediaItem.Builder()
@@ -573,6 +608,7 @@ class PlaybackService : MediaLibraryService() {
                 .add(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
+                .add(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -600,6 +636,10 @@ class PlaybackService : MediaLibraryService() {
                     Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
                     else -> Player.REPEAT_MODE_OFF
                 }
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == CMD_SLEEP) {
+                app.sleepTimer.value = SleepTimer.next(app.sleepTimer.value, System.currentTimeMillis())
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -732,6 +772,51 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /** L'ultimo brano per cui si è già chiesto il seguito: una richiesta sola per brano. */
+    private var continuedAfter: String? = null
+
+    /**
+     * "Continua ad ascoltare" ([Autoplay]): parte l'ultimo brano della coda e dopo non c'è
+     * niente, allora si aggiungono brani simili (la radio del brano, o brani a caso del server).
+     * Si aggiungono subito, così la dissolvenza ha già il brano dopo.
+     */
+    private fun continueAfterQueue() {
+        val last = player.currentMediaItem ?: return
+        val needed = Autoplay.needed(
+            enabled = app.settings.continueListening,
+            hasNext = player.hasNextMediaItem(),
+            repeatOff = player.repeatMode == Player.REPEAT_MODE_OFF,
+            endOfTrackTimer = app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK,
+        )
+        if (!needed) return
+        val key = "${player.currentMediaItemIndex}|${last.mediaId}"
+        if (continuedAfter == key) return
+        continuedAfter = key
+        val source = Autoplay.source(last.mediaId) ?: return
+        scope.launch {
+            val nodes = runCatching { tree.playableIn(source.toString()) }.getOrDefault(emptyList())
+            // Nel frattempo è cambiato qualcosa (salto, coda nuova): niente.
+            if (player.currentMediaItem?.mediaId != last.mediaId || player.hasNextMediaItem()) return@launch
+            val queue = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+            val chosen = Autoplay.pick(nodes.map { it.mediaId }, queue).map { nodes[it] }
+            if (chosen.isEmpty()) return@launch
+            val first = player.mediaItemCount
+            player.addMediaItems(chosen.toItems())
+            // In casuale i brani nuovi vanno dopo quello in corso, non sparsi anche prima.
+            if (player.shuffleModeEnabled) {
+                val timeline = player.currentTimeline
+                val order = ArrayList<Int>()
+                var i = timeline.getFirstWindowIndex(true)
+                while (i != C.INDEX_UNSET) {
+                    if (i < first) order += i
+                    i = timeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, true)
+                }
+                order += first until player.mediaItemCount
+                player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order.toIntArray(), System.nanoTime()))
+            }
+        }
+    }
+
     /**
      * Ordine casuale che parte dal brano in corso: ExoPlayer ne pesca uno qualunque, e con
      * "ripeti" spento i brani che nell'ordine stanno prima di quello in corso non suonerebbero mai.
@@ -767,5 +852,6 @@ class PlaybackService : MediaLibraryService() {
         const val CMD_TOGGLE_LIKE = "io.github.baldborne94.baldmusic.TOGGLE_LIKE"
         const val CMD_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
         const val CMD_REPEAT = "io.github.baldborne94.baldmusic.REPEAT"
+        const val CMD_SLEEP = "io.github.baldborne94.baldmusic.SLEEP"
     }
 }

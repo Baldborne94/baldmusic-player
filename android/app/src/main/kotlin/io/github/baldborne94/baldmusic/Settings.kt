@@ -47,6 +47,13 @@ class Settings(context: Context) {
         _crossfade.value = seconds
     }
 
+    /** "Continua ad ascoltare": finita la coda, musica simile invece di fermarsi. */
+    var continueListening: Boolean
+        get() = prefs.getBoolean(KEY_CONTINUE, true)
+        set(value) {
+            prefs.edit { putBoolean(KEY_CONTINUE, value) }
+        }
+
     /** La chiave dell'applicazione su AcoustID (acoustid.org/new-application) per riconoscere i brani dal suono. */
     var acoustIdKey: String?
         get() = prefs.getString(KEY_ACOUSTID, null)?.takeIf { it.isNotBlank() }
@@ -111,6 +118,7 @@ class Settings(context: Context) {
         const val KEY_LYRICS = "lyrics_online"
         const val KEY_REPLAY_GAIN = "replay_gain"
         const val KEY_CROSSFADE = "crossfade"
+        const val KEY_CONTINUE = "continue_listening"
         const val KEY_ACOUSTID = "acoustid_key"
         const val KEY_RECOGNITION_PROBLEM = "recognition_problem"
     }
