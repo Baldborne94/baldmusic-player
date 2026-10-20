@@ -14,6 +14,7 @@ import io.github.baldborne94.baldmusic.data.Backups
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.LyricsWorker
 import io.github.baldborne94.baldmusic.data.UserData
+import io.github.baldborne94.baldmusic.diagnostics.Problems
 import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.update.Updater
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,9 @@ class BaldMusicApp : Application() {
             .build()
     }
 
+    /** Chiusure improvvise e problemi annotati, per "Segnala un problema". */
+    val problems: Problems by lazy { Problems(this) }
+
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
@@ -61,6 +65,8 @@ class BaldMusicApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Per primo: se qualcosa chiude l'app, il resoconto si salva ("Segnala un problema").
+        problems.install()
         settings = Settings(this)
         // Tag letti dai file: si ricarica la libreria, come quando cambiano le impostazioni.
         local = LocalSource(
@@ -99,7 +105,7 @@ class BaldMusicApp : Application() {
     fun subsonic(): SubsonicClient? = settings.credentials?.let { SubsonicClient(it, http) }
 
     companion object {
-        const val SLEEP_END_OF_TRACK = -1L
+        const val SLEEP_END_OF_TRACK = io.github.baldborne94.baldmusic.core.library.SleepTimer.END_OF_TRACK
     }
 }
 

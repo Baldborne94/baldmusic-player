@@ -109,6 +109,8 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 - [ ] Prova completa con il **Desktop Head Unit** (l'emulatore di Android Auto) e in macchina: guida per installarlo sul PC, `android/tools/avvia-dhu.cmd` e checklist (avvio a freddo, ripresa, voce, cuore, timer, senza rete, notte, manopola, librerie grandi) pronte in `COLLAUDO.md`; resta da farla.
 - [x] Elenchi lunghi: Auto mostra pochi elementi per volta; artisti e album raggruppati per lettera, "Più ascoltati" e "Ascoltati di recente" in cima.
 - [x] Tasti **casuale** e **ripeti** accanto al cuore.
+- [x] **Timer di spegnimento dall'auto**: un tasto nella barra, un tocco per passo (15, 30, 60 minuti, fine brano, spento).
+- [x] **Continua ad ascoltare**: finita una raccolta o un album la musica va avanti con brani simili invece di fermarsi (si spegne nelle Impostazioni).
 - [x] Discografia divisa per tipo (fase 2) anche in Auto.
 
 ## Fase 5 — Tablet e PC
@@ -142,6 +144,7 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 - [x] **Testi anche senza rete**: in carica col Wi‑Fi l'app scarica in anticipo i testi dei brani più ascoltati, dei preferiti, delle raccolte e poi di tutto il telefono.
 - [x] **Note di versione e aggiornamenti dall'app**: ogni APK pubblica in `apk-latest` anche `version.json` con le novità (i titoli delle PR unite); l'app avvisa in Home, scarica e installa sopra con la conferma di Android, e dopo l'aggiornamento mostra cosa c'è di nuovo.
 - [ ] Accessibilità: TalkBack, contrasto, dimensione del testo.
+- [x] **Segnala un problema**: l'app salva le chiusure improvvise e annota i brani che non partono; dalle Impostazioni (o dal riquadro in Home dopo una chiusura) si manda un resoconto senza password, per correggere quello che si trova provando l'app.
 
 ## Cosa non faremo
 

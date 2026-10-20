@@ -115,6 +115,8 @@ fun SettingsScreen(vm: PlayerViewModel) {
         SettingsLink("Pulizia della libreria", "Doppioni e anteprime di 30 secondi da buttare") { ui.push(Screen.Cleanup) }
         SettingsLink("Salute della libreria", "Quali file hanno i tag da sistemare, cartella per cartella") { ui.push(Screen.Health) }
         SettingsLink("Riconosci i brani", "Titolo, artista, album e anno veri dal suono (AcoustID), senza toccare i file") { ui.push(Screen.Recognize) }
+        val sendReport = rememberSendProblemReport()
+        SettingsLink("Segnala un problema", "Manda cosa è successo (errori, versione, telefono; niente password) a chi sviluppa l'app") { sendReport() }
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             SettingsLink("Brani nel cestino", "Ripesca i brani buttati negli ultimi 30 giorni") { ui.push(Screen.Trash) }
         }
@@ -132,6 +134,22 @@ fun SettingsScreen(vm: PlayerViewModel) {
         if (lyricsOnline) OfflineLyrics()
         ReplayGainSetting()
         CrossfadeSetting()
+        var continueListening by remember { mutableStateOf(context.app.settings.continueListening) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Continua ad ascoltare", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Finita una raccolta, un album o una playlist, va avanti con musica simile invece di fermarsi (anche in Android Auto).",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            androidx.compose.material3.Switch(
+                checked = continueListening,
+                onCheckedChange = { continueListening = it; context.app.settings.continueListening = it },
+                colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
+            )
+        }
         Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds

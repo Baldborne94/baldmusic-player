@@ -44,6 +44,8 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 - **Dissolvenza tra i brani** come i DJ (3–12 secondi, mai dentro lo stesso album).
 - **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci; quelli dei brani che ascolti di più, dei preferiti e delle raccolte si scaricano prima, in carica col Wi‑Fi, e ci sono anche senza rete.
 - **Radio** da qualsiasi brano, **timer di spegnimento**, **coda** riordinabile che si salva per intero e riparte da dov'era.
+- **Continua ad ascoltare**: finita una raccolta, un album o una playlist, la musica va avanti con brani simili invece di fermarsi (si spegne nelle Impostazioni).
+- **Segnala un problema** (Impostazioni): se qualcosa non va, mandi un resoconto (errori, versione, telefono; niente password) a chi sviluppa l'app. Se l'app si chiude da sola, lo propone la Home.
 - **Pulizia della libreria**: doppioni tra le cartelle e anteprime di 30 secondi nel cestino di Android (recuperabili per 30 giorni da *Brani nel cestino*), senza perdere il brano nelle raccolte.
 - **Informazioni sul brano** (menu ⋮) e **Salute della libreria** (Impostazioni): i tag come li legge l'app, e cartella per cartella quali file hanno i tag da sistemare e perché un brano è finito tra gli sparsi.
 - **Riconosci i brani dal suono** (Impostazioni): per i file scaricati coi tag sbagliati l'app ascolta i primi due minuti e trova con [AcoustID](https://acoustid.org) e MusicBrainz titolo, artista, album, anno e numero di traccia veri. Le proposte si controllano cartella per cartella e si applicano (o si annullano) senza toccare i file. Serve una chiave gratuita di AcoustID, una volta.
@@ -63,7 +65,8 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 ## In macchina
 
 - Le schede **La tua musica**, **Telefono** e **Server** raccolgono raccolte, preferiti, playlist, album, artisti e mix; gli elenchi lunghi sono divisi per lettera.
-- Accanto ai comandi: **cuore**, **casuale** e **ripeti**.
+- Accanto ai comandi: **cuore**, **casuale**, **ripeti** e **timer di spegnimento** (un tocco per passo: 15, 30, 60 minuti, fine brano, spento).
+- Finita una raccolta o un album la musica continua con brani simili.
 - Toccando un brano parte il suo album (o la sua raccolta) da quel punto.
 - La 🔍 cerca in tutte e due le librerie. Funzionano anche i comandi vocali: *"Ok Google, metti Lucio Dalla su BaldMusic"*, *"metti la raccolta Movie Soundtracks su BaldMusic"*.
 - Alla riaccensione dell'auto riparte la stessa coda, dallo stesso punto.
