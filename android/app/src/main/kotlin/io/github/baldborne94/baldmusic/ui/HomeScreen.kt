@@ -95,7 +95,7 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (recentAdded) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.RECENT}")
     val newAlbums = recentAdded?.filter { it.kind != Kind.TRACK }
     val (allAlbums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
-    val (decades) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.DECADES}")
+    val (mixItems) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.MIXES}", lib.plays.size to lib.liked.size)
     val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
@@ -170,22 +170,8 @@ fun HomeScreen(vm: PlayerViewModel) {
             item { Carousel(recent, 140.dp) { ui.open(it.mediaId, it.title()) } }
         }
 
-        // I tuoi mix: si generano dalla tua musica, come i Daily Mix.
-        val mixes = buildList {
-            add(Mix("Mix casuale", "Tutta la tua musica, mescolata", "${LocalCatalog.KEY}/${LocalCatalog.SHUFFLE}"))
-            if (!liked.isNullOrEmpty()) add(Mix("Preferiti in shuffle", "I brani che ti piacciono", "${PersonalSource.KEY}/${PersonalSource.LIKED}"))
-            if (!top.isNullOrEmpty()) add(Mix("In loop", "Quelli che ascolti di più", "${PersonalSource.KEY}/${PersonalSource.TOP}"))
-            // Un mix per ognuno dei tuoi artisti più ascoltati (brani del telefono).
-            lib.plays.values.filter { it.track.id.startsWith("${LocalCatalog.KEY}/") }
-                .groupBy { it.track.artist }
-                .filterKeys { !it.isNullOrBlank() }
-                .entries.sortedByDescending { e -> e.value.sumOf { it.count } }
-                .take(4)
-                .forEach { (artist, _) ->
-                    add(Mix("Mix $artist", "$artist e musica simile", "${LocalCatalog.KEY}/${LocalCatalog.ARTIST_MIX}/${java.net.URLEncoder.encode(artist, "UTF-8")}"))
-                }
-            decades.orEmpty().forEach { add(Mix("Mix ${it.title()}", it.subtitle().orEmpty(), it.mediaId)) }
-        }
+        // I tuoi mix: li compone la libreria (PersonalSource), gli stessi di Android Auto.
+        val mixes = mixItems.orEmpty().map { Mix(it.title(), it.subtitle().orEmpty(), it.mediaId) }
         item { SectionHeader("I tuoi mix") }
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {

@@ -72,6 +72,62 @@ data class UserLibrary(
      * stessa istanza se non cambia niente.
      */
     fun syncFolders(folders: List<FolderCollection>, present: Set<String>, now: Long, newId: () -> String): UserLibrary {
+        val base = followMovedFolders(folders)
+        val synced = base.syncExisting(folders, present, now, newId)
+        return if (synced === base && base === this) this else synced
+    }
+
+    /**
+     * Cartelle rinominate o spostate ("Music/Disney" → "Music/Disney Italia"): una raccolta
+     * la cui cartella non c'è più segue la cartella nuova che ha almeno metà dei suoi brani,
+     * con il suo ordine e il nome (se non l'avevi cambiato). Se Android ha dato ai file ID
+     * nuovi (copia e cancella invece di rinominare), i brani si ritrovano per titolo e durata e
+     * preferiti, playlist e ascolti passano ai nuovi ID; i brani tolti a mano restano fuori
+     * solo se l'ID è lo stesso. Così non resta una raccolta vuota accanto a una nuova.
+     */
+    private fun followMovedFolders(folders: List<FolderCollection>): UserLibrary {
+        val current = folders.mapTo(HashSet()) { it.folder }
+        val used = playlists.mapNotNullTo(HashSet()) { it.folder }
+        val fresh = folders.filter { it.folder !in used && it.folder !in ignoredFolders && it.tracks.isNotEmpty() }
+        val orphans = playlists.filter { it.folder != null && it.folder !in current && it.tracks.any { t -> t.id.startsWith(LOCAL_TRACK) } }
+        if (fresh.isEmpty() || orphans.isEmpty()) return this
+
+        fun sameFile(a: TrackRef, b: TrackRef) = a.id == b.id || (
+            ArtistNames.key(a.title) == ArtistNames.key(b.title) &&
+                a.durationMs != null && b.durationMs != null && kotlin.math.abs(a.durationMs - b.durationMs) <= SAME_FILE_MS
+            )
+
+        // Le coppie raccolta → cartella, dalla più somigliante; ogni cartella ne prende una sola.
+        data class Match(val playlist: UserPlaylist, val folder: FolderCollection, val found: Map<String, TrackRef>)
+        val matches = orphans.flatMap { pl ->
+            val local = pl.tracks.filter { it.id.startsWith(LOCAL_TRACK) }
+            fresh.mapNotNull { f ->
+                val found = local.mapNotNull { t -> f.tracks.firstOrNull { sameFile(t, it) }?.let { t.id to it } }.toMap()
+                Match(pl, f, found).takeIf { found.size * 2 >= local.size }
+            }
+        }.sortedByDescending { it.found.size }
+        val taken = HashSet<String>()
+        val claimed = HashSet<String>()
+        val moves = matches.filter { m -> m.playlist.id !in taken && m.folder.folder !in claimed }.onEach { m ->
+            taken += m.playlist.id
+            claimed += m.folder.folder
+        }
+        if (moves.isEmpty()) return this
+
+        // ID nuovi dei file: valgono per tutta la tua musica, non solo per la raccolta.
+        val newIds = moves.flatMap { m -> m.found.filter { (old, new) -> old != new.id }.entries }.associate { it.key to it.value }
+        val renamed = mergeTracks(newIds)
+        val byPlaylist = moves.associateBy { it.playlist.id }
+        return renamed.copy(
+            playlists = renamed.playlists.map { pl ->
+                val m = byPlaylist[pl.id] ?: return@map pl
+                val oldName = pl.folder!!.substringAfterLast('/')
+                pl.copy(folder = m.folder.folder, name = if (pl.name == oldName) m.folder.name else pl.name)
+            },
+        )
+    }
+
+    private fun syncExisting(folders: List<FolderCollection>, present: Set<String>, now: Long, newId: () -> String): UserLibrary {
         var changed = false
         val byFolder = folders.associateBy { it.folder }
         val updated = playlists.map { pl ->
@@ -236,6 +292,9 @@ data class UserLibrary(
         const val MAX_SEARCHES = 10
         const val MAX_PLAYS = 2000
         private const val LOCAL_TRACK = "local/track/"
+
+        /** Lo stesso file con un ID nuovo: stesso titolo e la stessa durata, a meno di un paio di secondi. */
+        private const val SAME_FILE_MS = 2_000L
 
         /** L'ID di un brano senza il contenitore da cui è stato scelto. */
         fun baseId(trackId: String): String = MediaId.parse(trackId)?.copy(parent = null)?.toString() ?: trackId

@@ -167,7 +167,8 @@ object Recognition {
 
     /**
      * Il brano coi tag riconosciuti al posto di quelli del file. Restano del file il
-     * ReplayGain, i nomi di ordinamento e il titolo del disco, che AcoustID non dà.
+     * ReplayGain, i nomi di ordinamento e il titolo del disco, che AcoustID non dà; la
+     * copertina diventa quella del disco riconosciuto ([LocalTrack.coverMbid]).
      */
     fun applyTo(track: LocalTrack, tags: FileTags): LocalTrack = track.withTags(
         tags.copy(
@@ -176,5 +177,5 @@ object Recognition {
             albumArtistSort = track.albumArtistSort,
             discSubtitle = track.discSubtitle,
         ),
-    )
+    ).copy(coverMbid = tags.releaseGroupMbid)
 }

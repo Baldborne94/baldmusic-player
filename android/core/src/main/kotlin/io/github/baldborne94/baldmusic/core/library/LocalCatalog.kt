@@ -42,6 +42,11 @@ data class LocalTrack(
     /** Nomi di ordinamento di Picard ("Beatles, The"): decidono l'ordine alfabetico. */
     val artistSort: String? = null,
     val albumArtistSort: String? = null,
+    /**
+     * Il gruppo di pubblicazione MusicBrainz di un riconoscimento applicato (AcoustID): la
+     * copertina vera arriva da Cover Art Archive. null = la copertina è quella del file.
+     */
+    val coverMbid: String? = null,
 ) {
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
@@ -172,7 +177,7 @@ class LocalCatalog(
                     folder.substringAfterLast('/').ifEmpty { folder },
                     Kind.FOLDER,
                     subtitle = "${folder.substringBeforeLast('/', "")}${if (folder.contains('/')) " · " else ""}${count(tracks.size)}",
-                    artwork = "$KEY/${tracks.first().albumId}",
+                    artwork = artworkOf(tracks.first()),
                 )
             }
             RADIO -> {
@@ -230,13 +235,13 @@ class LocalCatalog(
                 } else {
                     listOfNotNull(
                         page.loose.takeIf { it.isNotEmpty() }?.let { s ->
-                            LibraryNode(MediaId(KEY, ARTIST_SINGLES, key).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}", group = OTHER_GROUP)
+                            LibraryNode(MediaId(KEY, ARTIST_SINGLES, key).toString(), "Singoli e brani sparsi", Kind.SECTION, subtitle = count(s.size), artwork = artworkOf(s.first()), group = OTHER_GROUP)
                         },
                     )
                 }
                 albums + own + listOfNotNull(
                     page.appearsOn.takeIf { it.isNotEmpty() }?.let { s ->
-                        LibraryNode(MediaId(KEY, ARTIST_APPEARS, key).toString(), "Compare in", Kind.SECTION, subtitle = count(s.size), artwork = "$KEY/${s.first().albumId}", group = OTHER_GROUP)
+                        LibraryNode(MediaId(KEY, ARTIST_APPEARS, key).toString(), "Compare in", Kind.SECTION, subtitle = count(s.size), artwork = artworkOf(s.first()), group = OTHER_GROUP)
                     },
                 )
             }
@@ -291,7 +296,7 @@ class LocalCatalog(
         kind = Kind.ALBUM,
         subtitle = if (a.various) "Artisti vari" else a.owner?.let(ix::name),
         artist = if (a.various) null else a.owner?.let(ix::name),
-        artwork = "$KEY/${a.tracks.first().albumId}",
+        artwork = artworkOf(a.tracks.first()),
         year = a.tracks.maxOf { it.shownYear }.takeIf { it > 0 },
     )
 
@@ -318,7 +323,7 @@ class LocalCatalog(
                 page.albums.size.takeIf { it > 0 }?.let { if (it == 1) "1 album" else "$it album" },
                 count(songs),
             ).joinToString(" · "),
-            artwork = "$KEY/${first.albumId}",
+            artwork = artworkOf(first),
             gridChildren = true,
             group = ArtistNames.letter(ix.sortName(key)),
         ) to ArtistNames.sortKey(ix.sortName(key))
@@ -334,7 +339,7 @@ class LocalCatalog(
         subtitle = t.artist,
         artist = t.artist,
         album = t.album,
-        artwork = "$KEY/${t.albumId}",
+        artwork = artworkOf(t),
         durationMs = t.durationMs,
         trackNumber = t.track.takeIf { it > 0 },
         discNumber = t.disc.takeIf { it > 0 },
@@ -587,13 +592,23 @@ class LocalCatalog(
             return if (parts.size >= 2 && parts[0] != "Android") "${parts[0]}/${parts[1]}" else null
         }
 
+        /** Sorgente delle copertine di Cover Art Archive (vedi [artworkOf]). */
+        const val COVER = "cover"
+
+        /**
+         * La copertina del brano: quella vera di Cover Art Archive se il brano è stato
+         * riconosciuto ("cover/<gruppo MusicBrainz>~<album di Android>": senza rete o se
+         * l'archivio non ce l'ha, l'app ripiega su quella del file), altrimenti quella del file.
+         */
+        fun artworkOf(t: LocalTrack): String = t.coverMbid?.let { "$COVER/$it~${t.albumId}" } ?: "$KEY/${t.albumId}"
+
         /** Il brano come lo ricordano playlist e raccolte. */
         fun ref(t: LocalTrack) = TrackRef(
             id = MediaId.track(KEY, "${t.id}", null).toString(),
             title = t.title,
             artist = t.artist,
             album = t.album,
-            artwork = "$KEY/${t.albumId}",
+            artwork = artworkOf(t),
             durationMs = t.durationMs,
         )
 

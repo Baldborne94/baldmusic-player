@@ -161,8 +161,8 @@ class MediaIdMoreTest {
             playlists = listOf(UserPlaylist("c", "Disney", folder = "Music/Disney"), UserPlaylist("p", "Mia"), UserPlaylist("q", "Altra")),
         )
         val sections = PersonalSource { lib }.sections()
-        assertEquals(listOf("Raccolte", "Brani che ti piacciono", "Le tue playlist", "Ascoltati di recente", "I più ascoltati"), sections.map { it.title })
-        assertEquals(listOf("1 raccolta", "1 brano", "2 playlist", null, null), sections.map { it.subtitle })
+        assertEquals(listOf("Raccolte", "Brani che ti piacciono", "I tuoi mix", "Le tue playlist", "Ascoltati di recente", "I più ascoltati"), sections.map { it.title })
+        assertEquals(listOf("1 raccolta", "1 brano", null, "2 playlist", null, null), sections.map { it.subtitle })
     }
 
     @Test
