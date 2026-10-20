@@ -86,4 +86,4 @@ Configurazione una tantum del repository:
 
 ## Licenza
 
-[MIT](LICENSE)
+[MIT](LICENSE), tranne [`Chromaprint.kt`](android/core/src/main/kotlin/io/github/baldborne94/baldmusic/core/acoustid/Chromaprint.kt): è il porting in Kotlin di [Chromaprint](https://github.com/acoustid/chromaprint) (MIT, Lukas Lalinsky) con la FFT di KISS FFT (BSD-3-Clause) e il ricampionatore di FFmpeg (LGPL 2.1), quindi quel file è sotto **LGPL 2.1**. I dettagli sono in testa al file.
