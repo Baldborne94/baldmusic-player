@@ -74,6 +74,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-9 | Testo: «In riproduzione» → microfono; poi lo stesso senza rete e di nuovo con la rete | Testo sincronizzato; toccando una riga si salta lì; senza rete «non disponibile», tornata la rete il testo arriva |
 | A-10 | Radio da un brano (⋮ → Radio) | Parte il brano e poi musica simile |
 | A-11 | Coda: scorri un brano a destra, sposta su/giù, «Svuota» | La coda cambia come atteso e si salva |
+| A-13 | Impostazioni → Testi da internet → «Scarica adesso», aspetta qualche minuto; poi modalità aereo col Wi‑Fi spento e apri il testo di un brano ascoltato spesso, di un preferito, di una raccolta | Il numero dei «testi salvati» cresce; senza rete i testi ci sono. Senza toccare niente lo stesso succede da solo di notte in carica col Wi‑Fi |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 
@@ -138,6 +139,45 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 
 ## Android Auto (in macchina o col Desktop Head Unit)
 
+### Android Auto sul PC (Desktop Head Unit)
+
+Il **Desktop Head Unit** (DHU) è lo schermo dell'auto in una finestra del PC: si prova tutto senza
+scendere in garage, con lo stesso Android Auto del telefono. Serve una volta sola:
+
+1. **Strumenti sul PC.** Scarica da <https://developer.android.com/studio#command-tools> gli «strumenti
+   a riga di comando» per Windows, estrai lo zip in `%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest`
+   (dentro devono esserci `bin` e `lib`), poi in un prompt:
+   `"%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest\bin\sdkmanager" "platform-tools" "extras;google;auto"`
+   (accetta le licenze con `y`). Con Android Studio: SDK Manager → SDK Tools → «Android Auto Desktop Head Unit Emulator».
+2. **Telefono.** Impostazioni → Informazioni sul telefono → tocca 7 volte «Numero build» → in Opzioni
+   sviluppatore attiva **Debug USB**.
+3. **Android Auto in modalità sviluppatore** (se non l'hai già fatto per installare BaldMusic, vedi
+   README): impostazioni di Android Auto → tocca 10 volte **Versione** → menu ⋮ → **Impostazioni
+   sviluppatore** → **Origini sconosciute** attivo. In «Auto connesse in precedenza» lascia attivo
+   «Aggiungi nuove auto ad Android Auto».
+
+Ogni volta:
+
+1. Sul telefono: Android Auto → menu ⋮ → **Avvia server unità principale** (compare una notifica).
+2. Collega il telefono col cavo, sbloccalo (la prima volta accetta «Consenti debug USB»).
+3. Sul PC fai doppio clic su `android/tools/avvia-dhu.cmd` (fa `adb forward tcp:5277 tcp:5277` e
+   apre il DHU). La prima volta accetta le condizioni sul telefono.
+
+Nella finestra nera del DHU (la console) si scrive:
+
+| Comando o tasto | A cosa serve |
+|-----------------|--------------|
+| `M` o `mic begin` | Il tasto della voce sul volante: parli nel microfono del PC («metti la raccolta Movie Soundtracks su BaldMusic») |
+| `N`, `day`, `night` | Schermo di giorno / di notte |
+| `screenshot nome.png` | Una foto dello schermo dell'auto, da allegare se qualcosa non torna |
+| `android\tools\avvia-dhu.cmd -i rotary` (da un prompt) | Avvio con la manopola invece del tocco (molte auto ce l'hanno): frecce e Invio |
+| `quit` | Chiude |
+
+Se il DHU non si collega: `adb kill-server`, scollega e ricollega il cavo, riavvia il server
+dell'unità principale sul telefono.
+
+### Prove in Auto
+
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
 | C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto; con brani del server in coda e il PC spento riparte in pochi secondi con i soli brani del telefono |
@@ -150,6 +190,11 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | C-8 | Telefono senza rete | La musica del telefono funziona; quella del server dice che non c'è rete, senza bloccare |
 | C-9 | Timer di spegnimento impostato dal telefono mentre sei in Auto | Si abbassa e si ferma |
 | C-10 | La tua musica → I tuoi mix | Gli stessi mix della Home: Riscopri e Per la macchina (con abbastanza ascolti), Mix casuale, mix degli artisti più ascoltati, dei decenni; ognuno parte e ha la sua copertina |
+| C-11 | Telefono con migliaia di brani: Telefono → Artisti, poi Tutti i brani, poi un artista; torna indietro e riapri | La prima volta in un paio di secondi al massimo, riaprendo subito; scorrendo veloce non si blocca |
+| C-12 | Schermo di notte (`night`) | Testi e icone leggibili, copertine non bruciate |
+| C-13 | Con la manopola (`-i rotary`): sfoglia, apri, torna indietro, metti in pausa | Si arriva a tutto senza toccare lo schermo |
+| C-14 | Voce: «metti Brani che ti piacciono su BaldMusic», «metti Per la macchina su BaldMusic» | Suonano i preferiti / il mix |
+| C-15 | Togli il cavo durante l'ascolto, ricollega | Si ferma; ricollegando riparte dallo stesso punto |
 
 ## PC (sito nel browser)
 

@@ -46,8 +46,22 @@ class LyricsRepository(private val context: Context, http: OkHttpClient) {
         return lyrics
     }
 
+    /**
+     * Se del brano si sa già qualcosa senza chiedere: testo salvato, o cercato da poco e non
+     * trovato. Per lo scaricamento in anticipo ([LyricsWorker]), che così salta quelli fatti.
+     */
+    fun known(artist: String?, title: String): Boolean {
+        if (artist.isNullOrBlank() || title.isBlank()) return true
+        val key = hash("$artist|$title")
+        val missing = File(dir, "$key.none")
+        return File(dir, "$key.json").exists() || (missing.exists() && System.currentTimeMillis() - missing.lastModified() < WEEK_MS)
+    }
+
+    /** Quanti testi sono salvati sul telefono (valgono anche senza rete). */
+    fun savedCount(): Int = dir.list()?.count { it.endsWith(".json") } ?: 0
+
     /** C'è una rete che arriva davvero a internet (non solo il Wi‑Fi senza connessione). */
-    private fun hasInternet(): Boolean {
+    fun hasInternet(): Boolean {
         val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return true
         return cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     }

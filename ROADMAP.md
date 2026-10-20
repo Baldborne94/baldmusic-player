@@ -106,7 +106,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 ## Fase 4 — Android Auto fatto bene
 
 - [x] **Comandi vocali per le raccolte**: "Ok Google, metti (la raccolta) Movie Soundtracks su BaldMusic".
-- [ ] Prova completa con il **Desktop Head Unit** (l'emulatore di Android Auto) e in macchina, con una checklist: avvio a freddo, ripresa, ricerca vocale ("metti *artista*", "metti *album*", "metti *playlist*"), cuore, timer, telefono senza rete.
+- [ ] Prova completa con il **Desktop Head Unit** (l'emulatore di Android Auto) e in macchina: guida per installarlo sul PC, `android/tools/avvia-dhu.cmd` e checklist (avvio a freddo, ripresa, voce, cuore, timer, senza rete, notte, manopola, librerie grandi) pronte in `COLLAUDO.md`; resta da farla.
 - [x] Elenchi lunghi: Auto mostra pochi elementi per volta; artisti e album raggruppati per lettera, "Più ascoltati" e "Ascoltati di recente" in cima.
 - [x] Tasti **casuale** e **ripeti** accanto al cuore.
 - [x] Discografia divisa per tipo (fase 2) anche in Auto.
@@ -138,7 +138,8 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 - [x] **I tuoi mix anche in Android Auto**: «Riscopri» (brani che ti piacevano e non senti da due mesi), «Per la macchina» (i tuoi preferiti di sempre), mix casuale, degli artisti più ascoltati e dei decenni, uguali in Home e in Auto; cambiano ogni giorno.
 - [x] **Salute della libreria**: cartella per cartella, i file con tag da sistemare (album diverso per ogni brano, senza album, unico brano del disco, numero di traccia mancante o doppio, anno mancante o 1970) e perché un brano è tra gli sparsi; quanti non sono mai passati da Picard. I **brani di 30 secondi** li trova la Pulizia.
 - [x] **Backup della tua musica**: preferiti, playlist, raccolte e ascolti in un file (a mano, o in automatico in Download/BaldMusic, che resta dopo la disinstallazione); su un telefono nuovo i brani si ritrovano per cartella, titolo e durata.
-- [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.
+- [x] **Prestazioni con librerie grandi** (provate con 20.000 brani): artisti da 5,6 s a 0,2 s la prima volta, elenchi riaperti subito, cuore di ogni riga senza scorrere i preferiti; il telefono rilegge la musica solo quando Android dice che i file sono cambiati, non ogni 30 secondi. Resta da sentirla sul telefono vero (`C-11`).
+- [x] **Testi anche senza rete**: in carica col Wi‑Fi l'app scarica in anticipo i testi dei brani più ascoltati, dei preferiti, delle raccolte e poi di tutto il telefono.
 - [x] **Note di versione e aggiornamenti dall'app**: ogni APK pubblica in `apk-latest` anche `version.json` con le novità (i titoli delle PR unite); l'app avvisa in Home, scarica e installa sopra con la conferma di Android, e dopo l'aggiornamento mostra cosa c'è di nuovo.
 - [ ] Accessibilità: TalkBack, contrasto, dimensione del testo.
 

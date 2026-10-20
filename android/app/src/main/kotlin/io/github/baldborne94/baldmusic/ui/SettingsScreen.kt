@@ -81,11 +81,14 @@ import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
+import io.github.baldborne94.baldmusic.data.LyricsWorker
 import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.library.LoudnessWorker
 import io.github.baldborne94.baldmusic.playback.kind
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(vm: PlayerViewModel) {
@@ -126,6 +129,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
             )
         }
+        if (lyricsOnline) OfflineLyrics()
         ReplayGainSetting()
         CrossfadeSetting()
         Spacer(Modifier.height(12.dp))
@@ -281,6 +285,32 @@ private fun ReplayGainSetting() {
                     measuringNow = true
                 }) { Text("Misura adesso (consuma batteria)") }
             }
+        }
+    }
+}
+
+/** I testi salvati per quando non c'è rete, e "Scarica adesso". */
+@Composable
+private fun OfflineLyrics() {
+    val context = LocalContext.current
+    val running by remember { LyricsWorker.running(context) }.collectAsState(initial = false)
+    var saved by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(running) {
+        // Mentre scarica il numero cresce: si ricontrolla ogni tanto.
+        do {
+            saved = withContext(Dispatchers.IO) { context.app.lyrics.savedCount() }
+            if (running) delay(3_000)
+        } while (running)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            (saved?.let { if (it == 1) "1 testo salvato" else "$it testi salvati" } ?: "Testi salvati") +
+                " sul telefono: si vedono anche senza rete. Quelli dei brani che ascolti di più, dei preferiti e delle raccolte si scaricano da soli, in carica col Wi‑Fi.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedButton(onClick = { LyricsWorker.now(context) }, enabled = !running) {
+            Text(if (running) "Scaricamento in corso…" else "Scarica adesso")
         }
     }
 }
