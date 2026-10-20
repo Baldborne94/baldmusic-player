@@ -12,12 +12,17 @@ object ArtistNames {
     private val variousNames = setOf("various artists", "various", "artisti vari", "autori vari", "va", "v.a.", "aa.vv.", "aa vv", "aavv")
 
     /** Due nomi sono lo stesso artista se coincidono a meno di maiuscole, spazi, accenti e apostrofi. */
-    fun key(name: String): String = Normalizer.normalize(name, Normalizer.Form.NFKD)
-        .replace(Regex("\\p{M}+"), "")
-        .replace('’', '\'').replace('‘', '\'').replace('´', '\'').replace('`', '\'')
-        .lowercase(Locale.ROOT)
-        .replace(Regex("\\s+"), " ")
-        .trim()
+    fun key(name: String): String {
+        // Si chiama decine di migliaia di volte per libreria: senza accenti (quasi sempre) si salta la normalizzazione.
+        val plain = if (name.all { it.code < 128 }) name else marks.replace(Normalizer.normalize(name, Normalizer.Form.NFKD), "")
+        return spaces.replace(
+            plain.replace('’', '\'').replace('‘', '\'').replace('´', '\'').replace('`', '\'').lowercase(Locale.ROOT),
+            " ",
+        ).trim()
+    }
+
+    private val marks = Regex("\\p{M}+")
+    private val spaces = Regex("\\s+")
 
     fun isVarious(name: String?) = name != null && key(name) in variousNames
 
@@ -43,6 +48,7 @@ object ArtistNames {
 
     private val featuring = Regex("\\s+(?:feat\\.?|ft\\.?|featuring)\\s+", RegexOption.IGNORE_CASE)
     private val spacedSeparators = Regex("\\s*;\\s*|\\s+/\\s+")
+    private val guestSeparators = Regex("\\s*(?:,|&|\\band\\b|\\be\\b)\\s*")
     private val inTitle = Regex("[(\\[]\\s*(?:feat\\.?|ft\\.?|featuring)\\s+([^)\\]]+)[)\\]]", RegexOption.IGNORE_CASE)
 
     /**
@@ -62,6 +68,6 @@ object ArtistNames {
 
     /** Gli ospiti scritti nel titolo: "Let Me Go (feat. Chad Kroeger)" → Chad Kroeger. */
     fun featuredInTitle(title: String): List<String> = inTitle.findAll(title)
-        .flatMap { m -> m.groupValues[1].split(Regex("\\s*(?:,|&|\\band\\b|\\be\\b)\\s*")) }
+        .flatMap { m -> m.groupValues[1].split(guestSeparators) }
         .map { it.trim() }.filter { it.isNotEmpty() }.toList()
 }

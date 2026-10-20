@@ -42,7 +42,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 - **Artisti riconosciuti** dai tag (anche "A feat. B"), album veri separati da singoli e brani sparsi, discografia per tipo (Album, EP, Dal vivo, Colonne sonore, Compilation), album su più dischi, elenchi con le lettere A–Z.
 - **Volume uguale tra i brani**: ReplayGain dai tag e, per i file che non l'hanno, volume misurato dall'app mentre il telefono è in carica.
 - **Dissolvenza tra i brani** come i DJ (3–12 secondi, mai dentro lo stesso album).
-- **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci.
+- **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)), tocca una riga per saltarci; quelli dei brani che ascolti di più, dei preferiti e delle raccolte si scaricano prima, in carica col Wi‑Fi, e ci sono anche senza rete.
 - **Radio** da qualsiasi brano, **timer di spegnimento**, **coda** riordinabile che si salva per intero e riparte da dov'era.
 - **Pulizia della libreria**: doppioni tra le cartelle e anteprime di 30 secondi nel cestino di Android (recuperabili per 30 giorni da *Brani nel cestino*), senza perdere il brano nelle raccolte.
 - **Informazioni sul brano** (menu ⋮) e **Salute della libreria** (Impostazioni): i tag come li legge l'app, e cartella per cartella quali file hanno i tag da sistemare e perché un brano è finito tra gli sparsi.

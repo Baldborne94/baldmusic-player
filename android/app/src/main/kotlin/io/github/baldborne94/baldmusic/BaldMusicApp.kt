@@ -12,6 +12,7 @@ import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.data.Backups
 import io.github.baldborne94.baldmusic.data.LyricsRepository
+import io.github.baldborne94.baldmusic.data.LyricsWorker
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.update.Updater
@@ -78,6 +79,8 @@ class BaldMusicApp : Application() {
             decades = { local.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES)) },
         )
         backups.start()
+        // Testi scaricati in anticipo, per quando non c'è rete.
+        LyricsWorker.schedule(this)
     }
 
     /** La tua musica per prima: in Android Auto è la prima scheda. */

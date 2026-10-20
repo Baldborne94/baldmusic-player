@@ -92,17 +92,24 @@ data class UserLibrary(
         val orphans = playlists.filter { it.folder != null && it.folder !in current && it.tracks.any { t -> t.id.startsWith(LOCAL_TRACK) } }
         if (fresh.isEmpty() || orphans.isEmpty()) return this
 
-        fun sameFile(a: TrackRef, b: TrackRef) = a.id == b.id || (
-            ArtistNames.key(a.title) == ArtistNames.key(b.title) &&
-                a.durationMs != null && b.durationMs != null && kotlin.math.abs(a.durationMs - b.durationMs) <= SAME_FILE_MS
-            )
+        // Lo stesso file: stesso ID, o stesso titolo e durata (ID nuovo). Indici per cartella, così
+        // con migliaia di brani non si confronta ogni brano con ogni altro.
+        class Lookup(f: FolderCollection) {
+            val byId = f.tracks.associateBy { it.id }
+            val byTitle = f.tracks.groupBy { ArtistNames.key(it.title) }
+            fun find(t: TrackRef, title: String): TrackRef? = byId[t.id] ?: byTitle[title]?.firstOrNull { o ->
+                t.durationMs != null && o.durationMs != null && kotlin.math.abs(t.durationMs - o.durationMs) <= SAME_FILE_MS
+            }
+        }
+        val lookups = fresh.associateWith(::Lookup)
 
         // Le coppie raccolta → cartella, dalla più somigliante; ogni cartella ne prende una sola.
         data class Match(val playlist: UserPlaylist, val folder: FolderCollection, val found: Map<String, TrackRef>)
         val matches = orphans.flatMap { pl ->
-            val local = pl.tracks.filter { it.id.startsWith(LOCAL_TRACK) }
+            val local = pl.tracks.filter { it.id.startsWith(LOCAL_TRACK) }.map { it to ArtistNames.key(it.title) }
             fresh.mapNotNull { f ->
-                val found = local.mapNotNull { t -> f.tracks.firstOrNull { sameFile(t, it) }?.let { t.id to it } }.toMap()
+                val lookup = lookups.getValue(f)
+                val found = local.mapNotNull { (t, title) -> lookup.find(t, title)?.let { t.id to it } }.toMap()
                 Match(pl, f, found).takeIf { found.size * 2 >= local.size }
             }
         }.sortedByDescending { it.found.size }
@@ -148,7 +155,10 @@ data class UserLibrary(
         return copy(playlists = updated + created)
     }
 
-    fun isLiked(trackId: String) = liked.any { it.id == baseId(trackId) }
+    // Si chiede per ogni riga di ogni elenco: un insieme invece di scorrere i preferiti (e non si salva).
+    private val likedIds: Set<String> by lazy { liked.mapTo(HashSet()) { it.id } }
+
+    fun isLiked(trackId: String) = baseId(trackId) in likedIds
 
     fun toggleLike(track: TrackRef): UserLibrary {
         val id = baseId(track.id)

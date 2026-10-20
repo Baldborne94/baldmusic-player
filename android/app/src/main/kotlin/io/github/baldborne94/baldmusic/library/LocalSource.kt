@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
@@ -19,6 +20,7 @@ import io.github.baldborne94.baldmusic.core.library.LocalTrack
 import io.github.baldborne94.baldmusic.core.library.LoudnessIndex
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.MusicSource
+import io.github.baldborne94.baldmusic.core.library.SongsCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,7 +58,22 @@ class LocalSource(
         plays = { plays() },
     )
 
-    @Volatile private var cached: Pair<Long, List<LocalTrack>>? = null
+    /** I brani letti da MediaStore: si rileggono quando Android dice che i file sono cambiati. */
+    private val songsCache = SongsCache<LocalTrack>(maxAgeMs = 10 * 60_000L)
+
+    init {
+        // File aggiunti, tolti o cambiati (anche da altre app o dal PC): la prossima richiesta rilegge.
+        // Anche ogni memoria per nome (scheda SD): Android avvisa per volume.
+        runCatching {
+            val observer = object : ContentObserver(null) {
+                override fun onChange(selfChange: Boolean) = songsCache.changed()
+            }
+            val volumes = if (Build.VERSION.SDK_INT >= 29) MediaStore.getExternalVolumeNames(context).map { MediaStore.Audio.Media.getContentUri(it) } else emptyList()
+            (listOf(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI) + volumes).distinct().forEach { uri ->
+                context.contentResolver.registerContentObserver(uri, true, observer)
+            }
+        }
+    }
 
     private val scanner = TagScanner(context)
     private val loudness = LoudnessScanner(context)
@@ -72,9 +89,7 @@ class LocalSource(
 
     fun hasPermission() = ContextCompat.checkSelfPermission(context, PERMISSION) == PackageManager.PERMISSION_GRANTED
 
-    fun invalidate() {
-        cached = null
-    }
+    fun invalidate() = songsCache.changed()
 
     override suspend fun sections(): List<LibraryNode> {
         if (!hasPermission()) {
@@ -91,7 +106,7 @@ class LocalSource(
         val trackId = id.id?.toLongOrNull() ?: return@withContext null
         if (!hasPermission()) return@withContext null
         val all = songs()
-        (all.firstOrNull { it.id == trackId } ?: query("${MediaStore.Audio.Media._ID} = ?", arrayOf("$trackId")).firstOrNull())
+        (catalog.track(trackId, all) ?: query("${MediaStore.Audio.Media._ID} = ?", arrayOf("$trackId")).firstOrNull())
             ?.let { catalog.node(it, id.parent, all) }
     }
 
@@ -155,16 +170,17 @@ class LocalSource(
         LibraryCleanup.duplicates(all) to LibraryCleanup.previews(all)
     }
 
-    /** Tutti i brani, riletti al massimo ogni 30 secondi (Auto chiede le liste a pagine). */
+    /** Tutti i brani, riletti solo quando i file cambiano ([SongsCache]): Auto chiede le liste a pagine. */
     // Una lettura di MediaStore alla volta: a cache vuota (ripresa, Auto che chiede più pagine)
     // le richieste in parallelo aspettano la prima invece di rileggere tutto ognuna.
     @Synchronized
     private fun songs(): List<LocalTrack> {
-        cached?.let { (at, list) -> if (System.currentTimeMillis() - at < 30_000) return list }
+        songsCache.fresh()?.let { return it }
+        songsCache.reading()
         val rows = rows(null, null)
         // Il volume misurato dall'app per i file che il ReplayGain nei tag non l'hanno.
         val stamps = rows.associate { it.track.id to it.stamp }
-        val list = LoudnessIndex.applyTo(LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))) { t -> stamps[t.id]?.let(loudness.index::measure) }
+        val read = LoudnessIndex.applyTo(LocalCatalog.withoutPlaceholderYears(rows.map(::withTags))) { t -> stamps[t.id]?.let(loudness.index::measure) }
         if (!loudnessScheduled && toMeasure(rows).let(loudness.index::pending).isNotEmpty()) {
             loudnessScheduled = true
             LoudnessWorker.schedule(context)
@@ -174,7 +190,8 @@ class LocalSource(
             recognitionScheduled = true
             RecognitionWorker.schedule(context)
         }
-        cached = System.currentTimeMillis() to list
+        // Gli stessi brani di prima: lo stesso elenco, così indice ed elenchi pronti restano validi.
+        val list = songsCache.store(read)
         // Un elenco vuoto può voler dire permesso tolto o memoria non montata: non si tocca niente.
         if (list.isNotEmpty()) onSongs(list)
         // Con MediaStore vuoto (memoria non ancora montata, indice che si rifà) l'indice dei tag non si svuota.
@@ -200,7 +217,7 @@ class LocalSource(
         loudness.retain(rows.mapTo(HashSet()) { it.track.id })
         val files = toMeasure(rows)
         val done = loudness.measure(files, { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }, stop)
-        if (done > 0) cached = null
+        if (done > 0) songsCache.changed()
         loudnessScheduled = false
         return done to loudness.index.pending(files).size
     }
@@ -219,7 +236,7 @@ class LocalSource(
             try {
                 val changed = scanner.refresh(files) { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
                 if (changed) {
-                    cached = null
+                    songsCache.changed()
                     onTagsRead()
                 }
             } finally {
@@ -300,7 +317,7 @@ class LocalSource(
     private fun changed(change: () -> Unit) {
         change()
         recognition.save()
-        cached = null
+        songsCache.changed()
         onTagsRead()
     }
 
