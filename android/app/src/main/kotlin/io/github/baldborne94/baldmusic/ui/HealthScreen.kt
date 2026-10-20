@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HealthScreen(vm: PlayerViewModel) {
     val context = LocalContext.current
+    val ui = LocalUi.current
     var report by remember { mutableStateOf<HealthReport?>(null) }
     LaunchedEffect(vm.libraryVersion) {
         val tracks = context.app.local.allTracks()
@@ -81,6 +82,13 @@ fun HealthScreen(vm: PlayerViewModel) {
             return@LazyColumn
         }
         item { Summary(r) }
+        if (r.notTagged > 0) {
+            item {
+                androidx.compose.material3.TextButton(onClick = { ui.push(Screen.Recognize) }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Text("Riconosci dal suono i ${r.notTagged} brani mai passati da Picard →", color = Accent)
+                }
+            }
+        }
         if (r.counts.isNotEmpty()) {
             item {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

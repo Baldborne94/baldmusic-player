@@ -111,6 +111,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
         SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
         SettingsLink("Pulizia della libreria", "Doppioni e anteprime di 30 secondi da buttare") { ui.push(Screen.Cleanup) }
         SettingsLink("Salute della libreria", "Quali file hanno i tag da sistemare, cartella per cartella") { ui.push(Screen.Health) }
+        SettingsLink("Riconosci i brani", "Titolo, artista, album e anno veri dal suono (AcoustID), senza toccare i file") { ui.push(Screen.Recognize) }
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             SettingsLink("Brani nel cestino", "Ripesca i brani buttati negli ultimi 30 giorni") { ui.push(Screen.Trash) }
         }

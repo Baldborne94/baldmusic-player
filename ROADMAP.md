@@ -49,7 +49,7 @@ aggiornamenti dall'app con le novità. I punti ancora aperti:
 
 | Area | Oggi | Cosa manca |
 |------|------|------------|
-| **Tag sul telefono** | L'app li legge tutti, e "Salute della libreria" dice quali file hanno i tag da sistemare | Sistemarli: passare le cartelle da Picard sul PC (guida in `server/README.md`), o riconoscerli dall'app con AcoustID |
+| **Tag sul telefono** | L'app li legge tutti; "Salute della libreria" dice quali file sistemare e "Riconosci i brani" li riconosce dal suono (AcoustID) | Scrivere i tag riconosciuti dentro i file, per averli anche sul PC (oggi valgono solo nell'app) |
 | **Android Auto** | Raccolte, lettere, voce, cuore/casuale/ripeti | Prova completa in macchina e col Desktop Head Unit (fase 4) |
 | **Senza pause tra i brani** | ExoPlayer è gapless; sul PC il brano dopo si carica in anticipo | Da sentire a orecchio sul telefono con album dal vivo (fase 3) |
 | **Telefono e PC** | Preferiti e playlist separati: sul telefono in un file dell'app, sul PC su Navidrome | Unirli quando il telefono raggiunge il server (fase 6) |
@@ -132,6 +132,7 @@ Con una libreria sola ha senso unire quello che oggi è separato per dispositivo
 
 ## Fase 7 — Rifinitura
 
+- [x] **Riconoscere i brani dal suono**: per i file mai passati da Picard l'app calcola l'impronta acustica (Chromaprint, come fpcalc) e chiede ad AcoustID titolo, artista, album, anno e traccia veri da MusicBrainz; le proposte si controllano cartella per cartella e valgono solo applicate, senza toccare i file.
 - [x] **Salute della libreria**: cartella per cartella, i file con tag da sistemare (album diverso per ogni brano, senza album, unico brano del disco, numero di traccia mancante o doppio, anno mancante o 1970) e perché un brano è tra gli sparsi; quanti non sono mai passati da Picard. I **brani di 30 secondi** li trova la Pulizia.
 - [x] **Backup della tua musica**: preferiti, playlist, raccolte e ascolti in un file (a mano, o in automatico in Download/BaldMusic, che resta dopo la disinstallazione); su un telefono nuovo i brani si ritrovano per cartella, titolo e durata.
 - [ ] Prestazioni con librerie grandi (10.000+ brani) su telefono e in Auto.

@@ -46,6 +46,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 - **Radio** da qualsiasi brano, **timer di spegnimento**, **coda** riordinabile che si salva per intero e riparte da dov'era.
 - **Pulizia della libreria**: doppioni tra le cartelle e anteprime di 30 secondi nel cestino di Android (recuperabili per 30 giorni da *Brani nel cestino*), senza perdere il brano nelle raccolte.
 - **Informazioni sul brano** (menu ⋮) e **Salute della libreria** (Impostazioni): i tag come li legge l'app, e cartella per cartella quali file hanno i tag da sistemare e perché un brano è finito tra gli sparsi.
+- **Riconosci i brani dal suono** (Impostazioni): per i file scaricati coi tag sbagliati l'app ascolta i primi due minuti e trova con [AcoustID](https://acoustid.org) e MusicBrainz titolo, artista, album, anno e numero di traccia veri. Le proposte si controllano cartella per cartella e si applicano (o si annullano) senza toccare i file. Serve una chiave gratuita di AcoustID, una volta.
 - **Backup della tua musica**: preferiti, playlist, raccolte e ascolti si salvano da soli in `Download/BaldMusic` (restano anche se disinstalli l'app) o dove vuoi tu; su un telefono nuovo *Impostazioni → Ripristina…* li rimette, ritrovando i brani per cartella e titolo.
 - **Tablet**: schede a sinistra; in orizzontale libreria e dettaglio affiancati, coda o testo fissi a destra.
 - **Le tue statistiche**, **widget**, condivisione, **aggiornamenti dall'app** con le novità.
@@ -85,4 +86,4 @@ Configurazione una tantum del repository:
 
 ## Licenza
 
-[MIT](LICENSE)
+[MIT](LICENSE), tranne [`Chromaprint.kt`](android/core/src/main/kotlin/io/github/baldborne94/baldmusic/core/acoustid/Chromaprint.kt): è il porting in Kotlin di [Chromaprint](https://github.com/acoustid/chromaprint) (MIT, Lukas Lalinsky) con la FFT di KISS FFT (BSD-3-Clause) e il ricampionatore di FFmpeg (LGPL 2.1), quindi quel file è sotto **LGPL 2.1**. I dettagli sono in testa al file.

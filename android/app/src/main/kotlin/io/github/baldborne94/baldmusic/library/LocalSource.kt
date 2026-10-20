@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
+import io.github.baldborne94.baldmusic.core.acoustid.Recognition
+import io.github.baldborne94.baldmusic.core.acoustid.RecognitionIndex
 import io.github.baldborne94.baldmusic.core.library.DuplicateGroup
 import io.github.baldborne94.baldmusic.core.library.FileStamp
 import io.github.baldborne94.baldmusic.core.library.LibraryCleanup
@@ -22,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -40,6 +43,9 @@ class LocalSource(
     private val onSongs: (List<LocalTrack>) -> Unit = {},
     /** Ascolti per brano (ID di TrackRef): gli artisti più ascoltati vanno in cima. */
     private val plays: () -> Map<String, Int> = { emptyMap() },
+    http: OkHttpClient = OkHttpClient(),
+    /** La chiave di AcoustID, se l'utente l'ha messa: senza, niente riconoscimento dal suono. */
+    private val acoustIdKey: () -> String? = { null },
 ) : MusicSource {
 
     override val key = LocalCatalog.KEY
@@ -55,6 +61,9 @@ class LocalSource(
     private val scanner = TagScanner(context)
     private val loudness = LoudnessScanner(context)
     @Volatile private var loudnessScheduled = false
+    /** Brani riconosciuti dal suono (AcoustID): i tag proposti valgono solo quelli applicati. */
+    val recognition = RecognitionScanner(context, http)
+    @Volatile private var recognitionScheduled = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val scanning = AtomicBoolean(false)
 
@@ -160,6 +169,11 @@ class LocalSource(
             loudnessScheduled = true
             LoudnessWorker.schedule(context)
         }
+        // Brani nuovi da riconoscere: in carica e con la rete, se c'è la chiave.
+        if (!recognitionScheduled && !acoustIdKey().isNullOrBlank() && recognition.index.pending(toRecognize(rows).map { it.stamp }).isNotEmpty()) {
+            recognitionScheduled = true
+            RecognitionWorker.schedule(context)
+        }
         cached = System.currentTimeMillis() to list
         // Un elenco vuoto può voler dire permesso tolto o memoria non montata: non si tocca niente.
         if (list.isNotEmpty()) onSongs(list)
@@ -217,7 +231,78 @@ class LocalSource(
     private fun query(selection: String?, args: Array<String>?): List<LocalTrack> = rows(selection, args).map(::withTags)
 
     /** Il brano coi tag letti dal file, se l'indice li ha e il file non è cambiato. */
-    private fun withTags(r: Row): LocalTrack = scanner.index.tags(r.stamp)?.let(r.track::withTags) ?: r.track
+    private fun fileTags(r: Row): LocalTrack = scanner.index.tags(r.stamp)?.let(r.track::withTags) ?: r.track
+
+    /**
+     * Il brano come lo mostra l'app: i tag del file e, per un file mai passato da Picard,
+     * quelli riconosciuti dal suono se l'utente li ha applicati. Un file con gli ID di
+     * MusicBrainz nei tag (passato da Picard dopo) usa i suoi.
+     */
+    private fun withTags(r: Row): LocalTrack {
+        val t = fileTags(r)
+        if (!untagged(t)) return t
+        return recognition.index.tagsFor(r.stamp)?.let { Recognition.applyTo(t, it) } ?: t
+    }
+
+    /** I file da riconoscere: tag già letti e niente ID di MusicBrainz. */
+    private fun toRecognize(rows: List<Row>): List<Row> = rows.filter { r -> scanner.index.tags(r.stamp) != null && untagged(fileTags(r)) }
+
+    /**
+     * Riconosce dal suono i brani che ne hanno bisogno, finché [stop] non dice basta (lo
+     * chiama [RecognitionWorker]). Senza chiave o senza permesso non fa niente.
+     */
+    suspend fun recognize(stop: () -> Boolean): RecognitionScanner.Run = withContext(Dispatchers.IO) {
+        val key = acoustIdKey()?.takeIf { it.isNotBlank() }
+        if (key == null || !hasPermission()) return@withContext RecognitionScanner.Run(0)
+        val rows = rows(null, null)
+        // Come per volume e tag: un MediaStore vuoto non deve cancellare niente.
+        if (rows.isEmpty()) return@withContext RecognitionScanner.Run(0)
+        recognition.retain(rows.mapTo(HashSet()) { it.track.id })
+        val files = toRecognize(rows).map { it.stamp to fileTags(it) }
+        val folders = files.associate { (stamp, t) -> stamp.id to t.folder }
+        val run = recognition.recognize(
+            files, key,
+            uriOf = { ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) },
+            folderOf = { folders[it] ?: "" },
+            stop = stop,
+        )
+        recognitionScheduled = false
+        run
+    }
+
+    /** Un file riconosciuto (o no), coi tag che ha adesso nel file. */
+    data class Recognized(val track: LocalTrack, val entry: RecognitionIndex.Entry)
+
+    /** Per la schermata: quanti file sono da riconoscere, su quanti, e le proposte. */
+    data class RecognitionStatus(val toDo: Int, val total: Int, val notFound: Int, val items: List<Recognized>)
+
+    suspend fun recognitionStatus(): RecognitionStatus = withContext(Dispatchers.IO) {
+        if (!hasPermission()) return@withContext RecognitionStatus(0, 0, 0, emptyList())
+        val rows = toRecognize(rows(null, null))
+        val items = rows.mapNotNull { r -> recognition.index.entry(r.stamp)?.let { Recognized(fileTags(r), it) } }
+        RecognitionStatus(
+            toDo = recognition.index.pending(rows.map { it.stamp }).size,
+            total = rows.size,
+            notFound = items.count { it.entry.proposal == null },
+            items = items.filter { it.entry.proposal != null },
+        )
+    }
+
+    /** Applica, scarta o rimette in attesa delle proposte; la libreria si rilegge. */
+    fun decideRecognized(ids: Collection<Long>, decision: RecognitionIndex.Decision) = changed { recognition.index.decide(ids, decision) }
+
+    /** L'utente sceglie un altro disco per il file (e lo applica). */
+    fun chooseRecognized(id: Long, candidate: Int) = changed { recognition.index.choose(id, candidate) }
+
+    /** I file non riconosciuti tornano da riconoscere (AcoustID impara brani nuovi col tempo). */
+    fun retryNotFound() = changed { recognition.index.forgetNotFound() }
+
+    private fun changed(change: () -> Unit) {
+        change()
+        recognition.save()
+        cached = null
+        onTagsRead()
+    }
 
     private fun rows(selection: String?, args: Array<String>?): List<Row> {
         val projection = arrayOf(
@@ -270,6 +355,9 @@ class LocalSource(
     }
 
     companion object {
+        /** Mai passato da Picard: niente ID di MusicBrainz nei tag. */
+        fun untagged(t: LocalTrack) = t.albumMbid == null && t.releaseGroupMbid == null && t.artistMbids.isEmpty()
+
         /** "/storage/emulated/0/Music/Queen/01.mp3" → "Music/Queen". */
         private fun folderOf(path: String?): String {
             val dir = path?.substringBeforeLast('/', "") ?: return "Sconosciuta"

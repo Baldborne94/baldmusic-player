@@ -5,6 +5,7 @@
 # usate dal parser via serializer generati.
 -keep class io.github.baldborne94.baldmusic.core.subsonic.** { *; }
 -keep class io.github.baldborne94.baldmusic.core.update.** { *; }
+-keep class io.github.baldborne94.baldmusic.core.acoustid.** { *; }
 
 # OkHttp 5 fa riferimento opzionale a librerie TLS alternative non incluse.
 -dontwarn org.bouncycastle.**
