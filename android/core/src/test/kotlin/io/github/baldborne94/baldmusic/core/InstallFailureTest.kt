@@ -35,4 +35,10 @@ class InstallFailureTest {
         assertTrue("Blocco automatico" in InstallFailure.message(incompatible, "INSTALL_FAILED_USER_RESTRICTED"))
         assertTrue("Spazio" in InstallFailure.message(InstallFailure.STATUS_FAILURE_STORAGE, null))
     }
+
+    @Test
+    fun `con le impronte delle firme si vede quale chiave ha ciascuna`() {
+        val text = InstallFailure.message(conflict, "INSTALL_FAILED_UPDATE_INCOMPATIBLE", certificates = "1a2b3c4d5e6f" to "977dcf00eddc")
+        assertTrue(text.endsWith("(firma installata 1a2b3c4d…, nuova 977dcf00…)"), text)
+    }
 }

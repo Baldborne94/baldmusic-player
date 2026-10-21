@@ -134,15 +134,13 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             _state.value = State.Failed(info, "Il file scaricato non è un aggiornamento di BaldMusic. Riprova tra qualche minuto.")
             return
         }
-        // Firma diversa da quella installata: Android rifiuterebbe; lo si dice subito e con certezza.
-        signatureDiffers = runCatching {
+        // Le firme si confrontano solo per spiegare un rifiuto: decide Android, non questo
+        // confronto (che su qualche telefono potrebbe sbagliare e bloccare un aggiornamento buono).
+        runCatching {
             val mine = certificates(context.packageManager.getPackageInfo(pkg, SIGNING_FLAGS))
             val theirs = certificates(archive)
-            if (mine.isEmpty() || theirs.isEmpty()) null else (mine intersect theirs).isEmpty()
-        }.getOrNull()
-        if (signatureDiffers == true) {
-            fail(info, InstallFailure.message(InstallFailure.STATUS_FAILURE_CONFLICT, null, signatureDiffers = true))
-            return
+            signatureDiffers = if (mine.isEmpty() || theirs.isEmpty()) null else (mine intersect theirs).isEmpty()
+            signingCertificates = mine.sorted().firstOrNull()?.let { m -> theirs.sorted().firstOrNull()?.let { t -> m to t } }
         }
         _state.value = State.Installing(info)
         runCatching { commit(file) }.onFailure {
@@ -152,6 +150,9 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
 
     /** Il risultato del confronto delle firme dell'ultimo APK scaricato (null: non si è potuto fare). */
     private var signatureDiffers: Boolean? = null
+
+    /** Le impronte delle due firme (installata, nuova), per il messaggio d'errore. */
+    private var signingCertificates: Pair<String, String>? = null
 
     /** Le impronte SHA-256 dei certificati con cui è firmato un pacchetto. */
     @Suppress("DEPRECATION")
@@ -231,7 +232,7 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             PackageInstaller.STATUS_SUCCESS -> _state.value = State.Idle
             PackageInstaller.STATUS_FAILURE_ABORTED -> _state.value = info?.let { State.Available(it) } ?: State.Idle
             // Il perché lo dice il messaggio di Android, non il codice: vedi InstallFailure.
-            else -> fail(info, InstallFailure.message(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE), signatureDiffers))
+            else -> fail(info, InstallFailure.message(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE), signatureDiffers, signingCertificates))
         }
     }
 

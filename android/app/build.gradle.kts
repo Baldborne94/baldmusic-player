@@ -10,6 +10,11 @@ plugins {
 // accettare l'APK nuovo come aggiornamento di quello installato.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
+// La chiave fissa dal secret ANDROID_DEBUG_KEYSTORE_B64 (la CI la scrive in un file e ne passa
+// il percorso): detta in modo esplicito, non lasciata alla chiave di debug predefinita di
+// Gradle, che sui runner di GitHub poteva essere una nuova a ogni build.
+val fixedKeystore = System.getenv("BALDMUSIC_KEYSTORE")?.let(::file)?.takeIf { it.exists() }
+
 android {
     namespace = "io.github.baldborne94.baldmusic"
     compileSdk = 36
@@ -22,15 +27,26 @@ android {
         versionName = "0.1.$buildNumber"
     }
 
+    signingConfigs {
+        if (fixedKeystore != null) {
+            create("fissa") {
+                storeFile = fixedKeystore
+                // Le password e il nome di una chiave di debug di Android (keytool -list le accetta).
+                storePassword = System.getenv("BALDMUSIC_KEYSTORE_PASSWORD") ?: "android"
+                keyAlias = System.getenv("BALDMUSIC_KEY_ALIAS") ?: "androiddebugkey"
+                keyPassword = System.getenv("BALDMUSIC_KEY_PASSWORD") ?: "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // APK da installare a mano, non per il Play Store: firmato con la chiave
-            // di debug, che in CI viene ripristinata da un secret per restare la stessa
-            // a ogni build (altrimenti ogni aggiornamento richiederebbe di disinstallare).
-            signingConfig = signingConfigs.getByName("debug")
+            // APK da installare a mano, non per il Play Store: in CI la chiave fissa del secret
+            // (altrimenti ogni aggiornamento richiederebbe di disinstallare); in locale quella di debug.
+            signingConfig = signingConfigs.getByName(if (fixedKeystore != null) "fissa" else "debug")
         }
     }
 

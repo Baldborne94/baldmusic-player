@@ -36,17 +36,27 @@ jobs:
       # Senza una chiave fissa ogni runner ne genera una nuova: ogni APK avrebbe
       # una firma diversa e per aggiornare bisognerebbe disinstallare (perdendo
       # le impostazioni). Il secret ANDROID_DEBUG_KEYSTORE_B64 è la chiave in base64.
+      #
+      # Il file si passa a Gradle per percorso (BALDMUSIC_KEYSTORE, vedi app/build.gradle.kts):
+      # copiarlo in ~/.android/debug.keystore non bastava, Gradle ne usava un'altra a ogni build.
       - name: Ripristina la chiave di firma
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            mkdir -p ~/.android
-            echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
-            echo "Chiave di firma ripristinata."
-          else
-            echo "::warning::ANDROID_DEBUG_KEYSTORE_B64 non impostato: ogni APK avrà una firma diversa e per aggiornare servirà disinstallare."
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_DEBUG_KEYSTORE_B64 non impostato: senza la chiave fissa gli aggiornamenti dall'app non funzionano."
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/baldmusic.keystore"
+          echo "BALDMUSIC_KEYSTORE=$RUNNER_TEMP/baldmusic.keystore" >> "$GITHUB_ENV"
+          # L'impronta della chiave (non è un segreto: è scritta in ogni APK), per il controllo dopo la build.
+          keytool -list -v -keystore "$RUNNER_TEMP/baldmusic.keystore" -storepass android | tee "$RUNNER_TEMP/chiave.txt" | grep -E "Alias|SHA256" || true
+          { grep -m1 "SHA256:" "$RUNNER_TEMP/chiave.txt" || true; } | sed 's/.*SHA256: *//; s/://g' | tr 'A-F' 'a-f' > "$RUNNER_TEMP/chiave-sha256.txt"
+          if [ ! -s "$RUNNER_TEMP/chiave-sha256.txt" ]; then
+            echo "::error::La chiave del secret non si apre come chiave di debug di Android (password «android», alias «androiddebugkey»)."
+            exit 1
+          fi
+          echo "Chiave di firma: $(cat "$RUNNER_TEMP/chiave-sha256.txt")"
 
       - name: Test della logica condivisa
         run: ./gradlew :core:test --no-daemon
@@ -58,6 +68,18 @@ jobs:
 
       - name: Compila l'APK
         run: ./gradlew :app:assembleRelease --no-daemon
+
+      # Ogni APK deve avere la firma della chiave fissa, o gli aggiornamenti dall'app falliscono e
+      # serve disinstallare: l'impronta del certificato dell'APK si confronta con quella della chiave.
+      - name: Controlla la firma dell'APK
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee firma.txt
+          ATTESA="$(tr -d '[:space:]' < "$RUNNER_TEMP/chiave-sha256.txt")"
+          if [ -z "$ATTESA" ] || ! grep -qi "certificate SHA-256 digest: $ATTESA" firma.txt; then
+            echo "::error::L'APK non è firmato con la chiave fissa del secret ($ATTESA): gli aggiornamenti dall'app fallirebbero."
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
