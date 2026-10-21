@@ -28,7 +28,26 @@ data class Lyrics(val synced: List<LyricLine> = emptyList(), val plain: String? 
         }
         return lo
     }
+
+    /**
+     * Le due righe da mostrare sotto il titolo nella schermata del brano: quella cantata a
+     * [positionMs] e la successiva (prima dell'inizio: nessuna e la prima). Le pause
+     * strumentali (righe vuote) sono "♪". Senza tempi, le prime due righe, ferme.
+     */
+    fun preview(positionMs: Long): LyricsPreview? {
+        if (synced.isNotEmpty()) {
+            val i = lineAt(positionMs)
+            fun text(index: Int) = synced.getOrNull(index)?.text?.ifBlank { "♪" }
+            return LyricsPreview(current = if (i < 0) null else text(i), next = text(i + 1), synced = true)
+        }
+        val lines = plain.orEmpty().lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.isEmpty()) return null
+        return LyricsPreview(current = lines[0], next = lines.getOrNull(1), synced = false)
+    }
 }
+
+/** Le righe del testo sotto il titolo: quella di adesso e la prossima. */
+data class LyricsPreview(val current: String?, val next: String?, val synced: Boolean)
 
 private val TIME_TAG = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 

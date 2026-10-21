@@ -223,6 +223,9 @@ fun NowPlayingScreen(
                 LikeButton(liked) { vm.toggleLike(item) }
             }
 
+            // Il testo sotto il titolo, come su Spotify: la riga di adesso e la prossima; tocca per tutto.
+            if (!showLyrics) lyrics?.let { LyricsPeek(vm, it) { showLyrics = true } }
+
             ProgressBar(vm)
 
             // Comandi.
@@ -361,6 +364,27 @@ fun SideLyrics(vm: PlayerViewModel) {
         loading = false
     }
     Box(Modifier.fillMaxSize().padding(12.dp)) { LyricsView(vm, lyrics, loading, color) }
+}
+
+/** Due righe del testo sotto il titolo (vedi [Lyrics.preview]); niente se il testo non c'è. */
+@Composable
+private fun LyricsPeek(vm: PlayerViewModel, lyrics: Lyrics, onOpen: () -> Unit) {
+    val preview = lyrics.preview(vm.position + 300) ?: return
+    Column(
+        Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen)
+            .background(Color.Black.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(
+            preview.current ?: "♪",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        preview.next?.let {
+            Text(it, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
 }
 
 /** Testo sincronizzato: la riga corrente in evidenza, le altre sfumate; tocca una riga per saltarci. */
