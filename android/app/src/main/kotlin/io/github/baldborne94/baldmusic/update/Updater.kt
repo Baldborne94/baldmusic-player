@@ -11,7 +11,9 @@ import android.provider.Settings
 import androidx.core.content.IntentCompat
 import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
+import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.update.AppUpdate
+import io.github.baldborne94.baldmusic.core.update.InstallFailure
 import io.github.baldborne94.baldmusic.core.update.ReleaseInfo
 import io.github.baldborne94.baldmusic.core.update.ReleaseNotes
 import io.github.baldborne94.baldmusic.core.update.UpdateClient
@@ -126,16 +128,47 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             return
         }
         // Mai installare qualcosa che non sia una versione più nuova di BaldMusic.
-        val archive = context.packageManager.getPackageArchiveInfo(file.path, 0)
+        val archive = context.packageManager.getPackageArchiveInfo(file.path, SIGNING_FLAGS)
         if (archive == null || archive.packageName != pkg || PackageInfoCompat.getLongVersionCode(archive) <= installed) {
             file.delete()
             _state.value = State.Failed(info, "Il file scaricato non è un aggiornamento di BaldMusic. Riprova tra qualche minuto.")
+            return
+        }
+        // Firma diversa da quella installata: Android rifiuterebbe; lo si dice subito e con certezza.
+        signatureDiffers = runCatching {
+            val mine = certificates(context.packageManager.getPackageInfo(pkg, SIGNING_FLAGS))
+            val theirs = certificates(archive)
+            if (mine.isEmpty() || theirs.isEmpty()) null else (mine intersect theirs).isEmpty()
+        }.getOrNull()
+        if (signatureDiffers == true) {
+            fail(info, InstallFailure.message(InstallFailure.STATUS_FAILURE_CONFLICT, null, signatureDiffers = true))
             return
         }
         _state.value = State.Installing(info)
         runCatching { commit(file) }.onFailure {
             _state.value = State.Failed(info, "L'installazione non è partita: ${it.message ?: "errore sconosciuto"}")
         }
+    }
+
+    /** Il risultato del confronto delle firme dell'ultimo APK scaricato (null: non si è potuto fare). */
+    private var signatureDiffers: Boolean? = null
+
+    /** Le impronte SHA-256 dei certificati con cui è firmato un pacchetto. */
+    @Suppress("DEPRECATION")
+    private fun certificates(info: android.content.pm.PackageInfo): Set<String> {
+        val signatures = if (Build.VERSION.SDK_INT >= 28) {
+            info.signingInfo?.let { if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory }
+        } else {
+            info.signatures
+        }
+        val sha = java.security.MessageDigest.getInstance("SHA-256")
+        return signatures.orEmpty().mapTo(HashSet()) { s -> sha.digest(s.toByteArray()).joinToString("") { "%02x".format(it) } }
+    }
+
+    /** Un aggiornamento non riuscito: lo si dice e finisce anche nel resoconto di "Segnala un problema". */
+    private fun fail(info: ReleaseInfo?, message: String) {
+        _state.value = State.Failed(info, message)
+        runCatching { context.app.problems.note("Aggiornamento a ${info?.versionName ?: "?"}: $message") }
     }
 
     private suspend fun download(info: ReleaseInfo): File = withContext(Dispatchers.IO) {
@@ -197,21 +230,18 @@ class Updater(private val context: Context, private val http: OkHttpClient) {
             }
             PackageInstaller.STATUS_SUCCESS -> _state.value = State.Idle
             PackageInstaller.STATUS_FAILURE_ABORTED -> _state.value = info?.let { State.Available(it) } ?: State.Idle
-            else -> _state.value = State.Failed(info, failure(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)))
+            // Il perché lo dice il messaggio di Android, non il codice: vedi InstallFailure.
+            else -> fail(info, InstallFailure.message(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE), signatureDiffers))
         }
-    }
-
-    private fun failure(status: Int, detail: String?): String = when (status) {
-        PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
-            "Android non accetta l'aggiornamento (firma diversa da quella installata). Scarica l'APK dalla pagina della release."
-        PackageInstaller.STATUS_FAILURE_STORAGE -> "Spazio insufficiente sul telefono per l'aggiornamento."
-        PackageInstaller.STATUS_FAILURE_BLOCKED -> "Android ha bloccato l'installazione."
-        else -> "Aggiornamento non riuscito" + (detail?.let { ": $it" } ?: ".")
     }
 
     companion object {
         const val ACTION_INSTALL_STATUS = "io.github.baldborne94.baldmusic.INSTALL_STATUS"
         const val RELEASE_PAGE = "https://github.com/Baldborne94/baldmusic-player/releases/tag/apk-latest"
+
+        @Suppress("DEPRECATION")
+        private val SIGNING_FLAGS =
+            if (Build.VERSION.SDK_INT >= 28) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES else android.content.pm.PackageManager.GET_SIGNATURES
         private const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
         private const val KEY_JSON = "latest"
         private const val KEY_CHECKED = "checked_at"

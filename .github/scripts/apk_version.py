@@ -27,7 +27,9 @@ def is_ancestor(sha: str) -> bool:
 def changes(prev_sha: str | None) -> list[str]:
     # Primo APK con le novità, o commit precedente sparito: solo l'ultima PR.
     span = f"{prev_sha}..HEAD" if prev_sha and is_ancestor(prev_sha) else "HEAD~1..HEAD"
-    out = git("log", "--first-parent", "--format=%P%x1f%s%x1f%b%x1e", span, "--", "android")
+    # ":(top)android": la cartella android/ della radice del repository, da qualunque cartella si
+    # lanci lo script (la CI lo lancia da android/, dove "android" sarebbe android/android).
+    out = git("log", "--first-parent", "--format=%P%x1f%s%x1f%b%x1e", span, "--", ":(top)android")
     titles: list[str] = []
     for record in out.split("\x1e"):
         if not record.strip():

@@ -9,3 +9,4 @@ dist/
 # Prove nel browser (Playwright)
 test-results/
 playwright-report/
+__pycache__/

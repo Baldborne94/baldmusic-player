@@ -6,10 +6,10 @@ name: App Android
 
 on:
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/apk_version.py"]
+    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/**"]
   push:
     branches: [main]
-    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/apk_version.py"]
+    paths: ["android/**", ".github/workflows/android.yml", ".github/scripts/**"]
   workflow_dispatch:
 
 jobs:
@@ -50,6 +50,11 @@ jobs:
 
       - name: Test della logica condivisa
         run: ./gradlew :core:test --no-daemon
+
+      # Lo script delle novità gira da android/ come qui sotto: i suoi test lo provano così.
+      - name: Test degli script della CI
+        run: python3 -m unittest discover -s ../.github/scripts -p 'test_*.py'
+
 
       - name: Compila l'APK
         run: ./gradlew :app:assembleRelease --no-daemon
