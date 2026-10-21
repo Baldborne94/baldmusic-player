@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.LetterIndex
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
@@ -74,65 +77,72 @@ fun LibraryScreen(vm: PlayerViewModel) {
         Filter.ARTIST -> artists.orEmpty()
     }.let { if (alphabetical) it.sortedBy { i -> io.github.baldborne94.baldmusic.core.library.ArtistNames.sortKey(i.title()) } else it }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item {
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(CircleShape).background(AccentBrush), contentAlignment = Alignment.Center) {
-                    Text("B", fontWeight = FontWeight.Black, color = Color.Black)
+    // Artisti e album per lettera, come in Android Auto (solo nell'ordine della libreria, che è già alfabetico).
+    val lettered = !alphabetical && (filter == Filter.ARTIST || filter == Filter.ALBUM)
+    val listState = rememberLazyListState()
+    // Sopra l'elenco: titolo, filtri e ordine.
+    val letters = remember(items, lettered) { if (lettered) LetterIndex.entries(items.map { it.group }, before = 3) else emptyList() }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(AccentBrush), contentAlignment = Alignment.Center) {
+                        Text("B", fontWeight = FontWeight.Black, color = Color.Black)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text("La tua libreria", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { ui.push(Screen.Cleanup) }) { Icon(Icons.Rounded.CleaningServices, "Pulizia della libreria") }
+                    IconButton(onClick = { creating = true }) { Icon(Icons.Rounded.Add, "Crea playlist", modifier = Modifier.size(28.dp)) }
                 }
-                Spacer(Modifier.width(12.dp))
-                Text("La tua libreria", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                IconButton(onClick = { ui.push(Screen.Cleanup) }) { Icon(Icons.Rounded.CleaningServices, "Pulizia della libreria") }
-                IconButton(onClick = { creating = true }) { Icon(Icons.Rounded.Add, "Crea playlist", modifier = Modifier.size(28.dp)) }
             }
-        }
-        item {
-            LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (filter != null) {
-                    item {
-                        Box(Modifier.size(34.dp).clip(CircleShape).background(Surface2).clickable { filter = null }, contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.Close, "Tutto", modifier = Modifier.size(18.dp))
+            item {
+                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (filter != null) {
+                        item {
+                            Box(Modifier.size(34.dp).clip(CircleShape).background(Surface2).clickable { filter = null }, contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.Close, "Tutto", modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
-                }
-                items(Filter.entries.filter { filter == null || it == filter }) { f ->
-                    Chip(f.label, selected = filter == f) { filter = if (filter == f) null else f }
+                    items(Filter.entries.filter { filter == null || it == filter }) { f ->
+                        Chip(f.label, selected = filter == f) { filter = if (filter == f) null else f }
+                    }
                 }
             }
-        }
-        item {
-            Row(
-                Modifier.fillMaxWidth().clickable { alphabetical = !alphabetical }.padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.Sort, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (alphabetical) "Alfabetico" else "Recenti", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-        }
-        if (filter == null || filter == Filter.PLAYLIST) {
             item {
-                val liked = MediaItem.Builder()
-                    .setMediaId("${PersonalSource.KEY}/${PersonalSource.LIKED}")
-                    .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder().setTitle("Brani che ti piacciono").build())
-                    .build()
-                ContainerRow(liked, subtitle = "Playlist · ${PersonalSource.count(lib.liked.size)}", pinned = true) {
-                    ui.open(liked.mediaId, "Brani che ti piacciono")
+                Row(
+                    Modifier.fillMaxWidth().clickable { alphabetical = !alphabetical }.padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Sort, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (alphabetical) "Alfabetico" else "Recenti", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
-        }
-        // Artisti e album per lettera, come in Android Auto (solo nell'ordine della libreria, che è già alfabetico).
-        val lettered = !alphabetical && (filter == Filter.ARTIST || filter == Filter.ALBUM)
-        items.forEachIndexed { i, item ->
-            val group = item.group
-            if (lettered && group != null && (i == 0 || items[i - 1].group != group)) {
-                item(key = "lettera-$i-$group") { SectionHeader(group) }
+            if (filter == null || filter == Filter.PLAYLIST) {
+                item {
+                    val liked = MediaItem.Builder()
+                        .setMediaId("${PersonalSource.KEY}/${PersonalSource.LIKED}")
+                        .setMediaMetadata(androidx.media3.common.MediaMetadata.Builder().setTitle("Brani che ti piacciono").build())
+                        .build()
+                    ContainerRow(liked, subtitle = "Playlist · ${PersonalSource.count(lib.liked.size)}", pinned = true) {
+                        ui.open(liked.mediaId, "Brani che ti piacciono")
+                    }
+                }
             }
-            item(key = item.mediaId) { ContainerRow(item) { ui.open(item.mediaId, item.title()) } }
+            items.forEachIndexed { i, item ->
+                val group = item.group
+                if (lettered && group != null && (i == 0 || items[i - 1].group != group)) {
+                    item(key = "lettera-$i-$group") { SectionHeader(group) }
+                }
+                item(key = item.mediaId) { ContainerRow(item) { ui.open(item.mediaId, item.title()) } }
+            }
+            if (items.isEmpty() && filter == null) {
+                item { Message("Crea la tua prima playlist con il + qui sopra, oppure tocca il cuore sui brani che ti piacciono.") }
+            }
         }
-        if (items.isEmpty() && filter == null) {
-            item { Message("Crea la tua prima playlist con il + qui sopra, oppure tocca il cuore sui brani che ti piacciono.") }
-        }
+        LetterRail(letters, listState.isScrollInProgress, onJump = { listState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
     }
 
     if (creating) {

@@ -257,8 +257,9 @@ class LocalSource(
      */
     private fun withTags(r: Row): LocalTrack {
         val t = fileTags(r)
-        if (!untagged(t)) return t
-        return recognition.index.tagsFor(r.stamp)?.let { Recognition.applyTo(t, it) } ?: t
+        val shown = if (!untagged(t)) t else recognition.index.tagsFor(r.stamp)?.let { Recognition.applyTo(t, it) } ?: t
+        // Senza numero di traccia nei tag, quello del nome del file ("03 - Titolo.mp3").
+        return shown.withNumberFromName()
     }
 
     /** I file da riconoscere: tag già letti e niente ID di MusicBrainz. */
@@ -363,6 +364,7 @@ class LocalSource(
                     year = c.getInt(8),
                     dateAdded = c.getLong(9),
                     folder = folderOf(c.getString(10)),
+                    fileName = c.getString(10)?.substringAfterLast('/'),
                     albumArtist = if (c.columnCount > 13) c.getString(13)?.takeUnless { it == UNKNOWN || it.isBlank() } else null,
                 )
                 out += Row(song, FileStamp(id, modified = c.getLong(11), size = c.getLong(12)))

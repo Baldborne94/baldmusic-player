@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.LetterIndex
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -124,201 +126,218 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
         else -> artworkColor
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(160.dp),
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
-    ) {
-        val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
+    // Le lettere a lato: per album e artisti, o per i brani ("Tutti i brani"), sopra c'è la testata.
+    val gridState = rememberLazyGridState()
+    val letters = remember(containers, tracks, selecting, reordering, kind) {
+        LetterIndex.entries(containers.map { it.group }, before = 1).ifEmpty {
+            if (reordering) emptyList()
+            else {
+                val discography = if (kind == Kind.ARTIST && containers.isNotEmpty() && containers.none { it.group != null }) 1 else 0
+                val above = 1 + containers.size + LetterIndex.headers(containers.map { it.group }) + discography + if (selecting) 1 else 0
+                LetterIndex.entries(tracks.map { it.group }, before = above)
+            }
+        }
+    }
 
-        if (hero) {
-            item(span = full) {
-                HeroHeader(
-                    vm = vm,
-                    mediaId = mediaId,
-                    node = node,
-                    title = shownTitle,
-                    color = headerColor,
-                    likedPage = likedPage,
-                    tracks = tracks,
-                    containers = containers,
-                    onAddAll = { ui.addToPlaylist(tracks) },
-                    menuItems = buildList {
-                        if (tracks.isNotEmpty()) add("Seleziona brani" to { reordering = false; selecting = true })
-                        if (playlistId != null && tracks.size > 1) {
-                            add("Riordina brani" to { selecting = false; selected.clear(); reordering = true })
-                            add("Ordina per titolo" to { vm.sortPlaylist(playlistId, byArtist = false) })
-                            add("Ordina per artista" to { vm.sortPlaylist(playlistId, byArtist = true) })
-                        }
-                    },
-                    onRename = if (playlistId != null) ({ renaming = true }) else null,
-                    onDelete = if (playlistId != null) ({ confirmDelete = true }) else null,
-                    // Solo le raccolte: buttare i file di una playlist (magari col server dentro) non avrebbe senso.
-                    onTrashAll = ui.trash?.takeIf { isCollection && playlistId != null && tracks.any { localFileUri(it) != null } }?.let { trash ->
-                        {
-                            val files = tracks.filter { localFileUri(it) != null }
-                            trash(files, "Eliminare “$shownTitle” e i suoi ${if (files.size == 1) "brano" else "${files.size} brani"}?", null) {
-                                vm.deleteCollectionWithFiles(playlistId!!)
-                                ui.back()
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(160.dp),
+            modifier = Modifier.fillMaxSize(),
+            state = gridState,
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            val full: (androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan) = { GridItemSpan(maxLineSpan) }
+
+            if (hero) {
+                item(span = full) {
+                    HeroHeader(
+                        vm = vm,
+                        mediaId = mediaId,
+                        node = node,
+                        title = shownTitle,
+                        color = headerColor,
+                        likedPage = likedPage,
+                        tracks = tracks,
+                        containers = containers,
+                        onAddAll = { ui.addToPlaylist(tracks) },
+                        menuItems = buildList {
+                            if (tracks.isNotEmpty()) add("Seleziona brani" to { reordering = false; selecting = true })
+                            if (playlistId != null && tracks.size > 1) {
+                                add("Riordina brani" to { selecting = false; selected.clear(); reordering = true })
+                                add("Ordina per titolo" to { vm.sortPlaylist(playlistId, byArtist = false) })
+                                add("Ordina per artista" to { vm.sortPlaylist(playlistId, byArtist = true) })
                             }
-                        }
-                    },
-                )
-            }
-        } else {
-            item(span = full) {
-                Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor.copy(alpha = 0.6f), Background))).statusBarsPadding()) {
-                    IconButton(onClick = ui.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Indietro") }
-                    Text(shownTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
-                }
-            }
-        }
-
-        when {
-            error != null -> item(span = full) { Message(error) }
-            items == null -> item(span = full) { Loading() }
-            list.isEmpty() -> item(span = full) {
-                Message(
-                    when {
-                        likedPage -> "Tocca il cuore su un brano per ritrovarlo qui."
-                        playlistId != null -> "La playlist è vuota.\nAggiungi brani dal menu ⋮ di un brano o dal player."
-                        else -> "Qui non c'è niente."
-                    },
-                )
-            }
-        }
-
-        // Album, playlist, artisti: in griglia, tranne dentro un artista dove sono una lista con l'anno.
-        // Le intestazioni (lettera, tipo di uscita) vengono dal gruppo di ogni elemento, come in Android Auto.
-        if (containers.isNotEmpty()) {
-            if (kind == Kind.ARTIST) {
-                if (containers.none { it.group != null }) item(span = full) { SectionHeader("Discografia") }
-                containers.forEachIndexed { i, c ->
-                    groupHeader(containers, i, full)
-                    item(key = c.mediaId, span = full) {
-                        ContainerRow(c, subtitle = if (c.kind == Kind.SECTION) c.subtitle() else c.mediaMetadata.recordingYear?.toString()) { ui.open(c.mediaId, c.title()) }
-                    }
-                }
-            } else if (containers.all { it.kind == Kind.SECTION || it.kind == Kind.FOLDER }) {
-                containers.forEachIndexed { i, c ->
-                    groupHeader(containers, i, full)
-                    item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                        },
+                        onRename = if (playlistId != null) ({ renaming = true }) else null,
+                        onDelete = if (playlistId != null) ({ confirmDelete = true }) else null,
+                        // Solo le raccolte: buttare i file di una playlist (magari col server dentro) non avrebbe senso.
+                        onTrashAll = ui.trash?.takeIf { isCollection && playlistId != null && tracks.any { localFileUri(it) != null } }?.let { trash ->
+                            {
+                                val files = tracks.filter { localFileUri(it) != null }
+                                trash(files, "Eliminare “$shownTitle” e i suoi ${if (files.size == 1) "brano" else "${files.size} brani"}?", null) {
+                                    vm.deleteCollectionWithFiles(playlistId!!)
+                                    ui.back()
+                                }
+                            }
+                        },
+                    )
                 }
             } else {
-                containers.forEachIndexed { i, c ->
-                    groupHeader(containers, i, full)
-                    // Una sezione in mezzo alla griglia (es. "I tuoi più ascoltati" tra gli artisti) va su una riga sua.
-                    if (c.kind == Kind.SECTION) {
-                        item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
-                    } else {
-                        item(key = c.mediaId) { Box(Modifier.padding(horizontal = 6.dp)) { GridCard(c) { ui.open(c.mediaId, c.title()) } } }
+                item(span = full) {
+                    Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(headerColor.copy(alpha = 0.6f), Background))).statusBarsPadding()) {
+                        IconButton(onClick = ui.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Indietro") }
+                        Text(shownTitle, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
                     }
                 }
             }
-        }
 
-        val numbered = id?.kind == "album"
-        if (selecting) {
-            item(span = full) {
-                val chosen = tracks.filter { it.mediaId in selected }
-                Row(Modifier.fillMaxWidth().background(Surface2).padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { selecting = false; selected.clear() }) { Icon(Icons.Rounded.Close, "Esci dalla selezione") }
-                    Text(if (chosen.size == 1) "1 selezionato" else "${chosen.size} selezionati", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
-                    IconButton(onClick = {
-                        if (chosen.size == tracks.size) selected.clear() else { selected.clear(); selected.addAll(tracks.map { it.mediaId }) }
-                    }) { Icon(Icons.Rounded.SelectAll, "Seleziona tutti") }
-                    IconButton(enabled = chosen.isNotEmpty(), onClick = { ui.addToPlaylist(chosen) }) {
-                        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi a una playlist o raccolta")
-                    }
-                    if (playlistId != null) {
-                        IconButton(enabled = chosen.isNotEmpty(), onClick = { vm.removeFromPlaylist(playlistId, chosen); selected.clear() }) {
-                            Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection) "Togli dalla raccolta" else "Togli dalla playlist")
-                        }
-                    }
-                    val trash = ui.trash
-                    if (trash != null && chosen.any { localFileUri(it) != null }) {
-                        IconButton(onClick = {
-                            val files = chosen.filter { localFileUri(it) != null }
-                            trash(files, "Eliminare ${if (files.size == 1) "1 brano" else "${files.size} brani"} dal telefono?", null) {
-                                selected.clear()
-                                selecting = false
-                            }
-                        }) { Icon(Icons.Rounded.Delete, "Elimina dal telefono", tint = Danger) }
-                    }
-                }
-            }
-        }
-        if (reordering && playlistId != null) {
-            item(span = full) {
-                Row(Modifier.fillMaxWidth().background(Surface2).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Trascina ≡ per spostare un brano", Modifier.weight(1f), color = TextMuted, fontSize = 14.sp)
-                    androidx.compose.material3.TextButton(onClick = { reordering = false }) { Text("Fatto", color = Accent, fontWeight = FontWeight.Bold) }
-                }
-            }
-            items(order, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
-                val moving = dragging == item.mediaId
-                ReorderRow(
-                    item,
-                    Modifier
-                        .zIndex(if (moving) 1f else 0f)
-                        .graphicsLayer { translationY = if (moving) dragOffset else 0f }
-                        .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) },
-                    onDragStart = { dragging = item.mediaId; dragOffset = 0f },
-                    onDrag = { dy ->
-                        dragOffset += dy
-                        val i = order.indexOfFirst { it.mediaId == item.mediaId }
-                        // Superata metà della riga vicina, il brano prende il suo posto.
-                        if (dragOffset > rowHeight / 2 && i in 0 until order.lastIndex) {
-                            order.add(i + 1, order.removeAt(i))
-                            dragOffset -= rowHeight
-                        } else if (dragOffset < -rowHeight / 2 && i > 0) {
-                            order.add(i - 1, order.removeAt(i))
-                            dragOffset += rowHeight
-                        }
-                    },
-                    onDragEnd = {
-                        dragging = null
-                        dragOffset = 0f
-                        vm.reorderPlaylist(playlistId, order.toList())
-                    },
-                )
-            }
-        } else {
-            tracks.forEachIndexed { i, item ->
-                // "Disco 2" in un album, la lettera in "Tutti i brani".
-                groupHeader(tracks, i, full)
-                item(key = item.mediaId, span = full) {
-                    TrackRow(
-                        item,
-                        active = sameTrack(item.mediaId, vm.current?.mediaId),
-                        liked = lib.isLiked(item.mediaId),
-                        number = if (numbered) item.mediaMetadata.trackNumber else null,
-                        onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
-                        onMenu = { ui.trackMenu(item, playlistId) },
-                        onSwipeQueue = { vm.enqueue(item) },
-                        selected = if (selecting) item.mediaId in selected else null,
-                        // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).
-                        onLongClick = {
-                            selecting = true
-                            reordering = false
-                            toggle(item)
+            when {
+                error != null -> item(span = full) { Message(error) }
+                items == null -> item(span = full) { Loading() }
+                list.isEmpty() -> item(span = full) {
+                    Message(
+                        when {
+                            likedPage -> "Tocca il cuore su un brano per ritrovarlo qui."
+                            playlistId != null -> "La playlist è vuota.\nAggiungi brani dal menu ⋮ di un brano o dal player."
+                            else -> "Qui non c'è niente."
                         },
                     )
                 }
             }
-        }
 
-        if (tracks.size > 1) {
-            item(span = full) {
-                val total = tracks.sumOf { it.mediaMetadata.durationMs ?: 0L }
-                Text(
-                    "${PersonalSource.count(tracks.size)}${if (total > 0) " · ${formatTotal(total)}" else ""}",
-                    color = TextMuted,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(16.dp),
-                )
+            // Album, playlist, artisti: in griglia, tranne dentro un artista dove sono una lista con l'anno.
+            // Le intestazioni (lettera, tipo di uscita) vengono dal gruppo di ogni elemento, come in Android Auto.
+            if (containers.isNotEmpty()) {
+                if (kind == Kind.ARTIST) {
+                    if (containers.none { it.group != null }) item(span = full) { SectionHeader("Discografia") }
+                    containers.forEachIndexed { i, c ->
+                        groupHeader(containers, i, full)
+                        item(key = c.mediaId, span = full) {
+                            ContainerRow(c, subtitle = if (c.kind == Kind.SECTION) c.subtitle() else c.mediaMetadata.recordingYear?.toString()) { ui.open(c.mediaId, c.title()) }
+                        }
+                    }
+                } else if (containers.all { it.kind == Kind.SECTION || it.kind == Kind.FOLDER }) {
+                    containers.forEachIndexed { i, c ->
+                        groupHeader(containers, i, full)
+                        item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                    }
+                } else {
+                    containers.forEachIndexed { i, c ->
+                        groupHeader(containers, i, full)
+                        // Una sezione in mezzo alla griglia (es. "I tuoi più ascoltati" tra gli artisti) va su una riga sua.
+                        if (c.kind == Kind.SECTION) {
+                            item(key = c.mediaId, span = full) { ContainerRow(c) { ui.open(c.mediaId, c.title()) } }
+                        } else {
+                            item(key = c.mediaId) { Box(Modifier.padding(horizontal = 6.dp)) { GridCard(c) { ui.open(c.mediaId, c.title()) } } }
+                        }
+                    }
+                }
+            }
+
+            val numbered = id?.kind == "album"
+            if (selecting) {
+                item(span = full) {
+                    val chosen = tracks.filter { it.mediaId in selected }
+                    Row(Modifier.fillMaxWidth().background(Surface2).padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { selecting = false; selected.clear() }) { Icon(Icons.Rounded.Close, "Esci dalla selezione") }
+                        Text(if (chosen.size == 1) "1 selezionato" else "${chosen.size} selezionati", Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        IconButton(onClick = {
+                            if (chosen.size == tracks.size) selected.clear() else { selected.clear(); selected.addAll(tracks.map { it.mediaId }) }
+                        }) { Icon(Icons.Rounded.SelectAll, "Seleziona tutti") }
+                        IconButton(enabled = chosen.isNotEmpty(), onClick = { ui.addToPlaylist(chosen) }) {
+                            Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi a una playlist o raccolta")
+                        }
+                        if (playlistId != null) {
+                            IconButton(enabled = chosen.isNotEmpty(), onClick = { vm.removeFromPlaylist(playlistId, chosen); selected.clear() }) {
+                                Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection) "Togli dalla raccolta" else "Togli dalla playlist")
+                            }
+                        }
+                        val trash = ui.trash
+                        if (trash != null && chosen.any { localFileUri(it) != null }) {
+                            IconButton(onClick = {
+                                val files = chosen.filter { localFileUri(it) != null }
+                                trash(files, "Eliminare ${if (files.size == 1) "1 brano" else "${files.size} brani"} dal telefono?", null) {
+                                    selected.clear()
+                                    selecting = false
+                                }
+                            }) { Icon(Icons.Rounded.Delete, "Elimina dal telefono", tint = Danger) }
+                        }
+                    }
+                }
+            }
+            if (reordering && playlistId != null) {
+                item(span = full) {
+                    Row(Modifier.fillMaxWidth().background(Surface2).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Trascina ≡ per spostare un brano", Modifier.weight(1f), color = TextMuted, fontSize = 14.sp)
+                        androidx.compose.material3.TextButton(onClick = { reordering = false }) { Text("Fatto", color = Accent, fontWeight = FontWeight.Bold) }
+                    }
+                }
+                items(order, key = { it.mediaId }, span = { GridItemSpan(maxLineSpan) }) { item ->
+                    val moving = dragging == item.mediaId
+                    ReorderRow(
+                        item,
+                        Modifier
+                            .zIndex(if (moving) 1f else 0f)
+                            .graphicsLayer { translationY = if (moving) dragOffset else 0f }
+                            .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) },
+                        onDragStart = { dragging = item.mediaId; dragOffset = 0f },
+                        onDrag = { dy ->
+                            dragOffset += dy
+                            val i = order.indexOfFirst { it.mediaId == item.mediaId }
+                            // Superata metà della riga vicina, il brano prende il suo posto.
+                            if (dragOffset > rowHeight / 2 && i in 0 until order.lastIndex) {
+                                order.add(i + 1, order.removeAt(i))
+                                dragOffset -= rowHeight
+                            } else if (dragOffset < -rowHeight / 2 && i > 0) {
+                                order.add(i - 1, order.removeAt(i))
+                                dragOffset += rowHeight
+                            }
+                        },
+                        onDragEnd = {
+                            dragging = null
+                            dragOffset = 0f
+                            vm.reorderPlaylist(playlistId, order.toList())
+                        },
+                    )
+                }
+            } else {
+                tracks.forEachIndexed { i, item ->
+                    // "Disco 2" in un album, la lettera in "Tutti i brani".
+                    groupHeader(tracks, i, full)
+                    item(key = item.mediaId, span = full) {
+                        TrackRow(
+                            item,
+                            active = sameTrack(item.mediaId, vm.current?.mediaId),
+                            liked = lib.isLiked(item.mediaId),
+                            number = if (numbered) item.mediaMetadata.trackNumber else null,
+                            onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
+                            onMenu = { ui.trackMenu(item, playlistId) },
+                            onSwipeQueue = { vm.enqueue(item) },
+                            selected = if (selecting) item.mediaId in selected else null,
+                            // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).
+                            onLongClick = {
+                                selecting = true
+                                reordering = false
+                                toggle(item)
+                            },
+                        )
+                    }
+                }
+            }
+
+            if (tracks.size > 1) {
+                item(span = full) {
+                    val total = tracks.sumOf { it.mediaMetadata.durationMs ?: 0L }
+                    Text(
+                        "${PersonalSource.count(tracks.size)}${if (total > 0) " · ${formatTotal(total)}" else ""}",
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
             }
         }
+        LetterRail(letters, gridState.isScrollInProgress, onJump = { gridState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
     }
 
     if (renaming && playlistId != null) {
