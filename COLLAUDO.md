@@ -45,6 +45,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | T-12 | Decenni | Nessun brano negli «Anni 70» solo perché il file dice 1970 |
 | T-13 | Cerca un artista, un titolo, una raccolta | Risultati giusti, anche senza accenti |
 | T-14 | ⋮ → Informazioni sul brano | Tag leggibili; per un brano tra gli sparsi si capisce il perché |
+| T-15 | Un disco con la copertina rovinata nel file (righe di colori a caso, come «Classical Music»), dopo l'aggiornamento | Al suo posto la copertina di un altro brano dello stesso disco, o nessuna copertina; mai le righe colorate, neanche nei mosaici delle raccolte e in Android Auto |
 
 ### Raccolte e playlist (dopo modifiche a playlist, selezione, riordino)
 
@@ -119,6 +120,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | B-5 | Su un altro telefono o tablet con gli stessi file | Il ripristino ritrova i brani anche se il telefono è diverso; quelli che mancano sono elencati |
 | B-6 | «Ripristina…» con un file qualsiasi (una foto, un testo) | «Questo file non è un backup di BaldMusic», nessun cambiamento |
 | B-7 | Telefono nuovo configurato col trasferimento di Android (o dal backup di Google) | Le impostazioni ci sono; preferiti e playlist no (non puntano a brani sbagliati): in Home compare «Hai già usato BaldMusic?» per ripristinarli dal backup |
+| B-9 | Imposta server, chiave di AcoustID, dissolvenza 9 s; salva un backup; disinstalla, reinstalla e ripristina | Tornano preferiti, playlist e le impostazioni: dissolvenza 9 s, chiave di AcoustID, testi, ReplayGain; in Impostazioni → Server indirizzo e utente sono già scritti, basta la password. Nel file di backup non c'è nessun token né password |
 
 ### Aggiornamenti (dopo modifiche a aggiornamenti o alla CI)
 

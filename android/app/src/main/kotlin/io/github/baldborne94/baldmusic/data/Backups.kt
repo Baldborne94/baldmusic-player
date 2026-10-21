@@ -7,9 +7,12 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.edit
+import io.github.baldborne94.baldmusic.Settings
 import io.github.baldborne94.baldmusic.core.library.Backup
+import io.github.baldborne94.baldmusic.core.library.BackupSettings
 import io.github.baldborne94.baldmusic.core.library.LibraryBackup
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
+import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.library.RestorePlan
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.library.LocalSource
@@ -22,6 +25,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,7 +36,12 @@ import kotlinx.coroutines.withContext
  * in Download/BaldMusic, fuori dall'app: disinstallandola resta lì, e da "Ripristina da
  * un backup" la ritrovi anche su un telefono nuovo. Le regole stanno in [LibraryBackup].
  */
-class Backups(private val context: Context, private val userData: UserData, private val local: LocalSource) {
+class Backups(
+    private val context: Context,
+    private val userData: UserData,
+    private val local: LocalSource,
+    private val settings: () -> Settings,
+) {
 
     /** Ultimo backup automatico riuscito (millis), o l'errore dell'ultimo tentativo. */
     data class AutoStatus(val lastAt: Long?, val error: String? = null)
@@ -59,7 +69,9 @@ class Backups(private val context: Context, private val userData: UserData, priv
     fun start() {
         if (!autoSupported) return
         scope.launch {
-            userData.state.drop(1).debounce(AUTO_DELAY_MS).collect { if (_autoEnabled.value) writeAuto() }
+            // Anche quando cambia un'impostazione: server, chiave di AcoustID, dissolvenza…
+            merge(userData.state.drop(1).map { }, settings().edits.drop(1).map { })
+                .debounce(AUTO_DELAY_MS).collect { if (_autoEnabled.value) writeAuto() }
         }
     }
 
@@ -68,7 +80,23 @@ class Backups(private val context: Context, private val userData: UserData, priv
         lib.liked.isNotEmpty() || lib.plays.isNotEmpty() || lib.playlists.any { !it.isCollection || it.removed.isNotEmpty() }
 
     private suspend fun snapshot(): String =
-        LibraryBackup.encode(LibraryBackup.create(userData.value, local.allTracks(), System.currentTimeMillis()))
+        LibraryBackup.encode(LibraryBackup.create(userData.value, local.allTracks(), System.currentTimeMillis(), currentSettings()))
+
+    /** Le impostazioni da mettere nel backup: del server solo indirizzo e utente, mai il token. */
+    private fun currentSettings(): BackupSettings {
+        val s = settings()
+        val server = s.credentials?.let { it.url to it.user } ?: s.savedServer
+        return BackupSettings(
+            serverUrl = server?.first,
+            serverUser = server?.second?.takeIf { it.isNotBlank() },
+            acoustIdKey = s.acoustIdKey,
+            lyricsOnline = s.lyricsOnline,
+            replayGain = s.replayGain.value.name,
+            crossfadeSeconds = s.crossfade.value,
+            continueListening = s.continueListening,
+            autoBackup = _autoEnabled.value,
+        )
+    }
 
     /** "Salva un backup…": nel file scelto dall'utente. */
     suspend fun writeTo(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
@@ -86,8 +114,22 @@ class Backups(private val context: Context, private val userData: UserData, priv
     /** Cosa farebbe il ripristino con i brani che ci sono adesso sul telefono. */
     suspend fun plan(backup: Backup): RestorePlan = withContext(Dispatchers.Default) { LibraryBackup.restore(backup, local.allTracks()) }
 
-    /** Sostituisce la tua musica con quella del backup. */
-    fun apply(plan: RestorePlan) = userData.replaceAll(plan.library)
+    /**
+     * Sostituisce la tua musica con quella del backup e rimette le impostazioni. Il server
+     * collegato adesso resta com'è; se non c'è, indirizzo e utente si ricordano per il modulo.
+     */
+    fun apply(plan: RestorePlan) {
+        userData.replaceAll(plan.library)
+        val saved = plan.settings ?: return
+        val s = settings()
+        saved.serverUrl?.let { s.rememberServer(it, saved.serverUser) }
+        if (s.acoustIdKey == null) saved.acoustIdKey?.let { s.acoustIdKey = it }
+        saved.lyricsOnline?.let { s.lyricsOnline = it }
+        saved.replayGain?.let { name -> ReplayGainMode.entries.firstOrNull { it.name == name } }?.let(s::setReplayGain)
+        saved.crossfadeSeconds?.let(s::setCrossfade)
+        saved.continueListening?.let { s.continueListening = it }
+        saved.autoBackup?.let(::setAutoEnabled)
+    }
 
     /** La copia in Download/BaldMusic, sovrascritta ogni volta. */
     private suspend fun writeAuto() {
@@ -99,7 +141,7 @@ class Backups(private val context: Context, private val userData: UserData, priv
         val localIds = userData.value.let { lib -> lib.liked + lib.playlists.flatMap { it.tracks } }.any { it.id.startsWith("${LocalCatalog.KEY}/") }
         if (tracks.isEmpty() && localIds) return
         val result = runCatching {
-            val text = LibraryBackup.encode(LibraryBackup.create(userData.value, tracks, System.currentTimeMillis())).toByteArray()
+            val text = LibraryBackup.encode(LibraryBackup.create(userData.value, tracks, System.currentTimeMillis(), currentSettings())).toByteArray()
             val resolver = context.contentResolver
             // Il file scritto da questa installazione; dopo una reinstallazione se ne crea uno nuovo.
             val saved = prefs.getString(KEY_URI, null)?.let(Uri::parse)

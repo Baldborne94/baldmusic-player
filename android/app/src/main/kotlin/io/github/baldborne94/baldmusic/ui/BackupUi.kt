@@ -93,6 +93,12 @@ private fun rememberRestore(onMessage: (String) -> Unit): () -> Unit {
                             color = TextMuted,
                         )
                     }
+                    plan.settings?.let { s ->
+                        Text(
+                            "Tornano anche le impostazioni" + (s.serverUrl?.let { " e il server ($it): per ricollegarlo basta la password" } ?: "") + ".",
+                            color = TextMuted,
+                        )
+                    }
                     Text("La tua musica di adesso viene sostituita da quella del backup.", color = TextMuted)
                 }
             },
@@ -100,7 +106,10 @@ private fun rememberRestore(onMessage: (String) -> Unit): () -> Unit {
                 TextButton(onClick = {
                     backups.apply(plan)
                     pending = null
-                    onMessage("Fatto: preferiti, playlist e raccolte sono tornati.")
+                    onMessage(
+                        "Fatto: preferiti, playlist e raccolte sono tornati." +
+                            (if (plan.settings?.serverUrl != null && context.app.settings.credentials == null) " Per il server: Impostazioni → Server Navidrome, scrivi la password e collegati." else ""),
+                    )
                 }) { Text("Ripristina", color = Accent) }
             },
             dismissButton = { TextButton(onClick = { pending = null }) { Text("Annulla", color = TextMuted) } },
