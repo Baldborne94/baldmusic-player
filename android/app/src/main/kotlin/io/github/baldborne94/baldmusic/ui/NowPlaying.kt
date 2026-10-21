@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
@@ -110,6 +111,7 @@ fun NowPlayingScreen(
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     var sleepSheet by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var info by remember { mutableStateOf(false) }
     var dragY by remember { mutableFloatStateOf(0f) }
 
     // Testo: si cerca a ogni cambio di brano, dalla cache o da LRCLIB.
@@ -190,6 +192,14 @@ fun NowPlayingScreen(
                             leadingIcon = { Icon(Icons.Rounded.Timer, null) },
                             onClick = { menu = false; sleepSheet = true },
                         )
+                        // Solo per i brani del telefono: i tag del server li legge Navidrome.
+                        if (localTrackId(item) != null) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Informazioni sul brano") },
+                                leadingIcon = { Icon(Icons.Rounded.Info, null) },
+                                onClick = { menu = false; info = true },
+                            )
+                        }
                     }
                 }
             }
@@ -268,6 +278,7 @@ fun NowPlayingScreen(
         }
     }
 
+    if (info) localTrackId(item)?.let { id -> TrackInfoDialog(id, item.title(), onDismiss = { info = false }) }
     if (sleepSheet) {
         ModalBottomSheet(onDismissRequest = { sleepSheet = false }, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
             SleepTimerOptions(sleepEnd) { minutes ->

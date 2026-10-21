@@ -14,12 +14,14 @@ import android.provider.MediaStore
 import android.util.Size
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.artwork.ArtworkCheck
+import io.github.baldborne94.baldmusic.core.artwork.CoverDownloads
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import okhttp3.Request
 import java.io.File
 import java.io.FileNotFoundException
+import java.util.concurrent.Executors
 
 /**
  * Serve le copertine come content://<pacchetto>.artwork/<sorgente>/<id>.
@@ -76,27 +78,18 @@ class ArtworkProvider : ContentProvider() {
 
     /**
      * La copertina vera di un brano riconosciuto: "<gruppo MusicBrainz>~<album di Android>".
-     * Se Cover Art Archive non ce l'ha, si tiene per sempre quella del file; senza rete si
-     * mostra quella del file ma non si ricorda, così la prossima volta si riprova.
+     * Non si aspetta mai la rete ([CoverDownloads]): finché non è scaricata si mostra quella
+     * del file e la vera si scarica in sottofondo, per la richiesta dopo. Se Cover Art Archive
+     * non ce l'ha si tiene per sempre quella del file; senza rete si riprova la volta dopo.
      */
     private fun cover(ctx: Context, id: String, out: File): File? {
         val mbid = id.substringBefore('~')
-        val albumId = id.substringAfter('~', "")
-        val token = Binder.clearCallingIdentity()
-        val found = try {
-            fetchCover(ctx, mbid, out)
-        } catch (e: Exception) {
-            null
-        } finally {
-            Binder.restoreCallingIdentity(token)
-        }
-        return when (found) {
-            true -> out
-            false -> cached(ctx, LocalCatalog.KEY, albumId)?.let { local ->
-                runCatching { writeAtomically(out) { stream -> local.inputStream().use { it.copyTo(stream) }; true } }
-                local
+        val local = { cached(ctx, LocalCatalog.KEY, id.substringAfter('~', "")) }
+        return downloads.shown(id, real = null, local = local) {
+            val found = runCatching { fetchCover(ctx, mbid, out) }.getOrNull()
+            if (found == false) {
+                local()?.let { file -> runCatching { writeAtomically(out) { stream -> file.inputStream().use { it.copyTo(stream) }; true } } }
             }
-            null -> cached(ctx, LocalCatalog.KEY, albumId)
         }
     }
 
@@ -227,6 +220,9 @@ class ArtworkProvider : ContentProvider() {
         private const val SIZE = 512
         private const val CHECK_SIZE = 64
         private const val MAX_TRACKS_TO_TRY = 6
+
+        /** Le copertine vere da Cover Art Archive: due download alla volta, in sottofondo. */
+        private val downloads = CoverDownloads(Executors.newFixedThreadPool(2)::execute)
 
         /**
          * La cartella delle copertine. Cambia nome quando cambia come si preparano, così quelle

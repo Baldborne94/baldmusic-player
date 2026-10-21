@@ -48,6 +48,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | T-15 | Un disco con la copertina rovinata nel file (righe di colori a caso, come «Classical Music»), dopo l'aggiornamento | Al suo posto la copertina di un altro brano dello stesso disco, o nessuna copertina; mai le righe colorate, neanche nei mosaici delle raccolte e in Android Auto |
 | T-16 | Un album i cui file sono numerati solo nel nome («01 - …», «02 - …»), senza il tag della traccia | Brani nell'ordine dei file; ⋮ → Informazioni sul brano: «Traccia 2 (dal nome del file)»; un file «99 Luftballons» o «883 - …» non prende un numero |
 | T-17 | Libreria → Artisti (o Album, o una pagina con più di 40 elementi), scorri | A destra compaiono le lettere; tocca o trascina: salta alla lettera, con la lettera grande accanto al dito; ferma la lista, dopo un attimo le lettere spariscono e i ⋮ delle righe si toccano di nuovo |
+| T-18 | Un brano riconosciuto e applicato (AcoustID), aperto nel lettore con la rete lenta o assente | La copertina del file compare subito, mai il riquadro vuoto; con la rete, dalla volta dopo quella vera. Il ⋮ del lettore ha «Informazioni sul brano» (solo brani del telefono) |
 
 ### Raccolte e playlist (dopo modifiche a playlist, selezione, riordino)
 

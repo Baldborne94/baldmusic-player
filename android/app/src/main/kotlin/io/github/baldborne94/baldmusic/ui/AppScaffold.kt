@@ -102,10 +102,13 @@ data class Ui(
 /** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
 private class TrashAsk(val items: List<MediaItem>, val title: String, val note: String?, val onDone: () -> Unit)
 
+/** L'ID di MediaStore di un brano del telefono; null per gli altri brani. */
+fun localTrackId(item: MediaItem): Long? =
+    MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
+
 /** Il file di un brano del telefono, per MediaStore; null per gli altri brani. */
 fun localFileUri(item: MediaItem): android.net.Uri? =
-    MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
-        ?.let { android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
+    localTrackId(item)?.let { android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
 
 val LocalUi = staticCompositionLocalOf<Ui> { error("Ui non fornita") }
 
@@ -255,8 +258,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onTrash = ui.trash?.takeIf { localFileUri(item) != null }?.let { trash ->
                         { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
-                    onInfo = MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
-                        ?.let { id -> { infoFor = id to item.title() } },
+                    onInfo = localTrackId(item)?.let { id -> { infoFor = id to item.title() } },
                 )
             }
 
