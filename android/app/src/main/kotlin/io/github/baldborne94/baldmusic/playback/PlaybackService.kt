@@ -40,12 +40,14 @@ import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
+import io.github.baldborne94.baldmusic.core.library.RecentSearches
 import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.SleepTimer
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -58,7 +60,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Riproduce la musica ed espone la libreria. La stessa sessione serve:
@@ -72,7 +73,8 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var session: MediaLibrarySession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val tree get() = app.tree
-    private val searches = ConcurrentHashMap<String, List<LibraryNode>>()
+    /** Ogni ricerca dell'app o di Auto chiede di cercare e poi i risultati: si cerca una volta. */
+    private val searches = RecentSearches<Deferred<List<LibraryNode>>>()
     private var scrobbleJob: Job? = null
     private var listenJob: Job? = null
     private var sleepJob: Job? = null
@@ -121,6 +123,8 @@ class PlaybackService : MediaLibraryService() {
         // Mi piace, playlist, cronologia: Android Auto rilegge "La tua musica" e il cuore si aggiorna.
         scope.launch {
             app.userData.state.drop(1).collect {
+                // Un cuore o una playlist cambiano i risultati: le ricerche si rifanno.
+                searches.clear()
                 listOf(PersonalSource.KEY, "${PersonalSource.KEY}/${PersonalSource.LIKED}", "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}",
                     "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}",
                     "${PersonalSource.KEY}/${PersonalSource.RECENT}", "${PersonalSource.KEY}/${PersonalSource.TOP}").forEach { id ->
@@ -191,7 +195,11 @@ class PlaybackService : MediaLibraryService() {
         val item = player.currentMediaItem ?: return
         app.settings.saveLast(item.mediaId, player.currentPosition)
         val snapshot = QueueSnapshot.of(
-            ids = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId },
+            // Letta un brano alla volta: si leggono solo i brani che si tengono.
+            ids = object : AbstractList<String>() {
+                override val size = player.mediaItemCount
+                override fun get(index: Int) = player.getMediaItemAt(index).mediaId
+            },
             index = player.currentMediaItemIndex,
             positionMs = player.currentPosition,
             shuffle = player.shuffleModeEnabled,
@@ -601,6 +609,9 @@ class PlaybackService : MediaLibraryService() {
         return listOfNotNull(tree.resolve(item.mediaId)?.toMediaItem(this))
     }
 
+    private suspend fun searched(query: String): List<LibraryNode> =
+        searches.getOrPut(query) { scope.async { runCatching { tree.search(query) }.getOrDefault(emptyList()) } }.await()
+
     private inner class LibraryCallback : MediaLibrarySession.Callback {
 
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
@@ -696,8 +707,7 @@ class PlaybackService : MediaLibraryService() {
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<Void>> {
             scope.launch {
-                val results = runCatching { tree.search(query) }.getOrDefault(emptyList())
-                searches[query] = results
+                val results = searched(query)
                 session.notifySearchResultChanged(browser, query, results.size, params)
             }
             return Futures.immediateFuture(LibraryResult.ofVoid())
@@ -711,7 +721,7 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?,
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> = scope.future {
-            val results = searches[query] ?: runCatching { tree.search(query) }.getOrDefault(emptyList())
+            val results = searched(query)
             LibraryResult.ofItemList(results.page(page, pageSize).toItems(), params)
         }
 

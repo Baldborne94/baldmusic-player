@@ -677,5 +677,5 @@ class LocalCatalog(
 }
 
 /** Ordina calcolando la chiave una volta per elemento (sortedBy la ricalcola a ogni confronto). */
-internal inline fun <T> List<T>.sortedByKey(crossinline key: (T) -> String): List<T> =
+inline fun <T> List<T>.sortedByKey(crossinline key: (T) -> String): List<T> =
     map { it to key(it) }.sortedBy { it.second }.map { it.first }

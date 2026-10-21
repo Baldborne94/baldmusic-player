@@ -53,10 +53,20 @@ class ArtworkProvider : ContentProvider() {
     /** La copertina nella cache, scaricata o composta se manca; null se non si trova. */
     private fun cached(ctx: Context, source: String, id: String): File? {
         val dir = File(ctx.cacheDir, CACHE_DIR).apply { mkdirs() }
-        val safeName = id.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val safeName = id.replace(UNSAFE, "_")
         val file = File(dir, "$source-$safeName.jpg")
         if (file.exists() && file.length() > 0L) return file
         if (brokenMark(file).exists()) return null
+        // Le righe di un disco chiedono tutte la stessa copertina insieme: si prepara una volta.
+        return synchronized(locks.getOrPut(file.name) { Any() }) {
+            if (file.exists() && file.length() > 0L) file
+            else if (brokenMark(file).exists()) null
+            else prepare(ctx, source, id, file)
+        }
+    }
+
+    /** La copertina che manca nella cache: dal telefono, dal server, da Cover Art Archive o composta. */
+    private fun prepare(ctx: Context, source: String, id: String, file: File): File? {
         // Chi chiama è Android Auto (un'altra app): le letture verso MediaStore
         // e la rete devono partire con l'identità di BaldMusic.
         if (source == LocalCatalog.COVER) return cover(ctx, id, file)
@@ -95,7 +105,7 @@ class ArtworkProvider : ContentProvider() {
 
     /** true = scaricata, false = l'archivio non ce l'ha, null = non si sa (rete, errore). */
     private fun fetchCover(ctx: Context, mbid: String, out: File): Boolean? {
-        if (!Regex("[0-9a-fA-F-]{36}").matches(mbid)) return false
+        if (!MBID.matches(mbid)) return false
         // Cover Art Archive chiede di dire chi siamo.
         val request = Request.Builder()
             .url("https://coverartarchive.org/release-group/$mbid/front-500")
@@ -206,9 +216,11 @@ class ArtworkProvider : ContentProvider() {
 
     /** Scrive su un file temporaneo e poi rinomina: nessuno legge mai mezza immagine. */
     private fun writeAtomically(out: File, write: (java.io.OutputStream) -> Boolean): Boolean {
-        val tmp = File(out.parentFile, "${out.name}.tmp")
-        val ok = tmp.outputStream().use(write)
-        return ok && tmp.length() > 0 && tmp.renameTo(out)
+        // Un file provvisorio tutto suo: due scritture insieme non si rovinano a vicenda.
+        val tmp = File.createTempFile(out.name, ".tmp", out.parentFile)
+        val done = runCatching { tmp.outputStream().use(write) && tmp.length() > 0 && tmp.renameTo(out) }.getOrDefault(false)
+        if (!done) tmp.delete()
+        return done
     }
 
     override fun query(uri: Uri, projection: Array<String>?, selection: String?, selectionArgs: Array<String>?, sortOrder: String?): Cursor? = null
@@ -220,6 +232,11 @@ class ArtworkProvider : ContentProvider() {
         private const val SIZE = 512
         private const val CHECK_SIZE = 64
         private const val MAX_TRACKS_TO_TRY = 6
+        private val UNSAFE = Regex("[^A-Za-z0-9._-]")
+        private val MBID = Regex("[0-9a-fA-F-]{36}")
+
+        /** Un lucchetto per copertina: la stessa si prepara una volta, copertine diverse insieme. */
+        private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
         /** Le copertine vere da Cover Art Archive: due download alla volta, in sottofondo. */
         private val downloads = CoverDownloads(Executors.newFixedThreadPool(2)::execute)

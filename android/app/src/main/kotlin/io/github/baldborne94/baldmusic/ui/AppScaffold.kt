@@ -53,6 +53,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -442,10 +443,15 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
                 }
             }
         }
-        val progress = if (vm.duration > 0) (vm.position.toFloat() / vm.duration).coerceIn(0f, 1f) else 0f
-        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.25f))) {
-            Box(Modifier.fillMaxWidth(progress).height(2.dp).background(Color.White))
-        }
+        // La posizione si legge mentre si disegna: la barra avanza senza ridisegnare il mini player.
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp))
+                .background(Color.White.copy(alpha = 0.25f))
+                .drawBehind {
+                    val progress = if (vm.duration > 0) (vm.position.toFloat() / vm.duration).coerceIn(0f, 1f) else 0f
+                    drawRect(Color.White, size = size.copy(width = size.width * progress))
+                },
+        )
         Spacer(Modifier.height(2.dp))
     }
 }

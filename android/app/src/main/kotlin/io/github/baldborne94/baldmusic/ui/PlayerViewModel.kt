@@ -82,7 +82,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = sync(player)
+        // La coda si rilegge solo quando cambia: play, pausa e buffering non la toccano.
+        override fun onEvents(player: Player, events: Player.Events) = sync(player, queueChanged = events.contains(Player.EVENT_TIMELINE_CHANGED))
     }
 
     init {
@@ -116,7 +117,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         app.updater.scope.launch { app.updater.install(info) }
     }
 
-    private fun sync(p: Player) {
+    private fun sync(p: Player, queueChanged: Boolean = true) {
         current = p.currentMediaItem
         isPlaying = p.isPlaying
         buffering = p.playbackState == Player.STATE_BUFFERING
@@ -124,7 +125,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         repeat = p.repeatMode
         position = p.currentPosition
         duration = p.duration.coerceAtLeast(0)
-        queue = (0 until p.mediaItemCount).map { p.getMediaItemAt(it) }
+        if (queueChanged || queue.size != p.mediaItemCount) queue = (0 until p.mediaItemCount).map { p.getMediaItemAt(it) }
         queueIndex = p.currentMediaItemIndex
         error = p.playerError?.let { "Impossibile riprodurre: ${it.errorCodeName}" }
         if (current == null) playingContainer = null

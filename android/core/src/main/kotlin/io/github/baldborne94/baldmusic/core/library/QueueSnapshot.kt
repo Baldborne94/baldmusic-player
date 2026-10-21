@@ -50,11 +50,12 @@ data class QueueSnapshot(
 
         fun of(ids: List<String>, index: Int, positionMs: Long, shuffle: Boolean, repeat: Int): QueueSnapshot? {
             if (ids.isEmpty() || index !in ids.indices) return null
-            if (ids.size <= MAX) return QueueSnapshot(ids, index, positionMs, shuffle, repeat)
+            // Si copiano solo i brani tenuti: [ids] può leggere la coda del player un brano alla volta.
+            if (ids.size <= MAX) return QueueSnapshot(ids.toList(), index, positionMs, shuffle, repeat)
             // Verso la fine della coda si tengono più brani prima: sempre MAX in tutto.
             val from = (index - BEFORE).coerceIn(0, ids.size - MAX)
             val to = from + MAX
-            return QueueSnapshot(ids.subList(from, to), index - from, positionMs, shuffle, repeat)
+            return QueueSnapshot(ids.subList(from, to).toList(), index - from, positionMs, shuffle, repeat)
         }
 
         fun fromJson(text: String?): QueueSnapshot? =

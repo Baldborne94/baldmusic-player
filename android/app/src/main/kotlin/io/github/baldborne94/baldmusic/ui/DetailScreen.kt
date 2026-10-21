@@ -88,8 +88,10 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     val isCollection = playlistId?.let { pid -> lib.playlists.firstOrNull { it.id == pid }?.isCollection } == true
     val kind = node?.kind
     val list = items.orEmpty()
-    val tracks = list.filter { it.kind == Kind.TRACK }
-    val containers = list.filter { it.kind != Kind.TRACK && it.kind != Kind.MESSAGE }
+    // Una volta per elenco, non a ogni ridisegno: con migliaia di brani si sente.
+    val (tracks, containers) = remember(list) {
+        list.filter { it.kind == Kind.TRACK } to list.filter { it.kind != Kind.TRACK && it.kind != Kind.MESSAGE }
+    }
     val hero = tracks.isNotEmpty() || kind in setOf(Kind.ALBUM, Kind.ARTIST, Kind.PLAYLIST, Kind.FOLDER) || likedPage || playlistId != null
     val shownTitle = node?.title()?.takeIf { it.isNotBlank() } ?: title
 
@@ -337,7 +339,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                 }
             }
         }
-        LetterRail(letters, gridState.isScrollInProgress, onJump = { gridState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
+        LetterRail(letters, scrolling = { gridState.isScrollInProgress }, onJump = { gridState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
     }
 
     if (renaming && playlistId != null) {
@@ -439,10 +441,7 @@ private fun HeroHeader(
                 }
                 Spacer(Modifier.width(8.dp))
                 val playingHere = vm.playingContainer == mediaId && vm.isPlaying
-                BigPlayButton(playingHere) {
-                    if (vm.playingContainer == mediaId && vm.current != null) vm.toggle()
-                    else vm.playAll(mediaId, shuffled = vm.shuffle, from = title)
-                }
+                BigPlayButton(playingHere) { vm.playOrToggle(mediaId, from = title) }
             }
         }
     }

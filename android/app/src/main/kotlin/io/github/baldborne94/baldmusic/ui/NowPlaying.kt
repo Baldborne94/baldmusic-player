@@ -64,6 +64,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -380,19 +381,21 @@ fun SideLyrics(vm: PlayerViewModel) {
 /** Due righe del testo sotto il titolo (vedi [Lyrics.preview]); niente se il testo non c'è. */
 @Composable
 private fun LyricsPeek(vm: PlayerViewModel, lyrics: Lyrics, onOpen: () -> Unit) {
-    val preview = lyrics.preview(vm.position + 300) ?: return
+    // Si ridisegna quando cambiano le righe, non a ogni passo della posizione.
+    val preview by remember(lyrics) { derivedStateOf { lyrics.preview(vm.position + 300) } }
+    val shown = preview ?: return
     Column(
         Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen)
             .background(Color.Black.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(
-            preview.current ?: "♪",
+            shown.current ?: "♪",
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        preview.next?.let {
+        shown.next?.let {
             Text(it, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -412,7 +415,8 @@ private fun LyricsView(vm: PlayerViewModel, lyrics: Lyrics?, loading: Boolean, c
             )
             lyrics.synced.isNotEmpty() -> {
                 val state = rememberLazyListState()
-                val current = lyrics.lineAt(vm.position + 300)
+                // Si ridisegna quando cambia la riga, non a ogni passo della posizione.
+                val current by remember(lyrics) { derivedStateOf { lyrics.lineAt(vm.position + 300) } }
                 LaunchedEffect(current) {
                     if (current >= 0) state.animateScrollToItem((current - 2).coerceAtLeast(0))
                 }

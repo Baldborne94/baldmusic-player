@@ -380,8 +380,11 @@ class LocalSource(
         /** "/storage/emulated/0/Music/Queen/01.mp3" → "Music/Queen". */
         private fun folderOf(path: String?): String {
             val dir = path?.substringBeforeLast('/', "") ?: return "Sconosciuta"
-            return dir.replace(Regex("^/storage/(emulated/\\d+|[^/]+)/?"), "").ifEmpty { "Memoria interna" }
+            return dir.replace(STORAGE_ROOT, "").ifEmpty { "Memoria interna" }
         }
+
+        /** "/storage/emulated/0/" o "/storage/XXXX-XXXX/" (scheda SD): una volta, non per ogni brano. */
+        private val STORAGE_ROOT = Regex("^/storage/(emulated/\\d+|[^/]+)/?")
 
         /** Colonna presente da sempre, ma documentata solo da Android 11. */
         private const val ALBUM_ARTIST = "album_artist"
