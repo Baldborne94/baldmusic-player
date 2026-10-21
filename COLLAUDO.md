@@ -129,6 +129,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | U-4 | Annulla la conferma di Android; un'altra volta esci con «indietro» durante il download e riapri | Torna «Aggiorna», si può riprovare; il download va avanti o finisce, non resta fermo a metà |
 | U-5 | «Più tardi» | L'avviso in Home sparisce fino alla versione dopo; in Impostazioni resta |
 | U-6 | Dopo l'aggiornamento | «Novità di BaldMusic» una volta sola, con le novità di tutte le versioni saltate |
+| U-7 | Un aggiornamento che non va (per esempio con «Blocco automatico» di Samsung acceso) | Il messaggio dice cosa fare e in fondo «(Android: …, codice N)»; «Pagina della release» apre il browser; «Segnala un problema» ha l'errore tra gli ultimi problemi |
+| U-8 | Novità nell'avviso e in «Novità di BaldMusic» | I titoli delle PR (es. «Segnala un problema, Continua ad ascoltare…»), non «Correzioni e piccoli miglioramenti» ripetuto |
 
 ### Segnala un problema (dopo modifiche al resoconto)
 

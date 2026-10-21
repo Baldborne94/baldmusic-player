@@ -105,16 +105,25 @@ fun UpdateBanner(vm: PlayerViewModel) {
             Text("È uscita la versione ${info.versionName.ifBlank { "${info.versionCode}" }}", fontWeight = FontWeight.Bold, fontSize = 17.sp)
         }
         Spacer(Modifier.height(6.dp))
-        info.changesBetween(vm.updater.installed).flatMap { it.changes }.take(3).forEach {
+        info.changesBetween(vm.updater.installed).flatMap { it.changes }.distinct().take(3).forEach {
             Text("• $it", color = TextMuted, maxLines = 2)
         }
         Spacer(Modifier.height(12.dp))
         UpdateProgress(state)
         if (state is Updater.State.Available || state is Updater.State.Failed) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { install(info) }, colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text("Aggiorna") }
-                TextButton(onClick = { vm.updater.later(info) }) { Text("Più tardi", color = TextMuted) }
+                Button(onClick = { install(info) }, colors = ButtonDefaults.buttonColors(containerColor = Accent)) { Text(if (state is Updater.State.Failed) "Riprova" else "Aggiorna") }
+                if (state is Updater.State.Failed) {
+                    // Dal browser l'installazione passa da Android e non dall'app: a volte va dove l'altra no.
+                    val context = LocalContext.current
+                    TextButton(onClick = {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Updater.RELEASE_PAGE)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }) { Text("Pagina della release", color = Accent) }
+                } else {
+                    TextButton(onClick = { vm.updater.later(info) }) { Text("Più tardi", color = TextMuted) }
+                }
             }
+            if (state is Updater.State.Failed) TextButton(onClick = { vm.updater.later(info) }) { Text("Più tardi", color = TextMuted) }
         }
     }
 }
