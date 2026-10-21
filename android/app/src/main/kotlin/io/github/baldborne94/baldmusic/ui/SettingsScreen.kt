@@ -96,8 +96,9 @@ fun SettingsScreen(vm: PlayerViewModel) {
     val settings = context.app.settings
     val scope = rememberCoroutineScope()
     var creds by remember { mutableStateOf(settings.credentials) }
-    var url by rememberSaveable { mutableStateOf(creds?.url ?: "") }
-    var user by rememberSaveable { mutableStateOf(creds?.user ?: "") }
+    // Dopo un ripristino dal backup indirizzo e utente ci sono già: manca solo la password.
+    var url by rememberSaveable { mutableStateOf(creds?.url ?: settings.savedServer?.first ?: "") }
+    var user by rememberSaveable { mutableStateOf(creds?.user ?: settings.savedServer?.second ?: "") }
     var password by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }

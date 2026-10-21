@@ -16,11 +16,20 @@ class Settings(context: Context) {
     private val _changes = MutableStateFlow(0)
     val changes: StateFlow<Int> = _changes.asStateFlow()
 
+    private val _edits = MutableStateFlow(0)
+    /** Cresce a ogni impostazione cambiata: il backup automatico si riscrive. */
+    val edits: StateFlow<Int> = _edits.asStateFlow()
+
+    private fun edited() {
+        _edits.value++
+    }
+
     /** Cerca i testi dei brani su internet (LRCLIB). */
     var lyricsOnline: Boolean
         get() = prefs.getBoolean(KEY_LYRICS, true)
         set(value) {
             prefs.edit { putBoolean(KEY_LYRICS, value) }
+            edited()
         }
 
     private val _replayGain = MutableStateFlow(
@@ -33,6 +42,7 @@ class Settings(context: Context) {
     fun setReplayGain(mode: ReplayGainMode) {
         prefs.edit { putString(KEY_REPLAY_GAIN, mode.name) }
         _replayGain.value = mode
+        edited()
     }
 
     private val _crossfade = MutableStateFlow(
@@ -45,6 +55,7 @@ class Settings(context: Context) {
     fun setCrossfade(seconds: Int) {
         prefs.edit { putInt(KEY_CROSSFADE, seconds) }
         _crossfade.value = seconds
+        edited()
     }
 
     /** "Continua ad ascoltare": finita la coda, musica simile invece di fermarsi. */
@@ -52,6 +63,7 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_CONTINUE, true)
         set(value) {
             prefs.edit { putBoolean(KEY_CONTINUE, value) }
+            edited()
         }
 
     /** La chiave dell'applicazione su AcoustID (acoustid.org/new-application) per riconoscere i brani dal suono. */
@@ -59,6 +71,7 @@ class Settings(context: Context) {
         get() = prefs.getString(KEY_ACOUSTID, null)?.takeIf { it.isNotBlank() }
         set(value) {
             prefs.edit { if (value.isNullOrBlank()) remove(KEY_ACOUSTID) else putString(KEY_ACOUSTID, value.trim()) }
+            edited()
         }
 
     /** Perché l'ultimo riconoscimento si è fermato (chiave sbagliata, niente rete); null se è andato bene. */
@@ -93,7 +106,27 @@ class Settings(context: Context) {
                 }
             }
             touch()
+            edited()
         }
+
+    /**
+     * Indirizzo e utente del server anche quando non si è collegati: dopo un ripristino dal
+     * backup (che non ha la password) il modulo di collegamento è già compilato.
+     */
+    val savedServer: Pair<String, String>?
+        get() {
+            val url = prefs.getString(KEY_URL, null) ?: return null
+            return url to prefs.getString(KEY_USER, null).orEmpty()
+        }
+
+    /** Ricorda indirizzo e utente (senza password: per collegarsi serve riscriverla). */
+    fun rememberServer(url: String, user: String?) {
+        if (credentials != null) return
+        prefs.edit {
+            putString(KEY_URL, url)
+            if (user != null) putString(KEY_USER, user) else remove(KEY_USER)
+        }
+    }
 
     /** Ultimo brano e posizione, per riprendere da dove si era rimasti (anche in auto). */
     fun saveLast(mediaId: String, positionMs: Long) {

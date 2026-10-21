@@ -46,7 +46,7 @@ class BaldMusicApp : Application() {
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
-    val backups: Backups by lazy { Backups(this, userData, local) }
+    val backups: Backups by lazy { Backups(this, userData, local) { settings } }
 
     /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
     val updater: Updater by lazy { Updater(this, http) }

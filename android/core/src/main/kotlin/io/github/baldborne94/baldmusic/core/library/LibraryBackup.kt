@@ -14,6 +14,38 @@ import kotlin.math.abs
 @Serializable
 data class FileKey(val folder: String, val title: String, val artist: String? = null, val durationMs: Long = 0)
 
+/**
+ * Le impostazioni che è noioso rifare dopo una reinstallazione o su un telefono nuovo. Mai
+ * credenziali: del server solo indirizzo e utente (al ripristino si riscrive la password; il
+ * token vale come una password e il file sta in Download, dove altre app possono leggerlo).
+ * Ogni campo è facoltativo: null = non c'era, resta com'è.
+ */
+@Serializable
+data class BackupSettings(
+    val serverUrl: String? = null,
+    val serverUser: String? = null,
+    /** La chiave dell'applicazione su AcoustID: non è la password dell'account. */
+    val acoustIdKey: String? = null,
+    val lyricsOnline: Boolean? = null,
+    /** Il nome di [ReplayGainMode]. */
+    val replayGain: String? = null,
+    val crossfadeSeconds: Int? = null,
+    val continueListening: Boolean? = null,
+    val autoBackup: Boolean? = null,
+) {
+    /** Solo valori che l'app sa usare: un campo strano (backup scritto a mano, versione futura) si ignora. */
+    fun cleaned(): BackupSettings = BackupSettings(
+        serverUrl = serverUrl?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+        serverUser = serverUser?.trim()?.takeIf { it.isNotEmpty() },
+        acoustIdKey = acoustIdKey?.trim()?.takeIf { it.isNotEmpty() && it.length <= 64 && it.none(Char::isWhitespace) },
+        lyricsOnline = lyricsOnline,
+        replayGain = replayGain?.takeIf { name -> ReplayGainMode.entries.any { it.name == name } },
+        crossfadeSeconds = crossfadeSeconds?.takeIf { it in Crossfade.CHOICES },
+        continueListening = continueListening,
+        autoBackup = autoBackup,
+    )
+}
+
 @Serializable
 data class Backup(
     val app: String = APP,
@@ -22,6 +54,8 @@ data class Backup(
     val library: UserLibrary = UserLibrary(),
     /** Per ID di brano del telefono. */
     val files: Map<String, FileKey> = emptyMap(),
+    /** null nei backup fatti prima che ci fossero. */
+    val settings: BackupSettings? = null,
 ) {
     companion object {
         const val APP = "BaldMusic"
@@ -37,6 +71,8 @@ data class RestorePlan(
     val found: Int,
     /** Quelli che non ci sono più: escono da preferiti e playlist. */
     val missing: List<TrackRef>,
+    /** Le impostazioni da rimettere, già ripulite; null se il backup non le aveva. */
+    val settings: BackupSettings? = null,
 )
 
 object LibraryBackup {
@@ -57,12 +93,12 @@ object LibraryBackup {
     /** I brani tolti a mano dalle raccolte: non stanno nella libreria, ma vanno ritrovati anche loro. */
     private fun removed(lib: UserLibrary): List<String> = lib.playlists.flatMap { it.removed }
 
-    fun create(lib: UserLibrary, tracks: List<LocalTrack>, now: Long): Backup {
+    fun create(lib: UserLibrary, tracks: List<LocalTrack>, now: Long, settings: BackupSettings? = null): Backup {
         val byId = tracks.associateBy { LocalCatalog.ref(it).id }
         val files = (refs(lib).map { it.id } + removed(lib)).filter(::isLocal).distinct().mapNotNull { id ->
             byId[id]?.let { t -> id to FileKey(t.folder, t.title, t.artist, t.durationMs) }
         }.toMap()
-        return Backup(createdAt = now, library = lib, files = files)
+        return Backup(createdAt = now, library = lib, files = files, settings = settings?.cleaned())
     }
 
     fun encode(backup: Backup): String = json.encodeToString(Backup.serializer(), backup)
@@ -122,6 +158,7 @@ object LibraryBackup {
             localTracks = ids.size,
             found = ids.size - gone.size,
             missing = gone.mapNotNull { byOldId[it] },
+            settings = backup.settings?.cleaned(),
         )
     }
 }
