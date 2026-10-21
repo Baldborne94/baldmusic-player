@@ -55,9 +55,6 @@ class Problems(private val context: Context) {
     /** Quando l'app si è chiusa da sola l'ultima volta; null se non è mai successo (o è stato cancellato). */
     fun lastCrashAt(): Long? = crashFiles().firstOrNull()?.name?.removePrefix("crash-")?.removeSuffix(".txt")?.toLongOrNull()
 
-    /** Quante chiusure improvvise sono salvate. */
-    fun crashCount(): Int = crashFiles().size
-
     /** Il resoconto da mandare: lento (legge il registro di Android), da chiamare fuori dal thread principale. */
     fun report(): String {
         val notes = runCatching { notesFile.readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())

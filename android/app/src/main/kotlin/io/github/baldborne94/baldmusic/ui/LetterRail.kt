@@ -46,12 +46,14 @@ import kotlin.math.ceil
  * sulla colonna si salta all'intestazione della lettera ([onJump] riceve la sua posizione).
  */
 @Composable
-fun LetterRail(entries: List<LetterIndex.Entry>, scrolling: Boolean, onJump: suspend (Int) -> Unit, modifier: Modifier = Modifier) {
+fun LetterRail(entries: List<LetterIndex.Entry>, scrolling: () -> Boolean, onJump: suspend (Int) -> Unit, modifier: Modifier = Modifier) {
     if (entries.isEmpty()) return
     var touched by remember { mutableStateOf<String?>(null) }
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(scrolling, touched) {
-        if (scrolling || touched != null) {
+    // Letto qui dentro: quando la lista comincia o smette di scorrere si ridisegna solo la colonna.
+    val moving = scrolling()
+    LaunchedEffect(moving, touched) {
+        if (moving || touched != null) {
             visible = true
         } else {
             delay(1500)

@@ -44,10 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.core.library.ArtistNames
 import io.github.baldborne94.baldmusic.core.library.LetterIndex
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.library.sortedByKey
 import io.github.baldborne94.baldmusic.playback.group
 
 private enum class Filter(val label: String) { COLLECTION("Raccolte"), PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti") }
@@ -65,17 +67,21 @@ fun LibraryScreen(vm: PlayerViewModel) {
     val (playlists) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}", lib.playlists)
     val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
-    val (albums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
-    val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
+    // Album e artisti (migliaia) solo quando si guardano.
+    val (albums) = if (filter == Filter.ALBUM) rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}") else (null to null)
+    val (artists) = if (filter == Filter.ARTIST) rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}") else (null to null)
     val (serverPlaylists) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.PLAYLISTS}") else (null to null)
 
-    val items: List<MediaItem> = when (filter) {
-        null -> (collections.orEmpty() + playlists.orEmpty() + recent.orEmpty()).distinctBy { it.mediaId }
-        Filter.COLLECTION -> collections.orEmpty()
-        Filter.PLAYLIST -> playlists.orEmpty() + serverPlaylists.orEmpty()
-        Filter.ALBUM -> albums.orEmpty()
-        Filter.ARTIST -> artists.orEmpty()
-    }.let { if (alphabetical) it.sortedBy { i -> io.github.baldborne94.baldmusic.core.library.ArtistNames.sortKey(i.title()) } else it }
+    // Una volta per elenco, non a ogni ridisegno; la chiave d'ordine si calcola una volta per elemento.
+    val items: List<MediaItem> = remember(filter, alphabetical, collections, playlists, recent, albums, artists, serverPlaylists) {
+        when (filter) {
+            null -> (collections.orEmpty() + playlists.orEmpty() + recent.orEmpty()).distinctBy { it.mediaId }
+            Filter.COLLECTION -> collections.orEmpty()
+            Filter.PLAYLIST -> playlists.orEmpty() + serverPlaylists.orEmpty()
+            Filter.ALBUM -> albums.orEmpty()
+            Filter.ARTIST -> artists.orEmpty()
+        }.let { if (alphabetical) it.sortedByKey { i -> ArtistNames.sortKey(i.title()) } else it }
+    }
 
     // Artisti e album per lettera, come in Android Auto (solo nell'ordine della libreria, che è già alfabetico).
     val lettered = !alphabetical && (filter == Filter.ARTIST || filter == Filter.ALBUM)
@@ -142,7 +148,7 @@ fun LibraryScreen(vm: PlayerViewModel) {
                 item { Message("Crea la tua prima playlist con il + qui sopra, oppure tocca il cuore sui brani che ti piacciono.") }
             }
         }
-        LetterRail(letters, listState.isScrollInProgress, onJump = { listState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
+        LetterRail(letters, scrolling = { listState.isScrollInProgress }, onJump = { listState.scrollToItem(it) }, Modifier.align(Alignment.CenterEnd).padding(end = 4.dp))
     }
 
     if (creating) {

@@ -73,7 +73,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
-import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.AsyncImage
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -126,18 +126,17 @@ fun Artwork(item: MediaItem?, modifier: Modifier = Modifier, shape: Shape = Roun
             .background(Brush.linearGradient(listOf(Surface2, Color(0xFF30333E)))),
         contentAlignment = Alignment.Center,
     ) {
-        val placeholder = @Composable {
-            Icon(kindIcon(kind), null, tint = TextMuted, modifier = Modifier.fillMaxSize(0.42f))
+        // L'icona sta sotto: si vede finché la copertina non c'è (o se non si trova). AsyncImage
+        // e non SubcomposeAsyncImage, che in un elenco lungo rallenta lo scorrimento.
+        Icon(kindIcon(kind), null, tint = TextMuted, modifier = Modifier.fillMaxSize(0.42f))
+        if (uri != null) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
-        if (uri == null) placeholder()
-        else SubcomposeAsyncImage(
-            model = uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-            loading = { placeholder() },
-            error = { placeholder() },
-        )
     }
 }
 

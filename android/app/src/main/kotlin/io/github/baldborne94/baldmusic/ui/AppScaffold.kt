@@ -53,6 +53,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -102,10 +103,13 @@ data class Ui(
 /** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
 private class TrashAsk(val items: List<MediaItem>, val title: String, val note: String?, val onDone: () -> Unit)
 
+/** L'ID di MediaStore di un brano del telefono; null per gli altri brani. */
+fun localTrackId(item: MediaItem): Long? =
+    MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
+
 /** Il file di un brano del telefono, per MediaStore; null per gli altri brani. */
 fun localFileUri(item: MediaItem): android.net.Uri? =
-    MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
-        ?.let { android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
+    localTrackId(item)?.let { android.content.ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, it) }
 
 val LocalUi = staticCompositionLocalOf<Ui> { error("Ui non fornita") }
 
@@ -255,8 +259,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onTrash = ui.trash?.takeIf { localFileUri(item) != null }?.let { trash ->
                         { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
-                    onInfo = MediaId.parse(item.mediaId)?.takeIf { it.source == LocalCatalog.KEY && it.isTrack }?.id?.toLongOrNull()
-                        ?.let { id -> { infoFor = id to item.title() } },
+                    onInfo = localTrackId(item)?.let { id -> { infoFor = id to item.title() } },
                 )
             }
 
@@ -440,10 +443,15 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
                 }
             }
         }
-        val progress = if (vm.duration > 0) (vm.position.toFloat() / vm.duration).coerceIn(0f, 1f) else 0f
-        Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.25f))) {
-            Box(Modifier.fillMaxWidth(progress).height(2.dp).background(Color.White))
-        }
+        // La posizione si legge mentre si disegna: la barra avanza senza ridisegnare il mini player.
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(2.dp).clip(RoundedCornerShape(1.dp))
+                .background(Color.White.copy(alpha = 0.25f))
+                .drawBehind {
+                    val progress = if (vm.duration > 0) (vm.position.toFloat() / vm.duration).coerceIn(0f, 1f) else 0f
+                    drawRect(Color.White, size = size.copy(width = size.width * progress))
+                },
+        )
         Spacer(Modifier.height(2.dp))
     }
 }
