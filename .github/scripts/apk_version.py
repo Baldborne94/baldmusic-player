@@ -35,14 +35,26 @@ def changes(prev_sha: str | None) -> list[str]:
         if not record.strip():
             continue
         parents, subject, body = (record.strip("\n").split("\x1f") + ["", ""])[:3]
-        if len(parents.split()) > 1:
+        parent_list = parents.split()
+        if len(parent_list) > 1:
             # "Merge pull request #N from …": il titolo della PR è la prima riga del corpo.
             title = next((line.strip() for line in body.splitlines() if line.strip()), "")
+            if not title:
+                # L'unione di prova di GitHub in una PR ("Merge abc into def") non ha titolo:
+                # valgono i commit della PR, così anche la CI della PR mostra le novità vere.
+                own = git("log", "--format=%s", f"{parent_list[0]}..{parent_list[1]}", "--", ":(top)android")
+                for line in own.splitlines():
+                    add(titles, line.strip())
+                continue
         else:
             title = subject.strip()
-        if title and not title.startswith("Merge ") and title not in titles:
-            titles.append(title)
+        add(titles, title)
     return titles or [FALLBACK]
+
+
+def add(titles: list[str], title: str) -> None:
+    if title and not title.startswith("Merge ") and title not in titles:
+        titles.append(title)
 
 
 def main() -> None:

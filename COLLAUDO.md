@@ -72,6 +72,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-8 | Telefonata, sveglia o «Ok Google» durante l'ascolto, anche nel mezzo di una dissolvenza | La musica si ferma tutta (niente brano che sfuma sotto la chiamata) e riparte dopo |
 | A-12 | Casuale su un album di 10 brani con «Ripeti» spento | Suonano tutti e 10, partendo da quello scelto |
 | A-9 | Testo: «In riproduzione» → microfono; poi lo stesso senza rete e di nuovo con la rete | Testo sincronizzato; toccando una riga si salta lì; senza rete «non disponibile», tornata la rete il testo arriva |
+| A-9b | «In riproduzione» con un brano cantato di cui c'è il testo | Sotto titolo e artista due righe: quella cantata adesso (bianca) e la prossima (sfumata), che cambiano con la canzone; toccandole si apre il testo intero. Senza testo le righe non ci sono |
 | A-10 | Radio da un brano (⋮ → Radio) | Parte il brano e poi musica simile |
 | A-11 | Coda: scorri un brano a destra, sposta su/giù, «Svuota» | La coda cambia come atteso e si salva |
 | A-13 | Impostazioni → Testi da internet → «Scarica adesso», aspetta qualche minuto; poi modalità aereo col Wi‑Fi spento e apri il testo di un brano ascoltato spesso, di un preferito, di una raccolta | Il numero dei «testi salvati» cresce; senza rete i testi ci sono. Senza toccare niente lo stesso succede da solo di notte in carica col Wi‑Fi |
