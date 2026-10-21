@@ -47,6 +47,10 @@ data class LocalTrack(
      * copertina vera arriva da Cover Art Archive. null = la copertina è quella del file.
      */
     val coverMbid: String? = null,
+    /** Il nome del file ("03 - Titolo.mp3"): dà il numero di traccia quando il tag manca. */
+    val fileName: String? = null,
+    /** Il numero di traccia (e di disco) viene dal nome del file, non dai tag. */
+    val numberFromName: Boolean = false,
 ) {
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
@@ -60,7 +64,7 @@ data class LocalTrack(
             artists.takeIf { it.size > 1 }?.let { "Artisti" to it.joinToString(", ") },
             "Album" to (album ?: "—"),
             "Artista dell'album" to (albumArtist ?: "—"),
-            "Traccia" to (if (track > 0) "$track" else "—") + (if (disc > 0) " · disco $disc" else ""),
+            "Traccia" to (if (track > 0) "$track" else "—") + (if (disc > 0) " · disco $disc" else "") + (if (numberFromName) " (dal nome del file)" else ""),
             "Anno" to (if (year > 0) "$year" else "—"),
             originalYear.takeIf { it > 0 && it != year }?.let { "Prima uscita" to "$it" },
             releaseTypes.takeIf { it.isNotEmpty() }?.let { "Tipo di uscita" to it.joinToString(", ") },
@@ -71,6 +75,16 @@ data class LocalTrack(
             "Cartella" to folder,
             "Tag letti dal file" to if (tagsRead) "sì" else "non ancora (valgono quelli di Android)",
         )
+    }
+
+    /**
+     * Il brano col numero di traccia del nome del file ([FileNames]), se i tag non ce l'hanno.
+     * Va chiamato dopo i tag (del file e riconosciuti), che valgono di più.
+     */
+    fun withNumberFromName(): LocalTrack {
+        if (track > 0 || fileName == null) return this
+        val n = FileNames.number(fileName, title, listOf(artist, albumArtist) + artists) ?: return this
+        return copy(track = n.track, disc = if (disc > 0) disc else n.disc, numberFromName = true)
     }
 
     /** Il brano con i tag letti dal file, che valgono più di quelli di MediaStore. */

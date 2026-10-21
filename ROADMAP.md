@@ -89,9 +89,9 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 ## Fase 2 — L'ordine giusto
 
-- [x] **Brani di un album**: disco → traccia dai tag. Resta da fare: il numero nel nome del file come ripiego per i file senza numero di traccia.
+- [x] **Brani di un album**: disco → traccia dai tag; senza il tag, il numero nel nome del file ("03 - Titolo.mp3", "1-03 Titolo", `FileNames`), mai quello che fa parte del titolo o dell'artista.
 - [x] **Album su più dischi**: intestazione "Disco 1", "Disco 2" col titolo del disco se c'è, sul telefono, nel web e in Auto.
-- [x] **Ordine alfabetico come una persona** (`ArtistNames.sortKey`): nomi di ordinamento di Picard, accenti con la loro lettera, articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"); intestazioni A–Z negli elenchi, anche in Auto. Resta da fare: lettere-indice laterali per saltare a una lettera.
+- [x] **Ordine alfabetico come una persona** (`ArtistNames.sortKey`): nomi di ordinamento di Picard, accenti con la loro lettera, articoli ignorati ("The", "Il", "La", "Lo", "L'", "I", "Gli", "Le"); intestazioni A–Z negli elenchi, anche in Auto; sul telefono lettere a lato per saltare a una lettera (`LetterIndex`, `LetterRail`).
 - [x] **Discografia**: Album, EP, Singoli, Raccolte, Live, Compare in; ognuna dal più recente. L'**anno originale** è già usato (fase 1) per album, decenni e ordine.
 - [ ] **Web allineato**: stesse regole nell'app web dove Navidrome non ordina già lui, verificate con la stessa libreria di prova in JSON (casi difficili: feat., raccolte, accenti, articoli, dischi multipli, album omonimi) usata dai test Kotlin.
 

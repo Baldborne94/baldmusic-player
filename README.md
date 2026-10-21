@@ -39,7 +39,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 
 - **Home** con accessi rapidi, raccolte, ascoltati di recente, i tuoi mix (Riscopri, Per la macchina, mix degli artisti e dei decenni: gli stessi in Android Auto), aggiunti di recente, più ascoltati.
 - **Brani che ti piacciono**, **playlist** e **raccolte**, per la musica del telefono e del server. Pressione lunga su un brano per selezionarne più di uno.
-- **Artisti riconosciuti** dai tag (anche "A feat. B"), album veri separati da singoli e brani sparsi, discografia per tipo (Album, EP, Dal vivo, Colonne sonore, Compilation), album su più dischi, elenchi con le lettere A–Z.
+- **Artisti riconosciuti** dai tag (anche "A feat. B"), album veri separati da singoli e brani sparsi, discografia per tipo (Album, EP, Dal vivo, Colonne sonore, Compilation), album su più dischi (senza il numero nei tag vale quello nel nome del file, «03 - Titolo.mp3»), elenchi con le lettere A–Z e la colonna di lettere a lato per saltare.
 - **Volume uguale tra i brani**: ReplayGain dai tag e, per i file che non l'hanno, volume misurato dall'app mentre il telefono è in carica.
 - **Dissolvenza tra i brani** come i DJ (3–12 secondi, mai dentro lo stesso album).
 - **Testi sincronizzati** stile karaoke (da [LRCLIB](https://lrclib.net)): sotto il titolo la riga cantata adesso e la prossima, tocca per il testo intero e una riga per saltarci; quelli dei brani che ascolti di più, dei preferiti e delle raccolte si scaricano prima, in carica col Wi‑Fi, e ci sono anche senza rete.
