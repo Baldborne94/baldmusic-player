@@ -69,6 +69,17 @@ class ApkVersionTest(unittest.TestCase):
     def test_lanciato_dalla_radice(self) -> None:
         self.assertEqual(["Segnala un problema", "Timer da Android Auto"], self.changes(self.repo))
 
+    def test_unione_di_prova_di_una_pr(self) -> None:
+        # La CI di una PR prova il commit "Merge <pr> into <main>", senza titolo: valgono i commit della PR.
+        self.git("checkout", "-q", "-b", "pr9")
+        self.write("android/a.txt", "9")
+        self.git("commit", "-q", "-am", "Aggiornamento: il motivo vero")
+        self.git("checkout", "-q", "main")
+        before = self.git("rev-parse", "HEAD").strip()
+        self.git("merge", "-q", "--no-ff", "pr9", "-m", "Merge 1234567 into 89abcde")
+        self.first = before
+        self.assertEqual(["Aggiornamento: il motivo vero"], self.changes(os.path.join(self.repo, "android")))
+
 
 if __name__ == "__main__":
     unittest.main()
