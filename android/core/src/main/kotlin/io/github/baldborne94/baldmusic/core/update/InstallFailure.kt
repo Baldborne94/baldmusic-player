@@ -36,8 +36,11 @@ object InstallFailure {
         }
     }
 
-    /** Il messaggio per chi usa l'app; il dettaglio di Android in fondo, per capire il resto. */
-    fun message(status: Int, detail: String?, signatureDiffers: Boolean? = null): String {
+    /**
+     * Il messaggio per chi usa l'app; il dettaglio di Android in fondo, per capire il resto, con
+     * l'inizio delle impronte delle due firme ([certificates]: installata e nuova) se si conoscono.
+     */
+    fun message(status: Int, detail: String?, signatureDiffers: Boolean? = null, certificates: Pair<String, String>? = null): String {
         val text = when (kind(status, detail, signatureDiffers)) {
             Kind.SIGNATURE ->
                 "La BaldMusic installata è firmata con un'altra chiave, e Android non la aggiorna sopra. Una volta sola: " +
@@ -52,6 +55,7 @@ object InstallFailure {
             Kind.OTHER -> "Android non ha installato l'aggiornamento. Prova a scaricarlo dal browser con «Pagina della release»."
         }
         val code = "codice $status"
-        return detail?.takeIf { it.isNotBlank() }?.let { "$text\n(Android: ${it.trim().take(300)}, $code)" } ?: "$text\n(Android: $code)"
+        val android = detail?.takeIf { it.isNotBlank() }?.let { "$text\n(Android: ${it.trim().take(300)}, $code)" } ?: "$text\n(Android: $code)"
+        return certificates?.let { (installed, new) -> "$android\n(firma installata ${installed.take(8)}…, nuova ${new.take(8)}…)" } ?: android
     }
 }

@@ -59,6 +59,18 @@ jobs:
       - name: Compila l'APK
         run: ./gradlew :app:assembleRelease --no-daemon
 
+      # Ogni APK deve avere la stessa firma, o gli aggiornamenti dall'app falliscono e serve
+      # disinstallare: l'impronta del certificato si confronta con quella fissata nel repository.
+      - name: Controlla la firma dell'APK
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk | tee firma.txt
+          ATTESA="$(tr -d '[:space:]' < ../.github/apk-cert-sha256.txt)"
+          if ! grep -qi "certificate SHA-256 digest: $ATTESA" firma.txt; then
+            echo "::error::L'APK non è firmato con la chiave di sempre ($ATTESA): gli aggiornamenti dall'app fallirebbero."
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: baldmusic-apk
