@@ -14,6 +14,7 @@ import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.data.Backups
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.LyricsWorker
+import io.github.baldborne94.baldmusic.data.PodcastWorker
 import io.github.baldborne94.baldmusic.data.Podcasts
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.diagnostics.Problems
@@ -51,7 +52,9 @@ class BaldMusicApp : Application() {
     val backups: Backups by lazy { Backups(this, userData, local) { settings } }
 
     /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */
-    val podcasts: Podcasts by lazy { Podcasts(this, http) { settings.touch() } }
+    val podcasts: Podcasts by lazy {
+        Podcasts(this, http, onShowsChanged = { settings.touch() }, onNewEpisodes = { show, episodes -> PodcastWorker.announce(this, show, episodes) })
+    }
     private val podcastSource: PodcastSource by lazy { PodcastSource(shows = { podcasts.shows() }, library = { podcasts.library.value }, forPlayback = { podcasts.showsForPlayback() }) }
 
     /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
@@ -93,6 +96,8 @@ class BaldMusicApp : Application() {
         backups.start()
         // Testi scaricati in anticipo, per quando non c'è rete.
         LyricsWorker.schedule(this)
+        // Puntate nuove dei podcast che segui, anche ad app chiusa.
+        PodcastWorker.schedule(this)
     }
 
     /** La tua musica per prima: in Android Auto è la prima scheda. */

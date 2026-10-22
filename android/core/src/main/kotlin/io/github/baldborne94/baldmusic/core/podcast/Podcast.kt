@@ -21,6 +21,9 @@ data class Episode(
     val publishedAt: Long? = null,
     val durationMs: Long? = null,
     val image: String? = null,
+    /** Da `itunes:season` / `itunes:episode`, se il feed li ha (altrimenti si guarda il titolo: [PodcastSeasons]). */
+    val season: Int? = null,
+    val number: Int? = null,
 )
 
 /** Un podcast letto dal suo feed: le puntate dalla più recente. */
@@ -91,7 +94,28 @@ object PodcastFeed {
             publishedAt = item.text("pubDate")?.let(::date),
             durationMs = item.textNs(ITUNES, "duration")?.let(::duration),
             image = item.childNs(ITUNES, "image")?.getAttribute("href")?.takeIf { it.isNotBlank() },
+            season = item.textNs(ITUNES, "season")?.toIntOrNull()?.takeIf { it > 0 },
+            number = item.textNs(ITUNES, "episode")?.toIntOrNull()?.takeIf { it > 0 },
         )
+    }
+
+    /** Puntate uscite da poco: più vecchie di così non sono «nuove» (un creatore che ripubblica l'archivio). */
+    const val NEW_FOR_MS = 14L * 24 * 3600 * 1000
+
+    /**
+     * Le puntate da annunciare dopo aver riletto il feed: quelle che prima non c'erano e sono
+     * uscite da poco. Il primo giro dopo aver seguito un podcast ([before] null) non annuncia niente.
+     */
+    fun newEpisodes(before: Podcast?, after: Podcast, now: Long): List<Episode> {
+        before ?: return emptyList()
+        val known = before.episodes.mapTo(HashSet()) { it.key }
+        return after.episodes.filter { it.key !in known && (it.publishedAt ?: 0) >= now - NEW_FOR_MS }
+    }
+
+    /** Titolo e testo della notifica delle puntate nuove di [show]. */
+    fun notice(show: Podcast, episodes: List<Episode>): Pair<String, String> = when (episodes.size) {
+        1 -> "Nuova puntata di ${show.title}" to episodes[0].title
+        else -> "${episodes.size} puntate nuove di ${show.title}" to episodes.joinToString(" · ") { it.title }
     }
 
     /** "01:02:03", "62:03", "3723" (secondi): la durata in millisecondi. */

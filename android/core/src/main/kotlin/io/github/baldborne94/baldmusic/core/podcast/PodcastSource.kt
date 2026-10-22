@@ -34,15 +34,55 @@ class PodcastSource(
 
     override suspend fun sections(): List<LibraryNode> = shows().map(::showNode)
 
+    /**
+     * Un podcast con almeno due stagioni si apre su «Ultime puntate» e una cartella per stagione
+     * (dalla più recente, puntate in ordine E01, E02…), poi «Altre puntate»; altrimenti l'elenco
+     * delle puntate dalla più recente.
+     */
     override suspend fun children(id: MediaId): List<LibraryNode> {
-        if (id.kind != SHOW) return emptyList()
-        val show = shows().firstOrNull { it.id == id.id } ?: return emptyList()
+        val (showId, part) = when (id.kind) {
+            SHOW -> (id.id ?: return emptyList()) to null
+            SEASON, RECENT -> split(id.id ?: return emptyList()) ?: return emptyList()
+            else -> return emptyList()
+        }
+        val show = shows().firstOrNull { it.id == showId } ?: return emptyList()
         val progress = library().progress
-        return show.episodes.map { episodeNode(show, it, progress[keyOf(show, it)]) }
+        fun episodes(list: List<Episode>) = list.map { episodeNode(show, it, progress[keyOf(show, it)]) }
+        val seasons = PodcastSeasons.split(show.episodes)
+        return when {
+            id.kind == RECENT -> episodes(show.episodes.take(RECENT_COUNT))
+            id.kind == SEASON -> seasons.firstOrNull { (it.number ?: 0).toString() == part }?.let { episodes(it.episodes) }.orEmpty()
+            seasons.isEmpty() -> episodes(show.episodes)
+            else -> listOf(recentNode(show)) + seasons.map { seasonNode(show, it) }
+        }
     }
 
-    override suspend fun node(id: MediaId): LibraryNode? =
-        if (id.kind == SHOW) shows().firstOrNull { it.id == id.id }?.let(::showNode) else null
+    override suspend fun node(id: MediaId): LibraryNode? {
+        if (id.kind == SHOW) return shows().firstOrNull { it.id == id.id }?.let(::showNode)
+        val (showId, part) = split(id.id ?: return null) ?: return null
+        val show = shows().firstOrNull { it.id == showId } ?: return null
+        return when (id.kind) {
+            RECENT -> recentNode(show)
+            SEASON -> PodcastSeasons.split(show.episodes).firstOrNull { (it.number ?: 0).toString() == part }?.let { seasonNode(show, it) }
+            else -> null
+        }
+    }
+
+    private fun recentNode(show: Podcast) = LibraryNode(
+        mediaId = MediaId(KEY, RECENT, "${show.id}~0").toString(),
+        title = "Ultime puntate",
+        kind = Kind.SECTION,
+        subtitle = show.title,
+        artwork = show.image?.let { "$KEY/${show.id}" },
+    )
+
+    private fun seasonNode(show: Podcast, season: PodcastSeasons.Season) = LibraryNode(
+        mediaId = MediaId(KEY, SEASON, "${show.id}~${season.number ?: 0}").toString(),
+        title = season.number?.let { "Stagione $it" } ?: "Altre puntate",
+        kind = Kind.SECTION,
+        subtitle = episodes(season.episodes.size),
+        artwork = show.image?.let { "$KEY/${show.id}" },
+    )
 
     override suspend fun track(id: MediaId): LibraryNode? {
         val (showId, episodeKey) = split(id.id ?: return null) ?: return null
@@ -101,6 +141,11 @@ class PodcastSource(
     companion object {
         const val KEY = "podcast"
         const val SHOW = "show"
+        const val SEASON = "season"
+        const val RECENT = "recent"
+
+        /** Quante puntate in «Ultime puntate». */
+        const val RECENT_COUNT = 20
 
         private val DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ITALIAN)
 

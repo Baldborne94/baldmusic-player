@@ -94,6 +94,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-4 | Elimina una raccolta «con i brani dal telefono» | Doppia conferma; i file nel cestino di Android (recuperabili 30 giorni) |
 | P-5 | Salute della libreria | Le cartelle con album diversi per ogni brano in cima; numeri plausibili; tocco su un brano = i suoi tag; «Condividi l'elenco» manda il testo |
 | P-6 | Sistema una cartella con Picard sul PC e ricopiala | Dopo la rilettura gli album si formano e la cartella sparisce (o scende) dalla Salute |
+| P-7 | Apri «Non Aprite Quella Podcast» (in app e in Auto) | In cima «Ultime puntate», poi «Stagione 15», «Stagione 14»…; dentro una stagione le puntate in ordine E01, E02…; in fondo «Altre puntate» per quelle senza stagione |
+| P-8 | Aggiungendo il podcast, consenti le notifiche; il lunedì dopo l'uscita di una puntata (o con «Esegui ora» dalle opzioni sviluppatore di WorkManager) | Notifica «Nuova puntata di Non Aprite Quella Podcast» col titolo; toccandola si apre l'app e la puntata è già in «Ultime puntate». Nessuna notifica per le puntate vecchie quando aggiungi il podcast |
 
 ### Riconoscere i brani (dopo modifiche al riconoscimento)
 

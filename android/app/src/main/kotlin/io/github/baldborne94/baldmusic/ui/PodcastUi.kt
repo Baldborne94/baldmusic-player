@@ -1,5 +1,9 @@
 package io.github.baldborne94.baldmusic.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,13 +52,16 @@ fun PodcastSection() {
     var link by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
+    // Per l'avviso delle puntate nuove: Android 13+ chiede il permesso delle notifiche.
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Podcast", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(
             "Incolla il link RSS di un podcast. Per quelli di Patreon serve il link privato: sul sito o nell'app di Patreon apri il podcast, " +
                 "«Il tuo abbonamento» (o il menu delle puntate audio) → «Ascolta in altre app» → «Copia link». " +
-                "Le puntate arrivano in Libreria, in Home e in Android Auto, e ognuna riparte da dove l'avevi lasciata. " +
+                "Le puntate arrivano in Libreria, in Home e in Android Auto, divise per stagione, e ognuna riparte da dove l'avevi lasciata. " +
+                "Ogni 2 ore l'app guarda se c'è una puntata nuova e te lo dice con una notifica. " +
                 "Il link è personale: resta solo sul telefono (non va nel backup né nei resoconti).",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
@@ -91,6 +98,7 @@ fun PodcastSection() {
                     status = podcasts.follow(link).fold(
                         onSuccess = { show ->
                             link = ""
+                            if (Build.VERSION.SDK_INT >= 33) askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
                             "Fatto: «${show.title}», ${show.episodes.size} puntate. Le trovi in Libreria → Podcast."
                         },
                         onFailure = { it.message ?: "Non sono riuscito a leggere il podcast." },

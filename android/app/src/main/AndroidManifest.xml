@@ -12,6 +12,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Aggiornamenti dall'app (Impostazioni → Aggiornamenti): Android chiede comunque conferma. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Avviso delle puntate nuove dei podcast che segui (Android 13+ lo chiede). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
