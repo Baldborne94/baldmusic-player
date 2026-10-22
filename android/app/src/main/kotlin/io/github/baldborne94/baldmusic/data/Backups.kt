@@ -20,15 +20,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Backup della tua musica (preferiti, playlist, raccolte, ascolti). A mano in un file
@@ -64,14 +67,27 @@ class Backups(
         if (on) scope.launch { writeAuto() }
     }
 
-    /** Dopo ogni modifica, quando le cose si calmano (gli ascolti arrivano a raffica). */
+    /** La tua musica dell'ultimo backup automatico di questa sessione: dice cosa è cambiato da allora. */
+    @Volatile private var autoSaved: UserLibrary? = null
+    private val settingsChanged = AtomicBoolean(false)
+
+    /**
+     * Dopo ogni modifica, quando le cose si calmano (gli ascolti arrivano a raffica). Se sono
+     * cambiati solo gli ascolti, al massimo ogni mezz'ora ([LibraryBackup.autoWait]).
+     */
     @OptIn(FlowPreview::class)
     fun start() {
         if (!autoSupported) return
         scope.launch {
             // Anche quando cambia un'impostazione: server, chiave di AcoustID, dissolvenza…
-            merge(userData.state.drop(1).map { }, settings().edits.drop(1).map { })
-                .debounce(AUTO_DELAY_MS).collect { if (_autoEnabled.value) writeAuto() }
+            merge(userData.state.drop(1).map { }, settings().edits.drop(1).map { settingsChanged.set(true) })
+                .debounce(AUTO_DELAY_MS)
+                .collectLatest {
+                    val wait = LibraryBackup.autoWait(autoSaved, userData.value, settingsChanged.get(), _auto.value.lastAt, System.currentTimeMillis())
+                        ?: return@collectLatest
+                    delay(wait)
+                    if (_autoEnabled.value) writeAuto()
+                }
         }
     }
 
@@ -133,15 +149,16 @@ class Backups(
 
     /** La copia in Download/BaldMusic, sovrascritta ogni volta. */
     private suspend fun writeAuto() {
-        if (Build.VERSION.SDK_INT < 29 || !worthSaving(userData.value)) return
+        val lib = userData.value
+        if (Build.VERSION.SDK_INT < 29 || !worthSaving(lib)) return
         // Senza i file del telefono (permesso tolto, memoria non montata) il backup non saprebbe
         // ritrovare i brani su un altro telefono: si tiene quello di prima.
         if (!local.hasPermission()) return
         val tracks = local.allTracks()
-        val localIds = userData.value.let { lib -> lib.liked + lib.playlists.flatMap { it.tracks } }.any { it.id.startsWith("${LocalCatalog.KEY}/") }
+        val localIds = (lib.liked + lib.playlists.flatMap { it.tracks }).any { it.id.startsWith("${LocalCatalog.KEY}/") }
         if (tracks.isEmpty() && localIds) return
         val result = runCatching {
-            val text = LibraryBackup.encode(LibraryBackup.create(userData.value, tracks, System.currentTimeMillis(), currentSettings())).toByteArray()
+            val text = LibraryBackup.encode(LibraryBackup.create(lib, tracks, System.currentTimeMillis(), currentSettings())).toByteArray()
             val resolver = context.contentResolver
             // Il file scritto da questa installazione; dopo una reinstallazione se ne crea uno nuovo.
             val saved = prefs.getString(KEY_URI, null)?.let(Uri::parse)
@@ -160,6 +177,8 @@ class Backups(
         _auto.value = result.fold(
             onSuccess = {
                 val now = System.currentTimeMillis()
+                autoSaved = lib
+                settingsChanged.set(false)
                 prefs.edit { putLong(KEY_LAST, now) }
                 AutoStatus(now)
             },

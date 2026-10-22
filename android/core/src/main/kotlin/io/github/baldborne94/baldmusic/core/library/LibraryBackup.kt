@@ -90,6 +90,24 @@ object LibraryBackup {
     private fun refs(lib: UserLibrary): List<TrackRef> =
         lib.liked + lib.playlists.flatMap { it.tracks } + lib.plays.values.map { it.track }
 
+    /** Gli ascolti da soli entrano nel backup automatico al massimo ogni tanto. */
+    const val PLAYS_EVERY_MS = 30L * 60 * 1000
+
+    /**
+     * Quanto aspettare prima di riscrivere il backup automatico: subito se sono cambiati
+     * preferiti, playlist, raccolte o impostazioni ([settingsChanged]), o se non c'è ancora un
+     * backup di questa sessione ([saved] null). Se sono cambiati solo ascolti, recenti e
+     * ricerche (succede a ogni brano), al massimo ogni [PLAYS_EVERY_MS] dall'ultimo ([lastAt]).
+     * Niente da scrivere se non è cambiato niente: null.
+     */
+    fun autoWait(saved: UserLibrary?, now: UserLibrary, settingsChanged: Boolean, lastAt: Long?, nowMs: Long): Long? {
+        if (saved == null || settingsChanged) return 0
+        if (saved.liked != now.liked || saved.playlists != now.playlists || saved.ignoredFolders != now.ignoredFolders) return 0
+        if (saved == now) return null
+        val since = lastAt?.let { nowMs - it } ?: return 0
+        return (PLAYS_EVERY_MS - since).coerceAtLeast(0)
+    }
+
     /** I brani tolti a mano dalle raccolte: non stanno nella libreria, ma vanno ritrovati anche loro. */
     private fun removed(lib: UserLibrary): List<String> = lib.playlists.flatMap { it.removed }
 

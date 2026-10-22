@@ -3,12 +3,14 @@ package io.github.baldborne94.baldmusic.data
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.FolderCollection
+import io.github.baldborne94.baldmusic.core.library.Preload
 import io.github.baldborne94.baldmusic.core.library.TrackRef
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,8 +37,11 @@ class UserData(context: Context) {
     private val lock = Any()
     private var pendingSave: Job? = null
 
-    private val _state = MutableStateFlow(load())
-    val state: StateFlow<UserLibrary> = _state.asStateFlow()
+    // Si legge in sottofondo appena l'app parte (anche da Android Auto o dal widget): l'avvio non
+    // resta fermo sul file, e chi chiede la tua musica per primo aspetta solo quello che manca.
+    private val loaded = Preload(Dispatchers.IO.asExecutor(), ::load)
+    private val _state by lazy { MutableStateFlow(loaded.value) }
+    val state: StateFlow<UserLibrary> by lazy { _state.asStateFlow() }
 
     val value: UserLibrary get() = _state.value
 

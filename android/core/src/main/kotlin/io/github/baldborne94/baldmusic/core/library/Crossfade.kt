@@ -22,6 +22,12 @@ object Crossfade {
     fun applies(seconds: Int, durationMs: Long, sameAlbum: Boolean): Boolean =
         seconds > 0 && !sameAlbum && durationMs >= (seconds * 2 + 5) * 1000L
 
+    /**
+     * Serve controllare, più volte al secondo, se è ora di sfumare? Solo mentre si suona (o si
+     * sta per suonare) con la dissolvenza accesa: in pausa o spenta il controllo si ferma.
+     */
+    fun watching(seconds: Int, playWhenReady: Boolean): Boolean = seconds > 0 && playWhenReady
+
     /** Volumi a metà sfumatura ([t] da 0 a 1): uscente ed entrante, a potenza costante. */
     fun gains(t: Float): Pair<Float, Float> {
         val x = t.coerceIn(0f, 1f) * PI.toFloat() / 2

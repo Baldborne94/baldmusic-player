@@ -44,6 +44,7 @@ import io.github.baldborne94.baldmusic.core.library.RecentSearches
 import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.SleepTimer
+import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
@@ -122,14 +123,14 @@ class PlaybackService : MediaLibraryService() {
 
         // Mi piace, playlist, cronologia: Android Auto rilegge "La tua musica" e il cuore si aggiorna.
         scope.launch {
-            app.userData.state.drop(1).collect {
+            var previous: UserLibrary? = null
+            app.userData.state.collect { lib ->
+                val before = previous.also { previous = lib } ?: return@collect
                 // Un cuore o una playlist cambiano i risultati: le ricerche si rifanno.
-                searches.clear()
-                listOf(PersonalSource.KEY, "${PersonalSource.KEY}/${PersonalSource.LIKED}", "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}",
-                    "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}",
-                    "${PersonalSource.KEY}/${PersonalSource.RECENT}", "${PersonalSource.KEY}/${PersonalSource.TOP}").forEach { id ->
-                    session.notifyChildrenChanged(id, Int.MAX_VALUE, null)
-                }
+                if (lib.liked != before.liked || lib.playlists != before.playlists) searches.clear()
+                // Solo le pagine il cui contenuto è cambiato: un ascolto non fa rileggere i preferiti.
+                PersonalSource.PAGES.filter { PersonalSource.shownBy(before, it) != PersonalSource.shownBy(lib, it) }
+                    .forEach { id -> session.notifyChildrenChanged(id, Int.MAX_VALUE, null) }
                 updateLikeButton()
             }
         }
@@ -149,12 +150,7 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { app.settings.replayGain.collect { applyVolume() } }
-        scope.launch {
-            while (true) {
-                delay(200)
-                watchCrossfade()
-            }
-        }
+        scope.launch { app.settings.crossfade.collect { updateCrossWatch() } }
 
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
@@ -299,6 +295,8 @@ class PlaybackService : MediaLibraryService() {
             if (!isPlaying) saveLast()
         }
 
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updateCrossWatch()
+
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             // Un brano che non parte non chiude l'app, ma va nel resoconto di "Segnala un problema".
             val item = player.currentMediaItem
@@ -404,6 +402,26 @@ class PlaybackService : MediaLibraryService() {
     private fun applyVolume() {
         val rg = Loudness.volume(player.currentMediaItem?.replayGain, app.settings.replayGain.value)
         player.volume = (rg * fade * crossIn).coerceIn(0f, 1f)
+    }
+
+    private var crossWatch: Job? = null
+
+    /** Il controllo della dissolvenza gira solo mentre si suona con la dissolvenza accesa ([Crossfade.watching]). */
+    private fun updateCrossWatch() {
+        val needed = Crossfade.watching(app.settings.crossfade.value, player.playWhenReady)
+        if (needed == (crossWatch != null)) return
+        crossWatch?.cancel()
+        crossWatch = null
+        if (needed) {
+            crossWatch = scope.launch {
+                while (isActive) {
+                    delay(200)
+                    watchCrossfade()
+                }
+            }
+        } else if (crossJob == null) {
+            dropOutgoing()
+        }
     }
 
     /** Ogni 200 ms: è ora di preparare il brano che finisce, o di cominciare a sfumare? */
