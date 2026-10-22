@@ -1,6 +1,7 @@
 package io.github.baldborne94.baldmusic.data
 
 import android.content.Context
+import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
@@ -28,7 +29,13 @@ import java.io.File
  * rete, file e stato. Tutto resta nei file dell'app: gli indirizzi privati non vanno nel backup
  * in Download né nei resoconti.
  */
-class Podcasts(context: Context, private val http: OkHttpClient, private val onShowsChanged: () -> Unit) {
+class Podcasts(
+    private val context: Context,
+    private val http: OkHttpClient,
+    private val onShowsChanged: () -> Unit,
+    /** Puntate appena uscite ([PodcastFeed.newEpisodes]): l'app le annuncia con una notifica. */
+    private val onNewEpisodes: (Podcast, List<Episode>) -> Unit = { _, _ -> },
+) {
 
     private val dir = File(context.filesDir, "podcast").apply { mkdirs() }
     private val file = File(dir, "podcast.json")
@@ -71,8 +78,10 @@ class Podcasts(context: Context, private val http: OkHttpClient, private val onS
         _library.value.feeds.forEach { sub ->
             if ((loaded()[sub.id]?.fetchedAt ?: 0) >= now - maxAgeMs) return@forEach
             val show = fetch(sub.url, sub.id).getOrNull() ?: return@forEach
-            if (show.episodes.map { it.key } != loaded()[sub.id]?.episodes?.map { it.key }) changed = true
+            val before = loaded()[sub.id]
+            if (show.episodes.map { it.key } != before?.episodes?.map { it.key }) changed = true
             store(show)
+            PodcastFeed.newEpisodes(before, show, now).takeIf { it.isNotEmpty() }?.let { onNewEpisodes(show, it) }
         }
         if (changed) onShowsChanged()
     }
@@ -91,6 +100,7 @@ class Podcasts(context: Context, private val http: OkHttpClient, private val onS
             store(show)
             update { it.follow(url, System.currentTimeMillis()) }
             onShowsChanged()
+            PodcastWorker.schedule(context)
         }
     }
 
@@ -99,6 +109,7 @@ class Podcasts(context: Context, private val http: OkHttpClient, private val onS
         cached = cached?.minus(id)
         File(dir, "$id.json").delete()
         onShowsChanged()
+        PodcastWorker.schedule(context)
     }
 
     /** Dove sei arrivato nella puntata [mediaId] (se è una puntata). */

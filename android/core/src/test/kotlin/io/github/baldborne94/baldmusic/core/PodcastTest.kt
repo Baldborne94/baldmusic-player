@@ -5,8 +5,10 @@ import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeProgress
+import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSeasons
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import kotlinx.coroutines.runBlocking
 import java.time.ZoneId
@@ -167,5 +169,84 @@ class PodcastTest {
         assertEquals("2 h", PodcastSource.minutes(7_200_000))
         assertEquals("", PodcastSource({ emptyList() }, { PodcastLibrary() }).subtitle(Episode("k", "t", "u"), null))
         assertEquals("ascoltata", PodcastSource({ emptyList() }, { PodcastLibrary() }).subtitle(Episode("k", "t", "u"), EpisodeProgress(0, finished = true)))
+    }
+}
+
+class PodcastSeasonsTest {
+    private fun ep(title: String, at: Long, season: Int? = null, number: Int? = null) =
+        Episode(key = title, title = title, audioUrl = "https://x/$title.mp3", publishedAt = at, season = season, number = number)
+
+    @Test
+    fun `stagione e numero dal titolo, se il feed non li dice`() {
+        assertEquals(15 to 8, PodcastSeasons.of(ep("S15 E08 Il Caso Cinturrino - Roboscroc (Ad-Free)", 0)))
+        assertEquals(15 to 8, PodcastSeasons.of(ep("S15E08 Il Caso", 0)))
+        assertEquals(3 to 4, PodcastSeasons.of(ep("Stagione 3 - Episodio 4: la casa", 0)))
+        assertEquals(2 to 5, PodcastSeasons.of(ep("Season 2 Episode 5", 0)))
+        assertEquals(1 to 12, PodcastSeasons.of(ep("1x12 Il pilota", 0)))
+        assertEquals(7 to null, PodcastSeasons.of(ep("Speciale stagione 7", 0)))
+        // I tag del feed valgono più del titolo.
+        assertEquals(4 to 2, PodcastSeasons.of(ep("S15 E08 titolo sbagliato", 0, season = 4, number = 2)))
+        assertNull(PodcastSeasons.of(ep("Live a Milano", 0)))
+        assertNull(PodcastSeasons.of(ep("PS5 e 2 amici", 0)))
+    }
+
+    @Test
+    fun `le puntate si dividono per stagione, la piu recente prima, poi le altre`() {
+        val episodes = listOf(
+            ep("S15 E02 Seconda", 400), ep("Live a Milano", 350), ep("S15 E01 Prima", 300),
+            ep("S14 E10 Finale", 200), ep("S14 E09 Penultima", 100),
+        )
+        val seasons = PodcastSeasons.split(episodes)
+        assertEquals(listOf(15, 14, null), seasons.map { it.number })
+        assertEquals(listOf("S15 E01 Prima", "S15 E02 Seconda"), seasons[0].episodes.map { it.title })
+        assertEquals(listOf("Live a Milano"), seasons[2].episodes.map { it.title })
+        // Una stagione sola: niente cartelle.
+        assertTrue(PodcastSeasons.split(episodes.filter { "S15" in it.title }).isEmpty())
+        assertTrue(PodcastSeasons.split(emptyList()).isEmpty())
+    }
+
+    @Test
+    fun `il podcast si apre su ultime puntate e stagioni, anche in Auto`() = runBlocking {
+        val show = Podcast("abc", "Non Aprite Quella Podcast", image = "https://x/cover.jpg", episodes = listOf(
+            ep("S15 E02 Seconda", 400), ep("S15 E01 Prima", 300), ep("S14 E01 Vecchia", 100), ep("Trailer", 50),
+        ))
+        val source = PodcastSource({ listOf(show) }, { PodcastLibrary() })
+        val page = source.children(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "abc"))
+        assertEquals(listOf("Ultime puntate", "Stagione 15", "Stagione 14", "Altre puntate"), page.map { it.title })
+        assertEquals("2 puntate", page[1].subtitle)
+        assertEquals(listOf("S15 E01 Prima", "S15 E02 Seconda"), source.children(MediaId.parse(page[1].mediaId)!!).map { it.title })
+        assertEquals("S15 E02 Seconda", source.children(MediaId.parse(page[0].mediaId)!!).first().title)
+        assertEquals(listOf("Trailer"), source.children(MediaId.parse(page[3].mediaId)!!).map { it.title })
+        assertEquals("Stagione 14", source.node(MediaId.parse(page[2].mediaId)!!)?.title)
+        // Le puntate dentro una stagione si suonano come sempre.
+        val first = source.children(MediaId.parse(page[1].mediaId)!!).first()
+        assertEquals("https://x/S15 E01 Prima.mp3", source.track(MediaId.parse(first.mediaId)!!)?.streamUri)
+    }
+}
+
+class PodcastNewEpisodesTest {
+    private val day = 24L * 3600 * 1000
+    private val now = 100 * day
+    private fun ep(key: String, at: Long?) = Episode(key, "Puntata $key", "https://x/$key.mp3", publishedAt = at)
+    private fun show(vararg e: Episode) = Podcast("abc", "Non Aprite Quella Podcast", episodes = e.toList())
+
+    @Test
+    fun `si annuncia la puntata appena uscita, non tutto l'archivio`() {
+        val before = show(ep("1", now - 10 * day))
+        val after = show(ep("2", now - day), ep("1", now - 10 * day))
+        assertEquals(listOf("2"), PodcastFeed.newEpisodes(before, after, now).map { it.key })
+        // Appena seguito il podcast: nessun annuncio per le centinaia di puntate già uscite.
+        assertTrue(PodcastFeed.newEpisodes(null, after, now).isEmpty())
+        // Una puntata vecchia ripubblicata, o senza data: niente annuncio.
+        assertTrue(PodcastFeed.newEpisodes(before, show(ep("vecchia", now - 60 * day), ep("senza", null), ep("1", 0)), now).isEmpty())
+        // Niente di nuovo: niente annuncio.
+        assertTrue(PodcastFeed.newEpisodes(after, after, now).isEmpty())
+    }
+
+    @Test
+    fun `il testo della notifica`() {
+        val s = show()
+        assertEquals("Nuova puntata di Non Aprite Quella Podcast" to "Puntata 2", PodcastFeed.notice(s, listOf(ep("2", now))))
+        assertEquals("2 puntate nuove di Non Aprite Quella Podcast" to "Puntata 3 · Puntata 2", PodcastFeed.notice(s, listOf(ep("3", now), ep("2", now))))
     }
 }
