@@ -124,6 +124,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | B-6 | «Ripristina…» con un file qualsiasi (una foto, un testo) | «Questo file non è un backup di BaldMusic», nessun cambiamento |
 | B-7 | Telefono nuovo configurato col trasferimento di Android (o dal backup di Google) | Le impostazioni ci sono; preferiti e playlist no (non puntano a brani sbagliati): in Home compare «Hai già usato BaldMusic?» per ripristinarli dal backup |
 | B-9 | Imposta server, chiave di AcoustID, dissolvenza 9 s; salva un backup; disinstalla, reinstalla e ripristina | Tornano preferiti, playlist e le impostazioni: dissolvenza 9 s, chiave di AcoustID, testi, ReplayGain; in Impostazioni → Server indirizzo e utente sono già scritti, basta la password. Nel file di backup non c'è nessun token né password |
+| B-10 | Ascolta 3–4 brani di fila guardando l'ora di `Download/BaldMusic/baldmusic-backup.json` (app File); poi metti un cuore | Mentre ascolti il file non si riscrive a ogni brano (gli ascolti entrano al massimo ogni mezz'ora); dopo il cuore si aggiorna entro un minuto circa |
 
 ### Aggiornamenti (dopo modifiche a aggiornamenti o alla CI)
 

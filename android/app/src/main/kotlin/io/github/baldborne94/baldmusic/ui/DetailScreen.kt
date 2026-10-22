@@ -77,8 +77,9 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     val lib by vm.library.collectAsStateWithLifecycle()
     val id = remember(mediaId) { MediaId.parse(mediaId) }
     val personal = id?.source == PersonalSource.KEY
-    // La musica tua cambia mentre la guardi (un cuore tolto, un brano aggiunto): si ricarica.
-    val (items, error) = rememberChildren(vm, mediaId, if (personal) lib else null)
+    // La musica tua cambia mentre la guardi (un cuore tolto, un brano aggiunto): si ricarica,
+    // ma solo se cambia quello che la pagina mostra (un ascolto non tocca i preferiti).
+    val (items, error) = rememberChildren(vm, mediaId, if (personal) PersonalSource.shownBy(lib, mediaId) else null)
     var node by remember(mediaId) { mutableStateOf<MediaItem?>(null) }
     LaunchedEffect(vm.browser, mediaId, if (personal) lib.playlists else null) { node = vm.item(mediaId) }
 

@@ -189,6 +189,31 @@ class PersonalSource(
             val covers = pl.tracks.mapNotNull { it.artwork }.distinct()
             return if (covers.size >= 4) "$MOSAIC/${covers.take(4).joinToString(",")}" else covers.firstOrNull()
         }
+        /** Le pagine della tua musica che l'app e Android Auto possono avere aperte. */
+        val PAGES = listOf(KEY, "$KEY/$LIKED", "$KEY/$PLAYLISTS", "$KEY/$COLLECTIONS", "$KEY/$RECENT", "$KEY/$TOP", "$KEY/$MIXES")
+
+        /**
+         * Quello che la pagina [mediaId] mostra della tua musica: la pagina si ricarica solo
+         * quando cambia questo. Un ascolto cambia gli ascolti e i recenti, non i preferiti né le
+         * playlist: «Brani che ti piacciono» o una raccolta aperti restano come sono.
+         * null = non è una pagina della tua musica.
+         */
+        fun shownBy(lib: UserLibrary, mediaId: String): Any? {
+            val id = MediaId.parse(mediaId)?.takeIf { it.source == KEY } ?: return null
+            return when (id.kind) {
+                // Le sezioni, coi loro conteggi.
+                null -> listOf(lib.collections.size, lib.liked.size, lib.playlists.count { !it.isCollection })
+                LIKED -> lib.liked
+                TOP -> lib.plays
+                RECENT -> lib.recent
+                PLAYLISTS, COLLECTIONS -> lib.playlists
+                PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }
+                // I mix vengono da preferiti e ascolti.
+                MIXES, MIX -> lib.liked to lib.plays
+                else -> lib
+            }
+        }
+
         private fun playlists(n: Int) = if (n == 1) "1 playlist" else "$n playlist"
         private fun collections(n: Int) = if (n == 1) "1 raccolta" else "$n raccolte"
     }
