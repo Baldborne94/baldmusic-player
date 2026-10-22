@@ -284,6 +284,8 @@ class PlaybackService : MediaLibraryService() {
                 endCrossfade()
                 dropOutgoing()
             }
+            // In pausa il controllo della dissolvenza si ferma; riparte con la musica.
+            updateCrossWatch()
         }
 
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
@@ -294,8 +296,6 @@ class PlaybackService : MediaLibraryService() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (!isPlaying) saveLast()
         }
-
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) = updateCrossWatch()
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             // Un brano che non parte non chiude l'app, ma va nel resoconto di "Segnala un problema".
