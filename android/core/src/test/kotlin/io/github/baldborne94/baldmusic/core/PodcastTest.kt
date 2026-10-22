@@ -4,11 +4,11 @@ import io.github.baldborne94.baldmusic.core.diagnostics.ProblemReport
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.podcast.Episode
+import io.github.baldborne94.baldmusic.core.podcast.EpisodeLabels
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeProgress
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
-import io.github.baldborne94.baldmusic.core.podcast.PodcastSeasons
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import kotlinx.coroutines.runBlocking
 import java.time.ZoneId
@@ -172,55 +172,46 @@ class PodcastTest {
     }
 }
 
-class PodcastSeasonsTest {
-    private fun ep(title: String, at: Long, season: Int? = null, number: Int? = null) =
-        Episode(key = title, title = title, audioUrl = "https://x/$title.mp3", publishedAt = at, season = season, number = number)
+class EpisodeLabelsTest {
+    private fun ep(title: String, at: Long) = Episode(key = title, title = title, audioUrl = "https://x/$title.mp3", publishedAt = at)
+    private val day = 24L * 3600 * 1000
+    private val oct19 = java.time.ZonedDateTime.of(2026, 10, 19, 7, 0, 0, 0, ZoneId.of("Europe/Rome")).toInstant().toEpochMilli()
 
     @Test
-    fun `stagione e numero dal titolo, se il feed non li dice`() {
-        assertEquals(15 to 8, PodcastSeasons.of(ep("S15 E08 Il Caso Cinturrino - Roboscroc (Ad-Free)", 0)))
-        assertEquals(15 to 8, PodcastSeasons.of(ep("S15E08 Il Caso", 0)))
-        assertEquals(3 to 4, PodcastSeasons.of(ep("Stagione 3 - Episodio 4: la casa", 0)))
-        assertEquals(2 to 5, PodcastSeasons.of(ep("Season 2 Episode 5", 0)))
-        assertEquals(1 to 12, PodcastSeasons.of(ep("1x12 Il pilota", 0)))
-        assertEquals(7 to null, PodcastSeasons.of(ep("Speciale stagione 7", 0)))
-        // I tag del feed valgono più del titolo.
-        assertEquals(4 to 2, PodcastSeasons.of(ep("S15 E08 titolo sbagliato", 0, season = 4, number = 2)))
-        assertNull(PodcastSeasons.of(ep("Live a Milano", 0)))
-        assertNull(PodcastSeasons.of(ep("PS5 e 2 amici", 0)))
-    }
-
-    @Test
-    fun `le puntate si dividono per stagione, la piu recente prima, poi le altre`() {
+    fun `l'etichetta ripetuta in fondo al titolo va nella riga sotto`() {
         val episodes = listOf(
-            ep("S15 E02 Seconda", 400), ep("Live a Milano", 350), ep("S15 E01 Prima", 300),
-            ep("S14 E10 Finale", 200), ep("S14 E09 Penultima", 100),
+            ep("Il Caso Mo Wilson (Patreon Exclusive)", 5), ep("S15 E08 Il Caso Cinturrino - Roboscroc (Ad-Free)", 4),
+            ep("Il Caso Zhu Ling (Patreon Exclusive)", 3), ep("S15 E07 Il Caso X (Ad-Free)", 2),
+            ep("Speciale Rapine Folli (Patreon Exclusive)", 1), ep("S15 E06 Il Caso Y (Ad-Free)", 0),
+            ep("Il Caso (Parte 1)", 0),
         )
-        val seasons = PodcastSeasons.split(episodes)
-        assertEquals(listOf(15, 14, null), seasons.map { it.number })
-        assertEquals(listOf("S15 E01 Prima", "S15 E02 Seconda"), seasons[0].episodes.map { it.title })
-        assertEquals(listOf("Live a Milano"), seasons[2].episodes.map { it.title })
-        // Una stagione sola: niente cartelle.
-        assertTrue(PodcastSeasons.split(episodes.filter { "S15" in it.title }).isEmpty())
-        assertTrue(PodcastSeasons.split(emptyList()).isEmpty())
+        val tags = EpisodeLabels.tags(episodes)
+        assertEquals(setOf("Patreon Exclusive", "Ad-Free"), tags)
+        assertEquals("Il Caso Mo Wilson" to "Patreon Exclusive", EpisodeLabels.split("Il Caso Mo Wilson (Patreon Exclusive)", tags))
+        assertEquals("S15 E08 Il Caso Cinturrino - Roboscroc" to "Ad-Free", EpisodeLabels.split("S15 E08 Il Caso Cinturrino - Roboscroc (Ad-Free)", tags))
+        // Una parentesi che non si ripete resta nel titolo; un titolo che è solo l'etichetta resta com'è.
+        assertEquals("Il Caso (Parte 1)" to null, EpisodeLabels.split("Il Caso (Parte 1)", tags))
+        assertEquals("(Ad-Free)" to null, EpisodeLabels.split("(Ad-Free)", tags))
     }
 
     @Test
-    fun `il podcast si apre su ultime puntate e stagioni, anche in Auto`() = runBlocking {
-        val show = Podcast("abc", "Non Aprite Quella Podcast", image = "https://x/cover.jpg", episodes = listOf(
-            ep("S15 E02 Seconda", 400), ep("S15 E01 Prima", 300), ep("S14 E01 Vecchia", 100), ep("Trailer", 50),
+    fun `il podcast e un elenco unico dalla piu recente, diviso per mese`() = runBlocking {
+        val show = Podcast("abc", "Non Aprite Quella Podcast", episodes = listOf(
+            ep("Il Caso Mo Wilson (Patreon Exclusive)", oct19),
+            ep("S15 E08 Il Caso Cinturrino (Ad-Free)", oct19 - 6 * day),
+            ep("Il Caso Zhu Ling (Patreon Exclusive)", oct19 - 21 * day),
+            ep("S15 E07 Il Caso X (Ad-Free)", oct19 - 27 * day),
+            ep("Speciale Rapine Folli (Patreon Exclusive)", oct19 - 28 * day),
+            ep("S15 E06 Il Caso Y (Ad-Free)", oct19 - 35 * day),
         ))
-        val source = PodcastSource({ listOf(show) }, { PodcastLibrary() })
+        val source = PodcastSource({ listOf(show) }, { PodcastLibrary() }, ZoneId.of("Europe/Rome"))
         val page = source.children(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "abc"))
-        assertEquals(listOf("Ultime puntate", "Stagione 15", "Stagione 14", "Altre puntate"), page.map { it.title })
-        assertEquals("2 puntate", page[1].subtitle)
-        assertEquals(listOf("S15 E01 Prima", "S15 E02 Seconda"), source.children(MediaId.parse(page[1].mediaId)!!).map { it.title })
-        assertEquals("S15 E02 Seconda", source.children(MediaId.parse(page[0].mediaId)!!).first().title)
-        assertEquals(listOf("Trailer"), source.children(MediaId.parse(page[3].mediaId)!!).map { it.title })
-        assertEquals("Stagione 14", source.node(MediaId.parse(page[2].mediaId)!!)?.title)
-        // Le puntate dentro una stagione si suonano come sempre.
-        val first = source.children(MediaId.parse(page[1].mediaId)!!).first()
-        assertEquals("https://x/S15 E01 Prima.mp3", source.track(MediaId.parse(first.mediaId)!!)?.streamUri)
+        // L'ordine di uscita, esclusive e stagioni mescolate come escono.
+        assertEquals(listOf("Il Caso Mo Wilson", "S15 E08 Il Caso Cinturrino", "Il Caso Zhu Ling", "S15 E07 Il Caso X", "Speciale Rapine Folli", "S15 E06 Il Caso Y"), page.map { it.title })
+        assertEquals(listOf("Ottobre 2026", "Ottobre 2026", "Settembre 2026", "Settembre 2026", "Settembre 2026", "Settembre 2026"), page.map { it.group })
+        assertTrue(page[0].subtitle!!.startsWith("Patreon Exclusive · 19 ott 2026"))
+        assertTrue(page.all { it.kind == LibraryNode.Kind.TRACK })
+        assertEquals("Senza data", EpisodeLabels.month(null, ZoneId.of("Europe/Rome")))
     }
 }
 

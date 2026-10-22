@@ -60,7 +60,7 @@ fun PodcastSection() {
         Text(
             "Incolla il link RSS di un podcast. Per quelli di Patreon serve il link privato: sul sito o nell'app di Patreon apri il podcast, " +
                 "«Il tuo abbonamento» (o il menu delle puntate audio) → «Ascolta in altre app» → «Copia link». " +
-                "Le puntate arrivano in Libreria, in Home e in Android Auto, divise per stagione, e ognuna riparte da dove l'avevi lasciata. " +
+                "Le puntate arrivano in Libreria, in Home e in Android Auto, dalla più recente, e ognuna riparte da dove l'avevi lasciata. " +
                 "Ogni 2 ore l'app guarda se c'è una puntata nuova e te lo dice con una notifica. " +
                 "Il link è personale: resta solo sul telefono (non va nel backup né nei resoconti).",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
