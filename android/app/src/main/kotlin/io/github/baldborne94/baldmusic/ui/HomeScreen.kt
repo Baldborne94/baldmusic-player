@@ -53,6 +53,7 @@ import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.playback.kind
 import java.util.Calendar
@@ -100,6 +101,7 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
     val (serverNew) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.RECENT}") else (null to null)
+    val (podcastShows) = if (roots?.any { it.mediaId == PodcastSource.KEY } == true) rememberChildren(vm, PodcastSource.KEY) else (null to null)
     val needsPermission = localSections?.any { it.kind == Kind.MESSAGE } == true
 
     // "Riscopri" cambia a ogni apertura dell'app, non a ogni ricomposizione.
@@ -179,6 +181,11 @@ fun HomeScreen(vm: PlayerViewModel) {
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(mixes, key = { it.id }) { mix -> MixCard(mix) { vm.playAll(mix.id, shuffled = true, from = mix.title) } }
             }
+        }
+
+        if (!podcastShows.isNullOrEmpty()) {
+            item { SectionHeader("I tuoi podcast") }
+            item { Carousel(podcastShows, 140.dp) { ui.open(it.mediaId, it.title()) } }
         }
 
         if (!newAlbums.isNullOrEmpty()) {

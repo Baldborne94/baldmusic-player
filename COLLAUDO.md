@@ -112,6 +112,17 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | N-11 | Salute della libreria dopo aver applicato | Molti meno brani da sistemare; il link «Riconosci dal suono» porta qui |
 | N-12 | Dopo «Applica», guarda album e brani riconosciuti (anche in Android Auto) | La copertina vera del disco da Cover Art Archive; senza rete o per un disco senza copertina nell'archivio resta quella del file |
 
+### Podcast (dopo modifiche ai podcast)
+
+| # | Prova | Risultato atteso |
+|---|---|---|
+| P-1 | Impostazioni → Podcast: incolla `https://www.patreon.com/cw/NAQP` (la pagina, non il feed) | Messaggio che spiega dove prendere il link RSS privato, niente podcast aggiunto |
+| P-2 | Su Patreon, «Non Aprite Quella Podcast» → «Ascolta in altre app» → «Copia link»; incollalo e «Aggiungi podcast» | «Fatto: «Non Aprite Quella Podcast», N puntate»; in Libreria il filtro «Podcast», in Home «I tuoi podcast», con la copertina |
+| P-3 | Apri il podcast, tocca una puntata; dopo qualche minuto metti in pausa, chiudi l'app, riaprila e tocca di nuovo la puntata | Riparte qualche secondo prima di dove eri; nell'elenco «mancano N min»; finita la puntata non parte musica a caso |
+| P-4 | Android Auto: scheda «Podcast» | Il podcast e le sue puntate; una puntata riparte da dove eri anche in macchina |
+| P-5 | ⋮ → Segnala un problema dopo aver ascoltato una puntata | Nel resoconto nessun `auth=` né `token-hash=` |
+| P-6 | Impostazioni → Podcast → ✕ accanto al podcast | Sparisce da Libreria, Home e Auto |
+
 ### Backup (dopo modifiche a backup o alla tua musica)
 
 | # | Cosa fare | Cosa deve succedere |

@@ -8,11 +8,13 @@ import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.MusicSource
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.core.subsonic.Credentials
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.data.Backups
 import io.github.baldborne94.baldmusic.data.LyricsRepository
 import io.github.baldborne94.baldmusic.data.LyricsWorker
+import io.github.baldborne94.baldmusic.data.Podcasts
 import io.github.baldborne94.baldmusic.data.UserData
 import io.github.baldborne94.baldmusic.diagnostics.Problems
 import io.github.baldborne94.baldmusic.library.LocalSource
@@ -47,6 +49,10 @@ class BaldMusicApp : Application() {
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
     val backups: Backups by lazy { Backups(this, userData, local) { settings } }
+
+    /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */
+    val podcasts: Podcasts by lazy { Podcasts(this, http) { settings.touch() } }
+    private val podcastSource: PodcastSource by lazy { PodcastSource(shows = { podcasts.shows() }, library = { podcasts.library.value }, forPlayback = { podcasts.showsForPlayback() }) }
 
     /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
     val updater: Updater by lazy { Updater(this, http) }
@@ -90,7 +96,7 @@ class BaldMusicApp : Application() {
     }
 
     /** La tua musica per prima: in Android Auto è la prima scheda. */
-    fun sources(): List<MusicSource> = listOfNotNull(personal, local, remoteSource())
+    fun sources(): List<MusicSource> = listOfNotNull(personal, local, remoteSource(), podcastSource.takeIf { podcasts.hasAny })
 
     @Synchronized
     fun remoteSource(): RemoteSource? {

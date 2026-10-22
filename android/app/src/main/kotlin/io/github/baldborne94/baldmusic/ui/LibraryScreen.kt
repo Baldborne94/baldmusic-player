@@ -50,9 +50,10 @@ import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.sortedByKey
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.playback.group
 
-private enum class Filter(val label: String) { COLLECTION("Raccolte"), PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti") }
+private enum class Filter(val label: String) { COLLECTION("Raccolte"), PLAYLIST("Playlist"), ALBUM("Album"), ARTIST("Artisti"), PODCAST("Podcast") }
 
 @Composable
 fun LibraryScreen(vm: PlayerViewModel) {
@@ -64,22 +65,25 @@ fun LibraryScreen(vm: PlayerViewModel) {
 
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
+    val hasPodcasts = roots?.any { it.mediaId == PodcastSource.KEY } == true
     val (playlists) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.PLAYLISTS}", lib.playlists)
     val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
     // Album e artisti (migliaia) solo quando si guardano.
     val (albums) = if (filter == Filter.ALBUM) rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}") else (null to null)
     val (artists) = if (filter == Filter.ARTIST) rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}") else (null to null)
+    val (podcastShows) = if (filter == Filter.PODCAST) rememberChildren(vm, PodcastSource.KEY) else (null to null)
     val (serverPlaylists) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.PLAYLISTS}") else (null to null)
 
     // Una volta per elenco, non a ogni ridisegno; la chiave d'ordine si calcola una volta per elemento.
-    val items: List<MediaItem> = remember(filter, alphabetical, collections, playlists, recent, albums, artists, serverPlaylists) {
+    val items: List<MediaItem> = remember(filter, alphabetical, collections, playlists, recent, albums, artists, serverPlaylists, podcastShows) {
         when (filter) {
             null -> (collections.orEmpty() + playlists.orEmpty() + recent.orEmpty()).distinctBy { it.mediaId }
             Filter.COLLECTION -> collections.orEmpty()
             Filter.PLAYLIST -> playlists.orEmpty() + serverPlaylists.orEmpty()
             Filter.ALBUM -> albums.orEmpty()
             Filter.ARTIST -> artists.orEmpty()
+            Filter.PODCAST -> podcastShows.orEmpty()
         }.let { if (alphabetical) it.sortedByKey { i -> ArtistNames.sortKey(i.title()) } else it }
     }
 
@@ -111,7 +115,7 @@ fun LibraryScreen(vm: PlayerViewModel) {
                             }
                         }
                     }
-                    items(Filter.entries.filter { filter == null || it == filter }) { f ->
+                    items(Filter.entries.filter { (filter == null || it == filter) && (it != Filter.PODCAST || hasPodcasts) }) { f ->
                         Chip(f.label, selected = filter == f) { filter = if (filter == f) null else f }
                     }
                 }

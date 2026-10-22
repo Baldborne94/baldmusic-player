@@ -25,7 +25,7 @@ object ProblemReport {
     /** Quante righe di annotazioni si tengono. */
     const val KEEP_NOTES = 60
 
-    private val secrets = Regex("""([?&;\s](?:t|s|p|u|token|salt|password|client|apiKey|api_key)=)[^&\s"']+""", RegexOption.IGNORE_CASE)
+    private val secrets = Regex("""([?&;\s](?:t|s|p|u|token|salt|password|client|apiKey|api_key|auth|token-hash|token-time|signature|x-amz-signature|sig)=)[^&\s"']+""", RegexOption.IGNORE_CASE)
 
     /** Toglie dal testo i parametri che valgono come credenziali (negli indirizzi dei brani, per esempio). */
     fun redact(text: String): String = secrets.replace(text) { it.groupValues[1] + "…" }
