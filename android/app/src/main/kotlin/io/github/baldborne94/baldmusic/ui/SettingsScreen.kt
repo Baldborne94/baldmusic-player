@@ -202,6 +202,9 @@ fun SettingsScreen(vm: PlayerViewModel) {
         status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
 
         Spacer(Modifier.height(12.dp))
+        PodcastSection()
+
+        Spacer(Modifier.height(12.dp))
         Text("Android Auto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Text(
             "BaldMusic compare tra le app musicali di Android Auto. Poiché l'app non arriva dal Play Store, la prima volta serve un passaggio:\n\n" +

@@ -45,6 +45,7 @@ import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.SleepTimer
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
 import kotlinx.coroutines.CoroutineScope
@@ -187,9 +188,17 @@ class PlaybackService : MediaLibraryService() {
      * Salva l'ultimo brano e tutta la coda (ordine, punto, casuale, ripeti): alla
      * riaccensione dell'auto, o dalla notifica dopo un riavvio, riparte tutto uguale.
      */
+    /** Dove sei arrivato nella puntata in corso, se è una puntata: la prossima volta riparte da lì. */
+    private fun savePodcastProgress() {
+        val item = player.currentMediaItem ?: return
+        if (!item.mediaId.startsWith("${PodcastSource.KEY}/")) return
+        app.podcasts.record(item.mediaId, player.currentPosition, player.duration.takeIf { it != C.TIME_UNSET })
+    }
+
     private fun saveLast(now: Boolean = false) {
         val item = player.currentMediaItem ?: return
         app.settings.saveLast(item.mediaId, player.currentPosition)
+        savePodcastProgress()
         val snapshot = QueueSnapshot.of(
             // Letta un brano alla volta: si leggono solo i brani che si tengono.
             ids = object : AbstractList<String>() {
@@ -366,6 +375,16 @@ class PlaybackService : MediaLibraryService() {
         if (item == null) return
         val id = MediaId.parse(item.mediaId) ?: return
         if (!id.isTrack) return
+        if (id.source == PodcastSource.KEY) {
+            // Una puntata non va tra i «più ascoltati» né nei mix: si ricorda solo dove sei arrivato.
+            listenJob = scope.launch {
+                while (player.currentMediaItem?.mediaId == item.mediaId) {
+                    delay(10_000)
+                    if (player.isPlaying) savePodcastProgress()
+                }
+            }
+            return
+        }
         listenJob = scope.launch {
             var played = 0L
             while (played < 20_000) {
@@ -772,7 +791,13 @@ class PlaybackService : MediaLibraryService() {
             shuffleFromCurrent = true
             val shuffle = single.requestMetadata.extras?.getBoolean(EXTRA_SHUFFLE) == true
             val start = if (shuffle && queue.isNotEmpty()) queue.indices.random() else index
-            MediaItemsWithStartPosition(queue.toItems(), start, startPositionMs)
+            // Una puntata riparte da dove eri arrivato (a meno che chi chiede non dica da dove).
+            val position = if (startPositionMs == C.TIME_UNSET || startPositionMs == 0L) {
+                queue.getOrNull(start)?.let { app.podcasts.resumeAt(it.mediaId) }?.takeIf { it > 0 } ?: startPositionMs
+            } else {
+                startPositionMs
+            }
+            MediaItemsWithStartPosition(queue.toItems(), start, position)
         }
 
         override fun onAddMediaItems(

@@ -6,6 +6,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
@@ -18,6 +19,7 @@ import io.github.baldborne94.baldmusic.core.artwork.CoverDownloads
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import okhttp3.Request
 import java.io.File
 import java.io.FileNotFoundException
@@ -76,6 +78,7 @@ class ArtworkProvider : ContentProvider() {
                 LocalCatalog.KEY -> fetchLocal(ctx, id, file)
                 RemoteSource.KEY -> fetchRemote(ctx, id, file)
                 PersonalSource.MOSAIC -> fetchMosaic(ctx, id, file)
+                PodcastSource.KEY -> fetchPodcast(ctx, id, file)
                 else -> false
             }
         } catch (e: Exception) {
@@ -212,6 +215,24 @@ class ArtworkProvider : ContentProvider() {
             if (!res.isSuccessful) return false
             return writeAtomically(out) { res.body.byteStream().copyTo(it); true }
         }
+    }
+
+    /**
+     * La copertina di un podcast, dall'indirizzo scritto nel suo feed. Spesso è enorme
+     * (3000×3000): si rimpicciolisce a [SIZE] prima di salvarla.
+     */
+    private fun fetchPodcast(ctx: Context, showId: String, out: File): Boolean {
+        val url = ctx.app.podcasts.imageUrl(showId) ?: return false
+        val bytes = ctx.app.http.newCall(Request.Builder().url(url).build()).execute().use { res ->
+            if (!res.isSuccessful) return false
+            res.body.bytes()
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= SIZE && bounds.outHeight / (sample * 2) >= SIZE) sample *= 2
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return false
+        return writeAtomically(out) { stream -> bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream) }
     }
 
     /** Scrive su un file temporaneo e poi rinomina: nessuno legge mai mezza immagine. */

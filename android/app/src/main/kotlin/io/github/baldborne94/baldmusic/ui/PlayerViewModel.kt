@@ -20,6 +20,7 @@ import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.playback.EXTRA_SHUFFLE
 import io.github.baldborne94.baldmusic.playback.PlaybackService
 import io.github.baldborne94.baldmusic.playback.toTrackRef
@@ -314,7 +315,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    suspend fun lyricsFor(item: MediaItem) = app.lyrics.get(
+    /** Il testo del brano; le puntate dei podcast non ne hanno (e non si chiede a LRCLIB). */
+    suspend fun lyricsFor(item: MediaItem) = if (item.mediaId.startsWith("${PodcastSource.KEY}/")) null else app.lyrics.get(
         item.mediaMetadata.artist?.toString(),
         item.mediaMetadata.title?.toString().orEmpty(),
         item.mediaMetadata.albumTitle?.toString(),
