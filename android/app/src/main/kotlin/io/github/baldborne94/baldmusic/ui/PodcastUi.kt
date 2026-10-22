@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
+import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +81,32 @@ fun PodcastSection() {
                     Icon(Icons.Rounded.Close, "Smetti di seguire ${show.title}")
                 }
             }
+        }
+        if (shows.isNotEmpty()) {
+            val downloading by podcasts.downloading.collectAsState()
+            // Si rilegge quando cambia cosa c'è sul telefono (scaricata, ascoltata, tolta).
+            val (count, bytes) = remember(library, downloading) { podcasts.stored() }
+            Text("Puntate sul telefono", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Le ultime puntate non ascoltate di ogni podcast si scaricano da sole col Wi‑Fi, così le senti anche senza rete. " +
+                    "Quelle ascoltate si tolgono da sole; un'altra puntata la scarichi dal suo menu ⋮.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PodcastLibrary.AUTO_DOWNLOAD_CHOICES.forEach { n ->
+                    Chip(if (n == 0) "Spento" else if (n == 1) "L'ultima" else "Le ultime $n", selected = library.autoDownload == n) { podcasts.setAutoDownload(n) }
+                }
+            }
+            Text(
+                when {
+                    downloading.isNotEmpty() -> "Scarico ${if (downloading.size == 1) "una puntata" else "${downloading.size} puntate"}…"
+                    count == 0 -> "Nessuna puntata sul telefono."
+                    else -> "${if (count == 1) "1 puntata" else "$count puntate"} sul telefono, ${android.text.format.Formatter.formatShortFileSize(LocalContext.current, bytes)}."
+                },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         OutlinedTextField(
             link, { link = it; status = null },

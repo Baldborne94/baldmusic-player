@@ -226,6 +226,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         position = ms
     }
 
+    /** Nelle puntate: indietro di 15 s o avanti di 30 s, con la stessa regola della notifica e di Auto. */
+    fun skipBack() = browser?.sendCustomCommand(androidx.media3.session.SessionCommand(PlaybackService.CMD_BACK, Bundle.EMPTY), Bundle.EMPTY)
+    fun skipForward() = browser?.sendCustomCommand(androidx.media3.session.SessionCommand(PlaybackService.CMD_FORWARD, Bundle.EMPTY), Bundle.EMPTY)
+
     fun skipTo(index: Int) {
         browser?.run {
             seekToDefaultPosition(index)

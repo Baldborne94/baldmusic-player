@@ -21,6 +21,10 @@ data class PodcastLibrary(
     val feeds: List<Subscription> = emptyList(),
     /** Per puntata: "<podcast>~<puntata>", come nell'ID del brano. */
     val progress: Map<String, EpisodeProgress> = emptyMap(),
+    /** Puntate da tenere sul telefono perché chieste a mano («Scarica»), finché non le ascolti. */
+    val downloads: Set<String> = emptySet(),
+    /** Quante delle ultime puntate non ascoltate di ogni podcast tenere sul telefono da sole (0 = nessuna). */
+    val autoDownload: Int = DEFAULT_AUTO_DOWNLOAD,
 ) {
     fun follow(url: String, now: Long): PodcastLibrary {
         val id = PodcastFeed.idOf(url)
@@ -29,7 +33,24 @@ data class PodcastLibrary(
     }
 
     /** Smetti di seguire un podcast: anche i punti di ripresa delle sue puntate se ne vanno. */
-    fun unfollow(id: String) = copy(feeds = feeds.filterNot { it.id == id }, progress = progress.filterKeys { !it.startsWith("$id~") })
+    fun unfollow(id: String) = copy(
+        feeds = feeds.filterNot { it.id == id },
+        progress = progress.filterKeys { !it.startsWith("$id~") },
+        downloads = downloads.filterTo(HashSet()) { !it.startsWith("$id~") },
+    )
+
+    /** «Scarica» o «Togli dal telefono» su una puntata. */
+    fun wantDownload(key: String, on: Boolean) = copy(downloads = if (on) downloads + key else downloads - key)
+
+    fun withAutoDownload(count: Int) = copy(autoDownload = count.coerceIn(0, MAX_AUTO_DOWNLOAD))
+
+    /**
+     * «Segna come ascoltata» (va tra le ascoltate, riparte dall'inizio, esce da «Da ascoltare»
+     * e dal telefono) o «Segna come da ascoltare» (come nuova).
+     */
+    fun mark(key: String, finished: Boolean, now: Long): PodcastLibrary =
+        if (finished) copy(progress = progress + (key to EpisodeProgress(0, progress[key]?.durationMs, finished = true, at = now)), downloads = downloads - key)
+        else copy(progress = progress - key)
 
     /**
      * Il punto di una puntata mentre la ascolti. Finita quando manca meno di un minuto (o è al
@@ -45,7 +66,8 @@ data class PodcastLibrary(
         val kept = (progress + (key to entry)).let { all ->
             if (all.size <= MAX_PROGRESS) all else all.entries.sortedByDescending { it.value.at }.take(MAX_PROGRESS).associate { it.key to it.value }
         }
-        return copy(progress = kept)
+        // Ascoltata: non serve più tenerla sul telefono, anche se l'avevi scaricata a mano.
+        return copy(progress = kept, downloads = if (entry.finished) downloads - key else downloads)
     }
 
     /** Da dove ripartire: il punto salvato, qualche secondo prima; dall'inizio se finita o appena cominciata. */
@@ -63,6 +85,11 @@ data class PodcastLibrary(
         /** Si riprende un po' prima di dove ci si era fermati, per ritrovare il filo. */
         const val REWIND_MS = 5_000L
         const val MAX_PROGRESS = 2_000
+        const val DEFAULT_AUTO_DOWNLOAD = 3
+        const val MAX_AUTO_DOWNLOAD = 10
+
+        /** Le scelte per «Scarica da sole le ultime puntate». */
+        val AUTO_DOWNLOAD_CHOICES = listOf(0, 1, 3, 5)
 
         private val json = Json { ignoreUnknownKeys = true }
 

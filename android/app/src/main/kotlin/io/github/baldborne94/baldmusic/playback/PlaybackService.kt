@@ -578,7 +578,10 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    /** Cuore, casuale, ripeti e timer accanto ai comandi: nella notifica e in Android Auto. */
+    /**
+     * Cuore, casuale, ripeti e timer accanto ai comandi: nella notifica e in Android Auto. Per una
+     * puntata di un podcast invece indietro di 15 s e avanti di 30 s (cuore, casuale e ripeti non servono).
+     */
     private fun updateLikeButton() {
         val item = player.currentMediaItem
         val liked = item != null && app.userData.isLiked(item.mediaId)
@@ -612,7 +615,26 @@ class PlaybackService : MediaLibraryService() {
             .setDisplayName(SleepTimer.label(app.sleepTimer.value, System.currentTimeMillis()))
             .setSessionCommand(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
             .build()
+        if (item != null && PodcastSource.episodeKey(item.mediaId) != null) {
+            val back = CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15)
+                .setDisplayName("Indietro di 15 secondi")
+                .setSessionCommand(SessionCommand(CMD_BACK, Bundle.EMPTY))
+                .build()
+            val forward = CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_30)
+                .setDisplayName("Avanti di 30 secondi")
+                .setSessionCommand(SessionCommand(CMD_FORWARD, Bundle.EMPTY))
+                .build()
+            session.setCustomLayout(ImmutableList.of(back, forward, timer))
+            return
+        }
         session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(heart, shuffle, repeat, timer))
+    }
+
+    /** Indietro o avanti dentro il brano (le puntate): mai prima dell'inizio né oltre la fine. */
+    private fun skipWithin(deltaMs: Long) {
+        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
+        val target = (player.currentPosition + deltaMs).coerceAtLeast(0)
+        player.seekTo(duration?.let { minOf(target, it - 1_000) }?.coerceAtLeast(0) ?: target)
     }
 
     private fun rootItem(id: String) = MediaItem.Builder()
@@ -657,6 +679,8 @@ class PlaybackService : MediaLibraryService() {
                 .add(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
                 .add(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
+                .add(SessionCommand(CMD_BACK, Bundle.EMPTY))
+                .add(SessionCommand(CMD_FORWARD, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(commands)
@@ -688,6 +712,10 @@ class PlaybackService : MediaLibraryService() {
             }
             if (customCommand.customAction == CMD_SLEEP) {
                 app.sleepTimer.value = SleepTimer.next(app.sleepTimer.value, System.currentTimeMillis())
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
+            if (customCommand.customAction == CMD_BACK || customCommand.customAction == CMD_FORWARD) {
+                skipWithin(if (customCommand.customAction == CMD_BACK) -BACK_MS else FORWARD_MS)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -906,5 +934,10 @@ class PlaybackService : MediaLibraryService() {
         const val CMD_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
         const val CMD_REPEAT = "io.github.baldborne94.baldmusic.REPEAT"
         const val CMD_SLEEP = "io.github.baldborne94.baldmusic.SLEEP"
+        /** Nelle puntate: indietro di 15 s, avanti di 30 s. */
+        const val CMD_BACK = "io.github.baldborne94.baldmusic.BACK_15"
+        const val CMD_FORWARD = "io.github.baldborne94.baldmusic.FORWARD_30"
+        const val BACK_MS = 15_000L
+        const val FORWARD_MS = 30_000L
     }
 }

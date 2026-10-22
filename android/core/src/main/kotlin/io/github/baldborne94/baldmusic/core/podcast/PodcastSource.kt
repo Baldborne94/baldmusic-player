@@ -25,6 +25,9 @@ class PodcastSource(
      * (Patreon) gli indirizzi dell'audio scadono.
      */
     private val forPlayback: suspend () -> List<Podcast> = shows,
+    /** L'indirizzo del file sul telefono di una puntata scaricata ([PodcastDownloads]), o null. */
+    private val downloaded: (String) -> String? = { null },
+    private val now: () -> Long = System::currentTimeMillis,
 ) : MusicSource {
 
     override val key = KEY
@@ -32,10 +35,46 @@ class PodcastSource(
     // Il punto di ripresa cambia mentre ascolti: niente cache nell'albero.
     override val cacheable get() = false
 
-    override suspend fun sections(): List<LibraryNode> = shows().map(::showNode)
+    /** «Da ascoltare» (se c'è qualcosa) e poi i podcast. */
+    override suspend fun sections(): List<LibraryNode> {
+        val all = shows()
+        val next = upNext(all)
+        val head = if (next.isEmpty()) emptyList() else listOf(
+            LibraryNode(
+                mediaId = MediaId(KEY, UPNEXT).toString(),
+                title = "Da ascoltare",
+                kind = Kind.SECTION,
+                subtitle = episodes(next.size),
+                artwork = next.first().first.image?.let { "$KEY/${next.first().first.id}" },
+            ),
+        )
+        return head + all.map(::showNode)
+    }
+
+    /**
+     * Le puntate da ascoltare: prima quelle iniziate e non finite (dall'ultima ascoltata), poi
+     * quelle uscite da poco e mai cominciate (dalla più recente).
+     */
+    fun upNext(all: List<Podcast>): List<Pair<Podcast, Episode>> {
+        val progress = library().progress
+        val started = all.flatMap { show -> show.episodes.map { show to it } }
+            .mapNotNull { pair -> progress[keyOf(pair.first, pair.second)]?.takeIf { !it.finished && it.positionMs >= PodcastLibrary.START_MS }?.let { pair to it.at } }
+            .sortedByDescending { it.second }.map { it.first }
+        val fresh = all.flatMap { show -> show.episodes.map { show to it } }
+            .filter { (show, e) -> progress[keyOf(show, e)] == null && (e.publishedAt ?: 0) >= now() - PodcastFeed.NEW_FOR_MS }
+            .sortedByDescending { it.second.publishedAt }
+        return (started + fresh).take(UPNEXT_MAX)
+    }
 
     /** Le puntate dalla più recente, divise per mese ([EpisodeLabels]). */
     override suspend fun children(id: MediaId): List<LibraryNode> {
+        if (id.kind == UPNEXT) {
+            val progress = library().progress
+            return upNext(shows()).map { (show, e) ->
+                val started = progress[keyOf(show, e)] != null
+                episodeNode(show, e, progress[keyOf(show, e)], EpisodeLabels.tags(show.episodes)).copy(group = if (started) "Da finire" else "Nuove")
+            }
+        }
         if (id.kind != SHOW) return emptyList()
         val show = shows().firstOrNull { it.id == id.id } ?: return emptyList()
         val progress = library().progress
@@ -45,8 +84,11 @@ class PodcastSource(
         }
     }
 
-    override suspend fun node(id: MediaId): LibraryNode? =
-        if (id.kind == SHOW) shows().firstOrNull { it.id == id.id }?.let(::showNode) else null
+    override suspend fun node(id: MediaId): LibraryNode? = when (id.kind) {
+        SHOW -> shows().firstOrNull { it.id == id.id }?.let(::showNode)
+        UPNEXT -> LibraryNode(MediaId(KEY, UPNEXT).toString(), "Da ascoltare", Kind.SECTION)
+        else -> null
+    }
 
     override suspend fun track(id: MediaId): LibraryNode? {
         val (showId, episodeKey) = split(id.id ?: return null) ?: return null
@@ -78,17 +120,19 @@ class PodcastSource(
 
     private fun episodeNode(show: Podcast, e: Episode, p: EpisodeProgress?, tags: Set<String>): LibraryNode {
         val (title, tag) = EpisodeLabels.split(e.title, tags)
+        // Scaricata: suona dal telefono, anche senza rete.
+        val local = downloaded(keyOf(show, e))
         return LibraryNode(
             // Senza contenitore: si ascolta la puntata scelta, non tutte quelle dopo.
             mediaId = MediaId.track(KEY, keyOf(show, e), null).toString(),
             title = title,
             kind = Kind.TRACK,
-            subtitle = listOfNotNull(tag, subtitle(e, p).takeIf { it.isNotEmpty() }).joinToString(" · "),
+            subtitle = listOfNotNull(tag, subtitle(e, p).takeIf { it.isNotEmpty() }, local?.let { "scaricata" }).joinToString(" · "),
             artist = show.title,
             album = show.title,
             artwork = show.image?.let { "$KEY/${show.id}" },
             durationMs = e.durationMs ?: p?.durationMs,
-            streamUri = e.audioUrl,
+            streamUri = local ?: e.audioUrl,
             // "Vai all'album" porta al podcast; e niente dissolvenza tra puntate dello stesso podcast.
             albumId = MediaId(KEY, SHOW, show.id).toString(),
         )
@@ -109,6 +153,10 @@ class PodcastSource(
     companion object {
         const val KEY = "podcast"
         const val SHOW = "show"
+        const val UPNEXT = "upnext"
+
+        /** Quante puntate al massimo in «Da ascoltare». */
+        const val UPNEXT_MAX = 20
 
         private val DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ITALIAN)
 
