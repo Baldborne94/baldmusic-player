@@ -21,9 +21,6 @@ data class Episode(
     val publishedAt: Long? = null,
     val durationMs: Long? = null,
     val image: String? = null,
-    /** Da `itunes:season` / `itunes:episode`, se il feed li ha (altrimenti si guarda il titolo: [PodcastSeasons]). */
-    val season: Int? = null,
-    val number: Int? = null,
 )
 
 /** Un podcast letto dal suo feed: le puntate dalla più recente. */
@@ -94,8 +91,6 @@ object PodcastFeed {
             publishedAt = item.text("pubDate")?.let(::date),
             durationMs = item.textNs(ITUNES, "duration")?.let(::duration),
             image = item.childNs(ITUNES, "image")?.getAttribute("href")?.takeIf { it.isNotBlank() },
-            season = item.textNs(ITUNES, "season")?.toIntOrNull()?.takeIf { it > 0 },
-            number = item.textNs(ITUNES, "episode")?.toIntOrNull()?.takeIf { it > 0 },
         )
     }
 
