@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
@@ -130,6 +131,7 @@ fun AppScaffold(vm: PlayerViewModel) {
     var menuFor by remember { mutableStateOf<Pair<MediaItem, String?>?>(null) }
     var addTo by remember { mutableStateOf<List<MediaItem>?>(null) }
     var infoFor by remember { mutableStateOf<Pair<Long, String>?>(null) }
+    var episodeInfo by remember { mutableStateOf<String?>(null) }
     var trashAsk by remember { mutableStateOf<TrashAsk?>(null) }
     var trashing by remember { mutableStateOf<TrashAsk?>(null) }
     val lib by vm.library.collectAsStateWithLifecycle()
@@ -267,11 +269,12 @@ fun AppScaffold(vm: PlayerViewModel) {
                         { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
                     onInfo = localTrackId(item)?.let { id -> { infoFor = id to item.title() } },
-                    extra = podcastActions(context.app.podcasts, item),
+                    extra = podcastActions(context.app.podcasts, item) { episodeInfo = item.mediaId },
                 )
             }
 
             infoFor?.let { (id, title) -> TrackInfoDialog(id, title, onDismiss = { infoFor = null }) }
+            episodeInfo?.let { id -> EpisodeInfoDialog(id, onDismiss = { episodeInfo = null }) }
 
             // Dopo un aggiornamento, una volta: cosa c'è di nuovo.
             WhatsNewDialog(vm)
@@ -470,7 +473,7 @@ fun personalPlaylistId(mediaId: String): String? =
 
 /** Condivide titolo e artista con le altre app (messaggi, social…). */
 /** Le voci del ⋮ di una puntata: scaricarla (o toglierla) e segnarla come ascoltata o da ascoltare. */
-private fun podcastActions(podcasts: Podcasts, item: MediaItem): List<Triple<ImageVector, String, () -> Unit>> {
+private fun podcastActions(podcasts: Podcasts, item: MediaItem, onInfo: () -> Unit): List<Triple<ImageVector, String, () -> Unit>> {
     val id = item.mediaId
     if (PodcastSource.episodeKey(id) == null) return emptyList()
     return buildList {
@@ -480,6 +483,7 @@ private fun podcastActions(podcasts: Podcasts, item: MediaItem): List<Triple<Ima
         }
         if (podcasts.isFinished(id)) add(Triple(Icons.Rounded.RadioButtonUnchecked, "Segna come da ascoltare", { podcasts.mark(id, false) }))
         else add(Triple(Icons.Rounded.CheckCircle, "Segna come ascoltata", { podcasts.mark(id, true) }))
+        add(Triple(Icons.Rounded.Info, "Informazioni sulla puntata", onInfo))
     }
 }
 

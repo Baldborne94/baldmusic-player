@@ -2,10 +2,14 @@ package io.github.baldborne94.baldmusic.core
 
 import io.github.baldborne94.baldmusic.core.diagnostics.ProblemReport
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
+import io.github.baldborne94.baldmusic.core.library.LibraryBackup
 import io.github.baldborne94.baldmusic.core.library.MediaId
+import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeLabels
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeProgress
+import io.github.baldborne94.baldmusic.core.podcast.PodcastBackups
 import io.github.baldborne94.baldmusic.core.podcast.PodcastDownloads
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
@@ -64,6 +68,8 @@ class PodcastTest {
         assertEquals("https://c10.patreonusercontent.com/cover.jpg", show.image)
         // Il post senza audio non è una puntata.
         assertEquals(listOf("Puntata 2", "Puntata 1 & introduzione"), show.episodes.map { it.title })
+        // La descrizione dal CDATA, senza HTML.
+        assertEquals("Prima puntata", show.episodes[1].description)
         assertEquals((3725L) * 1000, show.episodes[0].durationMs)
         assertEquals((45L * 60 + 30) * 1000, show.episodes[1].durationMs)
         assertEquals("https://c10.patreonusercontent.com/1.mp3?token-time=1&token-hash=abc", show.episodes[1].audioUrl)
@@ -314,5 +320,178 @@ class PodcastDownloadsTest {
         assertEquals("file:///data/podcast/e2.mp3", episodes[1].streamUri)
         assertTrue(episodes[1].subtitle!!.endsWith("scaricata"))
         assertEquals("https://x/1.mp3", episodes[0].streamUri)
+    }
+}
+
+class PodcastPlayAndLinkTest {
+    private val day = 24L * 3600 * 1000
+    private val now = 100 * day
+    private fun ep(n: Int, at: Long = now - n * day) = Episode("e$n", "Puntata $n", "https://x/$n.mp3", publishedAt = at)
+    private val naqp = Podcast("abc", "Non Aprite Quella Podcast", episodes = (1..6).map { ep(it) })
+    private val other = Podcast("zzz", "Un altro podcast", episodes = listOf(Episode("o1", "Altra", "https://y/1.mp3", publishedAt = now - 30 * day)))
+    private fun key(n: Int) = "abc~e$n"
+    private fun source(lib: PodcastLibrary) = PodcastSource({ listOf(naqp, other) }, { lib }, ZoneId.of("Europe/Rome"), now = { now })
+
+    @Test
+    fun `chiedere un podcast suona una puntata sola - quella a meta, poi la nuova, poi la piu recente non ascoltata`() = runBlocking {
+        // A metà la 4: riparte quella, non l'archivio dalla più recente.
+        var lib = PodcastLibrary().record(key(4), 900_000, 3_600_000, now)
+        assertEquals("abc~e4", source(lib).toPlay(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "abc"))?.let { PodcastSource.episodeKey(it.mediaId) })
+        // Niente a metà: la più recente uscita da poco.
+        lib = PodcastLibrary().mark(key(1), true, now)
+        assertEquals("abc~e2", source(lib).toPlay(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "abc"))?.let { PodcastSource.episodeKey(it.mediaId) })
+        // Ascoltate tutte quelle recenti dell'altro podcast: la più recente non ascoltata, anche se vecchia.
+        assertEquals("zzz~o1", source(PodcastLibrary()).toPlay(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "zzz"))?.let { PodcastSource.episodeKey(it.mediaId) })
+        // «Da ascoltare»: la prima della lista.
+        assertEquals("abc~e2", source(lib).toPlay(MediaId(PodcastSource.KEY, PodcastSource.UPNEXT))?.let { PodcastSource.episodeKey(it.mediaId) })
+        // Non è un contenitore dei podcast.
+        assertNull(source(lib).toPlay(MediaId("local", "album", "1")))
+    }
+
+    @Test
+    fun `con la voce - il nome del podcast, anche a pezzi, e l'ultima puntata`() = runBlocking {
+        val lib = PodcastLibrary().record(key(4), 900_000, 3_600_000, now)
+        fun k(node: LibraryNode?) = node?.let { PodcastSource.episodeKey(it.mediaId) }
+        assertEquals("abc~e4", k(source(lib).forVoice("non aprite quella podcast")))
+        assertEquals("abc~e4", k(source(lib).forVoice("Non aprite quella")))
+        // «L'ultima puntata»: la più recente, anche con un'altra a metà.
+        assertEquals("abc~e1", k(source(lib).forVoice("non aprite quella podcast", latest = true)))
+        // Nessun nome: tra tutti.
+        assertEquals("abc~e4", k(source(lib).forVoice("")))
+        assertNull(source(lib).forVoice("Muschio Selvaggio"))
+    }
+
+    @Test
+    fun `le richieste vocali di podcast`() {
+        assertEquals(VoiceQuery.PodcastAsk("Non Aprite Quella Podcast", false), VoiceQuery.podcast("il podcast Non Aprite Quella Podcast"))
+        assertEquals(VoiceQuery.PodcastAsk("Non Aprite Quella Podcast", true), VoiceQuery.podcast("l'ultima puntata di Non Aprite Quella Podcast"))
+        assertEquals(VoiceQuery.PodcastAsk("NAQP", false), VoiceQuery.podcast("la puntata del podcast NAQP"))
+        assertEquals(VoiceQuery.PodcastAsk("", false), VoiceQuery.podcast("un podcast"))
+        assertEquals(VoiceQuery.PodcastAsk("", false), VoiceQuery.podcast("Podcast"))
+        // Non parla di podcast: il nome detto da solo lo trova la ricerca.
+        assertNull(VoiceQuery.podcast("Non Aprite Quella Podcast"))
+        assertNull(VoiceQuery.podcast("Podcasting blues"))
+        assertNull(VoiceQuery.podcast("la raccolta Disney Italia"))
+    }
+
+    @Test
+    fun `un link rifiutato due volte di fila non funziona piu, uno solo no`() {
+        var lib = PodcastLibrary().follow("https://www.patreon.com/rss/naqp?auth=A", 1)
+        val id = lib.feeds.single().id
+        lib = lib.feedChecked(id, refused = true)
+        assertTrue(lib.broken().isEmpty())
+        lib = lib.feedChecked(id, refused = true)
+        assertEquals(listOf(id), lib.broken().map { it.id })
+        // Torna a funzionare (o lo incolli di nuovo): l'avviso sparisce.
+        assertTrue(lib.feedChecked(id, refused = false).broken().isEmpty())
+        // Il link nuovo tiene l'ID, quindi dove eri arrivato.
+        val renewed = lib.record("$id~e1", 600_000, 3_600_000, 2).replaceUrl(id, "https://www.patreon.com/rss/naqp?auth=B")
+        assertEquals("https://www.patreon.com/rss/naqp?auth=B", renewed.feeds.single().url)
+        assertTrue(renewed.broken().isEmpty())
+        assertEquals(595_000, renewed.resumeAt("$id~e1"))
+    }
+
+    @Test
+    fun `il link nuovo di Patreon sostituisce il podcast che segui gia`() {
+        val fresh = naqp.copy(id = "nuovo")
+        assertEquals("abc", PodcastFeed.replaces(listOf(other, naqp), fresh)?.id)
+        // Titolo cambiato ma stesse puntate: è lo stesso podcast.
+        assertEquals("abc", PodcastFeed.replaces(listOf(other, naqp), fresh.copy(title = "NAQP"))?.id)
+        // Un podcast diverso: si aggiunge.
+        assertNull(PodcastFeed.replaces(listOf(naqp), Podcast("x", "Altro", episodes = listOf(ep(9).copy(key = "q")))))
+    }
+
+    @Test
+    fun `la descrizione della puntata - HTML in testo semplice`() {
+        val html = """
+            <p>Ospite: <b>Mario</b> &amp; Luigi.</p><p>Parliamo di <a href="https://it.wikipedia.org/wiki/Shining">Shining</a> e di https://naqp.it.</p>
+            <ul><li>Uno</li><li>Due&nbsp;cose</li></ul>Fine<br/>riga&#8217;s &egrave;
+        """.trimIndent()
+        assertEquals(
+            "Ospite: Mario & Luigi.\n\nParliamo di Shining (https://it.wikipedia.org/wiki/Shining) e di https://naqp.it.\n\n• Uno\n• Due cose\n\nFine\nriga’s è",
+            PodcastFeed.plainText(html),
+        )
+        assertEquals("Solo testo", PodcastFeed.plainText("  Solo   testo "))
+        assertTrue(PodcastFeed.plainText("a".repeat(5000)).length <= PodcastFeed.MAX_DESCRIPTION + 1)
+    }
+}
+
+class PodcastBackupTest {
+    private val oldUrl = "https://www.patreon.com/rss/naqp?auth=VECCHIO"
+    private val newUrl = "https://www.patreon.com/rss/naqp?auth=NUOVO"
+    private fun ep(n: Int) = Episode("e$n", "Puntata $n", "https://x/$n.mp3?token-hash=SEGRETO", publishedAt = n * 1000L)
+    private fun show(id: String, title: String = "Non Aprite Quella Podcast") = Podcast(id, title, episodes = (1..4).map(::ep))
+
+    private fun listened(): Pair<PodcastLibrary, Podcast> {
+        var lib = PodcastLibrary().follow(oldUrl, 1).withAutoDownload(5)
+        val id = lib.feeds.single().id
+        lib = lib.record("$id~e2", 600_000, 3_600_000, 10).mark("$id~e1", true, 11).wantDownload("$id~e3", true)
+        return lib to show(id)
+    }
+
+    @Test
+    fun `nel backup ascoltate e punti di ripresa, mai il link`() {
+        val (lib, naqp) = listened()
+        val backup = assertNotNull(PodcastBackups.create(lib, listOf(naqp)))
+        assertEquals("Non Aprite Quella Podcast", backup.shows.single().title)
+        assertEquals(setOf("e1", "e2"), backup.shows.single().progress.keys)
+        assertEquals(setOf("e3"), backup.shows.single().downloads)
+        assertEquals(5, backup.autoDownload)
+        val text = LibraryBackup.encode(LibraryBackup.create(UserLibrary(), emptyList(), 1, podcasts = backup))
+        assertFalse("auth=" in text || "VECCHIO" in text || "patreon.com" in text || "token-hash" in text, text)
+        assertEquals(backup, LibraryBackup.decode(text)?.podcasts)
+        assertNull(PodcastBackups.create(PodcastLibrary(), emptyList()))
+    }
+
+    @Test
+    fun `su un telefono nuovo il podcast aspetta il link e poi riprende da dove eri`() {
+        val (lib, naqp) = listened()
+        val backup = PodcastBackups.create(lib, listOf(naqp))!!
+        // Ripristinato prima di seguire il podcast: aspetta, e resta anche nel backup dopo.
+        var fresh = PodcastBackups.restore(PodcastLibrary(), backup, emptyList())
+        assertEquals(1, fresh.pending.size)
+        assertEquals(5, fresh.autoDownload)
+        assertEquals(backup.shows, PodcastBackups.create(fresh, emptyList())?.shows)
+        // Incolli il link nuovo (ID diverso): stesso podcast per titolo, tornano ascoltate e ripresa.
+        fresh = fresh.follow(newUrl, 20)
+        val newId = fresh.feeds.single().id
+        assertFalse(newId == naqp.id)
+        fresh = PodcastBackups.adopt(fresh, show(newId))
+        assertTrue(fresh.pending.isEmpty())
+        assertEquals(595_000, fresh.resumeAt("$newId~e2"))
+        assertTrue(fresh.progress.getValue("$newId~e1").finished)
+        assertTrue("$newId~e3" in fresh.downloads)
+    }
+
+    @Test
+    fun `ripristinato su un podcast che segui gia vince il punto piu recente`() {
+        val (lib, naqp) = listened()
+        val backup = PodcastBackups.create(lib, listOf(naqp))!!
+        // Sul telefono la puntata 2 è andata avanti dopo il backup: resta quella di adesso.
+        val now = PodcastLibrary().follow(oldUrl, 1).record("${naqp.id}~e2", 1_200_000, 3_600_000, 99)
+        val restored = PodcastBackups.restore(now, backup, listOf(naqp))
+        assertTrue(restored.pending.isEmpty())
+        assertEquals(1_195_000, restored.resumeAt("${naqp.id}~e2"))
+        assertTrue(restored.progress.getValue("${naqp.id}~e1").finished)
+        // Titolo cambiato ma le stesse puntate: è lo stesso podcast.
+        assertTrue(PodcastBackups.matches(backup.shows.single(), show("altro", "NAQP")))
+        assertFalse(PodcastBackups.matches(backup.shows.single(), Podcast("x", "Altro", episodes = listOf(ep(9)))))
+    }
+
+    @Test
+    fun `i punti di ripresa entrano nel backup automatico come gli ascolti`() {
+        val lib = UserLibrary()
+        assertNull(LibraryBackup.autoWait(lib, lib, false, lastAt = 0, nowMs = 1_000))
+        // Cambiati solo i podcast: al massimo ogni mezz'ora.
+        assertEquals(LibraryBackup.PLAYS_EVERY_MS - 1_000, LibraryBackup.autoWait(lib, lib, false, lastAt = 0, nowMs = 1_000, podcastsChanged = true))
+    }
+
+    @Test
+    fun `le descrizioni stanno in un file a parte`() {
+        val full = Podcast("a", "P", episodes = listOf(ep(1).copy(description = "Di cosa parla"), ep(2)))
+        val (light, notes) = PodcastFeed.withoutNotes(full)
+        assertTrue(light.episodes.all { it.description == null })
+        assertEquals(mapOf("e1" to "Di cosa parla"), notes)
+        assertEquals(full.episodes.map { it.key }, light.episodes.map { it.key })
     }
 }

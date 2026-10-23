@@ -5,7 +5,13 @@ import kotlinx.serialization.json.Json
 
 /** Un podcast seguito: l'indirizzo del feed (per Patreon contiene la chiave personale). */
 @Serializable
-data class Subscription(val id: String, val url: String, val addedAt: Long = 0)
+data class Subscription(
+    val id: String,
+    val url: String,
+    val addedAt: Long = 0,
+    /** Quante volte di fila il server ha rifiutato il link (401/403/404/410 o non più un feed). */
+    val refused: Int = 0,
+)
 
 /** Dove eri arrivato in una puntata. */
 @Serializable
@@ -25,6 +31,8 @@ data class PodcastLibrary(
     val downloads: Set<String> = emptySet(),
     /** Quante delle ultime puntate non ascoltate di ogni podcast tenere sul telefono da sole (0 = nessuna). */
     val autoDownload: Int = DEFAULT_AUTO_DOWNLOAD,
+    /** Podcast ripristinati da un backup che aspettano il loro link ([PodcastBackups.adopt]). */
+    val pending: List<ShowBackup> = emptyList(),
 ) {
     fun follow(url: String, now: Long): PodcastLibrary {
         val id = PodcastFeed.idOf(url)
@@ -38,6 +46,23 @@ data class PodcastLibrary(
         progress = progress.filterKeys { !it.startsWith("$id~") },
         downloads = downloads.filterTo(HashSet()) { !it.startsWith("$id~") },
     )
+
+    /**
+     * Il link nuovo di un podcast che segui già ([PodcastFeed.replaces]): stesso ID, quindi
+     * punti di ripresa, ascoltate e puntate sul telefono restano.
+     */
+    fun replaceUrl(id: String, url: String) = copy(feeds = feeds.map { if (it.id == id) it.copy(url = url, refused = 0) else it })
+
+    /**
+     * Com'è andata l'ultima lettura del feed: [refused] se il server ha rifiutato il link. Senza
+     * rete o con il server giù non si chiama: non dice niente sul link.
+     */
+    fun feedChecked(id: String, refused: Boolean) = copy(
+        feeds = feeds.map { if (it.id != id) it else it.copy(refused = if (refused) it.refused + 1 else 0) },
+    )
+
+    /** I podcast il cui link non funziona più: rifiutato [BROKEN_AFTER] volte di fila (una sola può essere un intoppo). */
+    fun broken(): List<Subscription> = feeds.filter { it.refused >= BROKEN_AFTER }
 
     /** «Scarica» o «Togli dal telefono» su una puntata. */
     fun wantDownload(key: String, on: Boolean) = copy(downloads = if (on) downloads + key else downloads - key)
@@ -85,6 +110,7 @@ data class PodcastLibrary(
         /** Si riprende un po' prima di dove ci si era fermati, per ritrovare il filo. */
         const val REWIND_MS = 5_000L
         const val MAX_PROGRESS = 2_000
+        const val BROKEN_AFTER = 2
         const val DEFAULT_AUTO_DOWNLOAD = 3
         const val MAX_AUTO_DOWNLOAD = 10
 

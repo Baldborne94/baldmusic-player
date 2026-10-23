@@ -1,5 +1,6 @@
 package io.github.baldborne94.baldmusic.core.library
 
+import io.github.baldborne94.baldmusic.core.podcast.PodcastBackup
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.math.abs
@@ -56,6 +57,8 @@ data class Backup(
     val files: Map<String, FileKey> = emptyMap(),
     /** null nei backup fatti prima che ci fossero. */
     val settings: BackupSettings? = null,
+    /** Ascoltate e punti di ripresa dei podcast, senza i link; null se non ne segui. */
+    val podcasts: PodcastBackup? = null,
 ) {
     companion object {
         const val APP = "BaldMusic"
@@ -73,6 +76,7 @@ data class RestorePlan(
     val missing: List<TrackRef>,
     /** Le impostazioni da rimettere, già ripulite; null se il backup non le aveva. */
     val settings: BackupSettings? = null,
+    val podcasts: PodcastBackup? = null,
 )
 
 object LibraryBackup {
@@ -98,12 +102,13 @@ object LibraryBackup {
      * preferiti, playlist, raccolte o impostazioni ([settingsChanged]), o se non c'è ancora un
      * backup di questa sessione ([saved] null). Se sono cambiati solo ascolti, recenti e
      * ricerche (succede a ogni brano), al massimo ogni [PLAYS_EVERY_MS] dall'ultimo ([lastAt]).
-     * Niente da scrivere se non è cambiato niente: null.
+     * Niente da scrivere se non è cambiato niente: null. I podcast ([podcastsChanged]: punti di
+     * ripresa, salvati ogni 10 s mentre ascolti) valgono come gli ascolti.
      */
-    fun autoWait(saved: UserLibrary?, now: UserLibrary, settingsChanged: Boolean, lastAt: Long?, nowMs: Long): Long? {
+    fun autoWait(saved: UserLibrary?, now: UserLibrary, settingsChanged: Boolean, lastAt: Long?, nowMs: Long, podcastsChanged: Boolean = false): Long? {
         if (saved == null || settingsChanged) return 0
         if (saved.liked != now.liked || saved.playlists != now.playlists || saved.ignoredFolders != now.ignoredFolders) return 0
-        if (saved == now) return null
+        if (saved == now && !podcastsChanged) return null
         val since = lastAt?.let { nowMs - it } ?: return 0
         return (PLAYS_EVERY_MS - since).coerceAtLeast(0)
     }
@@ -111,12 +116,12 @@ object LibraryBackup {
     /** I brani tolti a mano dalle raccolte: non stanno nella libreria, ma vanno ritrovati anche loro. */
     private fun removed(lib: UserLibrary): List<String> = lib.playlists.flatMap { it.removed }
 
-    fun create(lib: UserLibrary, tracks: List<LocalTrack>, now: Long, settings: BackupSettings? = null): Backup {
+    fun create(lib: UserLibrary, tracks: List<LocalTrack>, now: Long, settings: BackupSettings? = null, podcasts: PodcastBackup? = null): Backup {
         val byId = tracks.associateBy { LocalCatalog.ref(it).id }
         val files = (refs(lib).map { it.id } + removed(lib)).filter(::isLocal).distinct().mapNotNull { id ->
             byId[id]?.let { t -> id to FileKey(t.folder, t.title, t.artist, t.durationMs) }
         }.toMap()
-        return Backup(createdAt = now, library = lib, files = files, settings = settings?.cleaned())
+        return Backup(createdAt = now, library = lib, files = files, settings = settings?.cleaned(), podcasts = podcasts)
     }
 
     fun encode(backup: Backup): String = json.encodeToString(Backup.serializer(), backup)
@@ -177,6 +182,7 @@ object LibraryBackup {
             found = ids.size - gone.size,
             missing = gone.mapNotNull { byOldId[it] },
             settings = backup.settings?.cleaned(),
+            podcasts = backup.podcasts,
         )
     }
 }

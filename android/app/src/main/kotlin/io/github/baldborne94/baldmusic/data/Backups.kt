@@ -15,6 +15,7 @@ import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import io.github.baldborne94.baldmusic.core.library.RestorePlan
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.podcast.PodcastBackup
 import io.github.baldborne94.baldmusic.library.LocalSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,7 @@ class Backups(
     private val context: Context,
     private val userData: UserData,
     private val local: LocalSource,
+    private val podcasts: Podcasts,
     private val settings: () -> Settings,
 ) {
 
@@ -70,6 +72,7 @@ class Backups(
     /** La tua musica dell'ultimo backup automatico di questa sessione: dice cosa è cambiato da allora. */
     @Volatile private var autoSaved: UserLibrary? = null
     private val settingsChanged = AtomicBoolean(false)
+    private val podcastsChanged = AtomicBoolean(false)
 
     /**
      * Dopo ogni modifica, quando le cose si calmano (gli ascolti arrivano a raffica). Se sono
@@ -80,10 +83,15 @@ class Backups(
         if (!autoSupported) return
         scope.launch {
             // Anche quando cambia un'impostazione: server, chiave di AcoustID, dissolvenza…
-            merge(userData.state.drop(1).map { }, settings().edits.drop(1).map { settingsChanged.set(true) })
+            // E i podcast (ascoltate, punti di ripresa): come gli ascolti, al massimo ogni mezz'ora.
+            merge(
+                userData.state.drop(1).map { },
+                settings().edits.drop(1).map { settingsChanged.set(true) },
+                podcasts.library.drop(1).map { podcastsChanged.set(true) },
+            )
                 .debounce(AUTO_DELAY_MS)
                 .collectLatest {
-                    val wait = LibraryBackup.autoWait(autoSaved, userData.value, settingsChanged.get(), _auto.value.lastAt, System.currentTimeMillis())
+                    val wait = LibraryBackup.autoWait(autoSaved, userData.value, settingsChanged.get(), _auto.value.lastAt, System.currentTimeMillis(), podcastsChanged.get())
                         ?: return@collectLatest
                     delay(wait)
                     if (_autoEnabled.value) writeAuto()
@@ -92,11 +100,11 @@ class Backups(
     }
 
     /** C'è qualcosa da salvare: non una libreria appena installata con le sole raccolte create da sole. */
-    private fun worthSaving(lib: UserLibrary) =
-        lib.liked.isNotEmpty() || lib.plays.isNotEmpty() || lib.playlists.any { !it.isCollection || it.removed.isNotEmpty() }
+    private fun worthSaving(lib: UserLibrary, podcasts: PodcastBackup?) =
+        lib.liked.isNotEmpty() || lib.plays.isNotEmpty() || lib.playlists.any { !it.isCollection || it.removed.isNotEmpty() } || podcasts != null
 
     private suspend fun snapshot(): String =
-        LibraryBackup.encode(LibraryBackup.create(userData.value, local.allTracks(), System.currentTimeMillis(), currentSettings()))
+        LibraryBackup.encode(LibraryBackup.create(userData.value, local.allTracks(), System.currentTimeMillis(), currentSettings(), podcasts.backup()))
 
     /** Le impostazioni da mettere nel backup: del server solo indirizzo e utente, mai il token. */
     private fun currentSettings(): BackupSettings {
@@ -136,6 +144,8 @@ class Backups(
      */
     fun apply(plan: RestorePlan) {
         userData.replaceAll(plan.library)
+        // Dei podcast solo ascoltate e punti di ripresa: i link si incollano di nuovo.
+        plan.podcasts?.let { scope.launch { podcasts.restore(it) } }
         val saved = plan.settings ?: return
         val s = settings()
         saved.serverUrl?.let { s.rememberServer(it, saved.serverUser) }
@@ -150,7 +160,8 @@ class Backups(
     /** La copia in Download/BaldMusic, sovrascritta ogni volta. */
     private suspend fun writeAuto() {
         val lib = userData.value
-        if (Build.VERSION.SDK_INT < 29 || !worthSaving(lib)) return
+        val podcastBackup = podcasts.backup()
+        if (Build.VERSION.SDK_INT < 29 || !worthSaving(lib, podcastBackup)) return
         // Senza i file del telefono (permesso tolto, memoria non montata) il backup non saprebbe
         // ritrovare i brani su un altro telefono: si tiene quello di prima.
         if (!local.hasPermission()) return
@@ -158,7 +169,7 @@ class Backups(
         val localIds = (lib.liked + lib.playlists.flatMap { it.tracks }).any { it.id.startsWith("${LocalCatalog.KEY}/") }
         if (tracks.isEmpty() && localIds) return
         val result = runCatching {
-            val text = LibraryBackup.encode(LibraryBackup.create(lib, tracks, System.currentTimeMillis(), currentSettings())).toByteArray()
+            val text = LibraryBackup.encode(LibraryBackup.create(lib, tracks, System.currentTimeMillis(), currentSettings(), podcastBackup)).toByteArray()
             val resolver = context.contentResolver
             // Il file scritto da questa installazione; dopo una reinstallazione se ne crea uno nuovo.
             val saved = prefs.getString(KEY_URI, null)?.let(Uri::parse)
@@ -179,6 +190,7 @@ class Backups(
                 val now = System.currentTimeMillis()
                 autoSaved = lib
                 settingsChanged.set(false)
+                podcastsChanged.set(false)
                 prefs.edit { putLong(KEY_LAST, now) }
                 AutoStatus(now)
             },

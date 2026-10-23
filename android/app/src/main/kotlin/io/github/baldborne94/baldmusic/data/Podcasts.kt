@@ -1,8 +1,11 @@
 package io.github.baldborne94.baldmusic.data
 
 import android.content.Context
+import io.github.baldborne94.baldmusic.core.library.Preload
 import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
+import io.github.baldborne94.baldmusic.core.podcast.PodcastBackup
+import io.github.baldborne94.baldmusic.core.podcast.PodcastBackups
 import io.github.baldborne94.baldmusic.core.podcast.PodcastDownloads
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
@@ -10,6 +13,7 @@ import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +23,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -45,8 +51,11 @@ class Podcasts(
     private val refreshing = Mutex()
     private val syncing = Mutex()
 
-    private val _library = MutableStateFlow(PodcastLibrary.decode(runCatching { file.readText() }.getOrNull()))
-    val library: StateFlow<PodcastLibrary> = _library.asStateFlow()
+    // Si legge in sottofondo appena creato (come la tua musica): chi lo chiede per primo, anche
+    // dal thread dell'interfaccia, aspetta solo quello che manca.
+    private val preloaded = Preload(Dispatchers.IO.asExecutor()) { PodcastLibrary.decode(runCatching { file.readText() }.getOrNull()) }
+    private val _library by lazy { MutableStateFlow(preloaded.value) }
+    val library: StateFlow<PodcastLibrary> by lazy { _library.asStateFlow() }
 
     /** I podcast letti l'ultima volta, per ID: si mostrano subito, anche senza rete. */
     @Volatile private var cached: Map<String, Podcast>? = null
@@ -79,7 +88,11 @@ class Podcasts(
         var changed = false
         _library.value.feeds.forEach { sub ->
             if ((loaded()[sub.id]?.fetchedAt ?: 0) >= now - maxAgeMs) return@forEach
-            val show = fetch(sub.url, sub.id).getOrNull() ?: return@forEach
+            val result = fetch(sub.url, sub.id)
+            // Un link rifiutato (abbonamento scaduto, link rinnovato) si conta; senza rete no.
+            val refused = result.exceptionOrNull() is FeedRefused
+            if (result.isSuccess || refused) update { it.feedChecked(sub.id, refused) }
+            val show = result.getOrNull() ?: return@forEach
             val before = loaded()[sub.id]
             if (show.episodes.map { it.key } != before?.episodes?.map { it.key }) changed = true
             store(show)
@@ -98,9 +111,21 @@ class Podcasts(
             return Result.failure(IllegalArgumentException(PATREON_HINT))
         }
         val id = PodcastFeed.idOf(url)
-        return fetch(url, id).onSuccess { show ->
-            store(show)
-            update { it.follow(url, System.currentTimeMillis()) }
+        return fetch(url, id).map { fresh ->
+            // Il link nuovo di un podcast che segui già: stesso ID, si tiene dove eri arrivato.
+            val old = PodcastFeed.replaces(_library.value.feeds.mapNotNull { loaded()[it.id] }.filter { it.id != id }, fresh)
+            if (old != null) {
+                val show = fresh.copy(id = old.id)
+                store(show)
+                update { PodcastBackups.adopt(it.replaceUrl(old.id, url), show) }
+                show
+            } else {
+                store(fresh)
+                // Se era in un backup ripristinato: tornano ascoltate e punti di ripresa.
+                update { PodcastBackups.adopt(it.follow(url, System.currentTimeMillis()).feedChecked(id, refused = false), fresh) }
+                fresh
+            }
+        }.onSuccess {
             onShowsChanged()
             PodcastWorker.schedule(context)
             // Le ultime puntate sul telefono, se c'è il Wi‑Fi.
@@ -112,7 +137,9 @@ class Podcasts(
         update { it.unfollow(id) }
         cached = cached?.minus(id)
         File(dir, "$id.json").delete()
+        notesFile(id).delete()
         audioDir.listFiles { f -> f.name.startsWith("$id~") }?.forEach { it.delete() }
+        _stored.value = _stored.value.filterKeys { !it.startsWith("$id~") }
         onShowsChanged()
         PodcastWorker.schedule(context)
     }
@@ -126,16 +153,30 @@ class Podcasts(
     /** Le puntate che si stanno scaricando adesso (chiave "<podcast>~<puntata>"). */
     val downloading: StateFlow<Set<String>> = _downloading.asStateFlow()
 
-    /** L'indirizzo del file sul telefono di una puntata scaricata, o null. */
-    fun localUri(key: String): String? = audioFile(key).takeIf { it.isFile && it.length() > 0 }?.let { android.net.Uri.fromFile(it).toString() }
+    private val _stored = MutableStateFlow<Map<String, Long>>(emptyMap())
+    /**
+     * Le puntate sul telefono (chiave → byte), tenute in memoria: gli elenchi chiedono per ogni
+     * puntata se è scaricata, e guardare il disco ogni volta (anche dal thread dell'interfaccia)
+     * rallenterebbe. Si rilegge all'avvio e dopo ogni scaricamento o cancellazione.
+     */
+    val stored: StateFlow<Map<String, Long>> = _stored.asStateFlow()
 
-    fun isDownloaded(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { localUri(it) != null } == true
+    init {
+        scope.launch { rescan() }
+    }
+
+    private fun rescan() {
+        _stored.value = (audioDir.listFiles { f -> f.name.endsWith(".audio") } ?: emptyArray())
+            .filter { it.length() > 0 }.associate { it.name.removeSuffix(".audio") to it.length() }
+    }
+
+    /** L'indirizzo del file sul telefono di una puntata scaricata, o null. */
+    fun localUri(key: String): String? = if (key in _stored.value) android.net.Uri.fromFile(audioFile(key)).toString() else null
+
+    fun isDownloaded(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { it in _stored.value } == true
 
     /** Chiesta a mano: si può togliere dal telefono (le altre si tolgono da sole quando le ascolti). */
     fun isManualDownload(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { it in _library.value.downloads } == true
-
-    /** Quante puntate sono sul telefono e quanto spazio occupano. */
-    fun stored(): Pair<Int, Long> = (audioDir.listFiles { f -> f.name.endsWith(".audio") } ?: emptyArray()).let { files -> files.size to files.sumOf { it.length() } }
 
     /** «Scarica»: subito, con qualsiasi rete. */
     fun download(mediaId: String) {
@@ -161,7 +202,8 @@ class Podcasts(
      * più volute, scarica le altre (quelle da sole solo col Wi‑Fi, quelle chieste con qualsiasi rete).
      */
     suspend fun syncDownloads(downloadNew: Boolean = true) = withContext(Dispatchers.IO) { syncing.withLock {
-        val present = (audioDir.listFiles { f -> f.name.endsWith(".audio") } ?: emptyArray()).mapTo(HashSet()) { it.name.removeSuffix(".audio") }
+        rescan()
+        val present = _stored.value.keys
         var plan = PodcastDownloads.plan(shows(), _library.value, present)
         var changed = plan.delete.isNotEmpty()
         plan.delete.forEach { audioFile(it).delete() }
@@ -174,7 +216,10 @@ class Podcasts(
                 if (fetchAudio(wanted.key, wanted.episode.audioUrl)) changed = true
             }
         }
-        if (changed) onShowsChanged()
+        if (changed) {
+            rescan()
+            onShowsChanged()
+        }
     } }
 
     private fun fetchAudio(key: String, url: String): Boolean {
@@ -243,34 +288,79 @@ class Podcasts(
         }.associateBy { it.id }.also { cached = it }
     }
 
-    private suspend fun store(show: Podcast) = withContext(Dispatchers.IO) {
+    /** Il podcast nel suo file, le descrizioni delle puntate in un altro ([PodcastFeed.withoutNotes]). */
+    private suspend fun store(full: Podcast) = withContext(Dispatchers.IO) {
+        val (show, notes) = PodcastFeed.withoutNotes(full)
         cached = loaded() + (show.id to show)
         runCatching {
-            val tmp = File(dir, "${show.id}.json.tmp")
-            tmp.writeText(json.encodeToString(Podcast.serializer(), show))
-            tmp.renameTo(File(dir, "${show.id}.json"))
+            write(File(dir, "${show.id}.json"), json.encodeToString(Podcast.serializer(), show))
+            if (notes.isNotEmpty()) write(notesFile(show.id), json.encodeToString(NOTES, notes))
         }
     }
+
+    private fun write(file: File, text: String) {
+        val tmp = File(file.parentFile, "${file.name}.tmp")
+        tmp.writeText(text)
+        tmp.renameTo(file)
+    }
+
+    private fun notesFile(showId: String) = File(dir, "$showId.note.json")
 
     private suspend fun fetch(url: String, id: String): Result<Podcast> = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder().url(url).header("User-Agent", "BaldMusic (https://github.com/Baldborne94/baldmusic-player)").build()
             http.newCall(request).execute().use { res ->
                 when {
-                    res.code == 401 || res.code == 403 || res.code == 404 ->
-                        error("Il link non dà le puntate (errore ${res.code}). Se è di Patreon, copialo di nuovo da «Ascolta in altre app»: i link vecchi smettono di funzionare.")
+                    res.code == 401 || res.code == 403 || res.code == 404 || res.code == 410 ->
+                        throw FeedRefused("Il link non dà le puntate (errore ${res.code}). Se è di Patreon, copialo di nuovo da «Ascolta in altre app»: i link vecchi smettono di funzionare.")
                     !res.isSuccessful -> error("Il server del podcast ha risposto con un errore (${res.code}). Riprova più tardi.")
                 }
                 val text = res.body.string()
                 PodcastFeed.parse(text, id, System.currentTimeMillis())
-                    ?: error(if ("patreon" in url.lowercase()) PATREON_HINT else "Questo link non è un feed di podcast (RSS).")
+                    ?: throw FeedRefused(if ("patreon" in url.lowercase()) PATREON_HINT else "Questo link non è un feed di podcast (RSS).")
             }
         }.recoverCatching { e ->
             throw if (e is java.io.IOException) IllegalStateException("Senza rete o il server del podcast non risponde. Riprova quando sei connesso.") else e
         }
     }
 
+    /** I podcast il cui link non funziona più ([PodcastLibrary.broken]), con il titolo: per l'avviso in Home. */
+    suspend fun broken(): List<Podcast> {
+        val ids = _library.value.broken().mapTo(HashSet()) { it.id }
+        if (ids.isEmpty()) return emptyList()
+        return loaded().values.filter { it.id in ids }
+    }
+
+    /**
+     * La puntata [mediaId] con il suo podcast e la descrizione, per «Informazioni sulla puntata».
+     * Fuori dal thread dell'interfaccia: la descrizione si legge dal suo file solo adesso.
+     */
+    suspend fun episodeOf(mediaId: String): Pair<Podcast, Episode>? = withContext(Dispatchers.IO) {
+        val key = PodcastSource.episodeKey(mediaId) ?: return@withContext null
+        val showId = key.substringBefore('~')
+        val show = loaded()[showId] ?: return@withContext null
+        val episode = show.episodes.firstOrNull { it.key == key.substringAfter('~') } ?: return@withContext null
+        val notes = runCatching { json.decodeFromString(NOTES, notesFile(showId).readText()) }.getOrNull()
+        show to (notes?.get(episode.key)?.let { episode.copy(description = it) } ?: episode)
+    }
+
+    /** Per il backup in Download: ascoltate e punti di ripresa, mai i link ([PodcastBackups.create]). */
+    suspend fun backup(): PodcastBackup? = PodcastBackups.create(_library.value, loaded().values.toList())
+
+    /** Dal backup: si unisce a quello che c'è; i podcast non seguiti aspettano il loro link. */
+    suspend fun restore(backup: PodcastBackup) {
+        val shows = loaded().values.toList()
+        update { PodcastBackups.restore(it, backup, shows) }
+        onShowsChanged()
+        if (hasAny) PodcastWorker.now(context)
+    }
+
+    /** Il server ha rifiutato il link (o non è più un feed): diverso da «senza rete». */
+    class FeedRefused(message: String) : Exception(message)
+
     companion object {
+        private val NOTES = MapSerializer(String.serializer(), String.serializer())
+
         /** Ogni quanto si guarda se ci sono puntate nuove. */
         const val STALE_MS = 30 * 60_000L
         private const val PLAYBACK_WAIT_MS = 8_000L

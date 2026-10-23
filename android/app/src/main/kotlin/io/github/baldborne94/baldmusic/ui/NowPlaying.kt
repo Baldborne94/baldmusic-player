@@ -116,6 +116,8 @@ fun NowPlayingScreen(
     var sleepSheet by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf(false) }
+    // Una puntata di un podcast: −15/+30 al posto di casuale e ripeti, informazioni sulla puntata.
+    val episode = remember(item.mediaId) { PodcastSource.episodeKey(item.mediaId) != null }
     var dragY by remember { mutableFloatStateOf(0f) }
 
     // Testo: si cerca a ogni cambio di brano, dalla cache o da LRCLIB.
@@ -197,9 +199,9 @@ fun NowPlayingScreen(
                             onClick = { menu = false; sleepSheet = true },
                         )
                         // Solo per i brani del telefono: i tag del server li legge Navidrome.
-                        if (localTrackId(item) != null) {
+                        if (localTrackId(item) != null || episode) {
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Informazioni sul brano") },
+                                text = { Text(if (episode) "Informazioni sulla puntata" else "Informazioni sul brano") },
                                 leadingIcon = { Icon(Icons.Rounded.Info, null) },
                                 onClick = { menu = false; info = true },
                             )
@@ -243,7 +245,6 @@ fun NowPlayingScreen(
             ProgressBar(vm)
 
             // Comandi.
-            val episode = remember(vm.current?.mediaId) { vm.current?.mediaId?.let(PodcastSource::episodeKey) != null }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 // Una puntata: indietro di 15 s e avanti di 30 s al posto di casuale e ripeti.
                 if (episode) SkipButton(Icons.Rounded.Replay, "15", "Indietro di 15 secondi") { vm.skipBack() }
@@ -286,7 +287,10 @@ fun NowPlayingScreen(
         }
     }
 
-    if (info) localTrackId(item)?.let { id -> TrackInfoDialog(id, item.title(), onDismiss = { info = false }) }
+    if (info) {
+        if (episode) EpisodeInfoDialog(item.mediaId, onDismiss = { info = false })
+        else localTrackId(item)?.let { id -> TrackInfoDialog(id, item.title(), onDismiss = { info = false }) }
+    }
     if (sleepSheet) {
         ModalBottomSheet(onDismissRequest = { sleepSheet = false }, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
             SleepTimerOptions(sleepEnd) { minutes ->
