@@ -140,6 +140,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-22 | Incolla il link in Impostazioni → Podcast | La puntata a metà riparte da dove eri, quella segnata è «ascoltata», quelle scaricate a mano tornano sul telefono |
 | P-23 | Con un podcast di centinaia di puntate: chiudi l'app, riaprila e apri subito Libreria → Podcast e «Informazioni sulla puntata» | Si apre senza scatti; la descrizione compare subito |
 | P-24 | Ascolta una raccolta, poi rinomina la sua cartella sul telefono con l'app File (o eliminala); riapri BaldMusic | Nei riquadri in cima alla Home e in «Ascoltati di recente» (anche in Auto) c'è il nome nuovo; una raccolta eliminata non c'è più |
+| P-25 | Raccolta in casuale: salta due brani dopo pochi secondi, poi spegni e riaccendi «Casuale», poi tocca un altro brano della raccolta | I due saltati spariscono dalla coda e non tornano più in questo ascolto; nemmeno quelli già sentiti; quello che tocchi suona anche se l'avevi saltato |
+| P-26 | Stessa raccolta con «Ripeti tutto», arrivando in fondo | Al giro dopo i brani saltati non ci sono; un brano lasciato negli ultimi 30 s (o finito con la dissolvenza) conta come sentito, non saltato |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

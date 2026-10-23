@@ -37,6 +37,7 @@ import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
+import io.github.baldborne94.baldmusic.core.library.ListeningSession
 import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
@@ -99,6 +100,8 @@ class PlaybackService : MediaLibraryService() {
 
     /** Coda appena impostata: col casuale deve partire dal brano scelto e passare da tutti gli altri. */
     private var shuffleFromCurrent = false
+    /** Cosa hai già sentito o saltato nella raccolta che stai ascoltando ([ListeningSession]). */
+    private var listening = ListeningSession()
 
     override fun onCreate() {
         super.onCreate()
@@ -300,6 +303,7 @@ class PlaybackService : MediaLibraryService() {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
             // Si è spostato il punto del brano: il brano preparato per sfumare non vale più.
             if (reason == Player.DISCONTINUITY_REASON_SEEK && !crossSeek) dropOutgoing()
+            noteLeft(oldPosition, newPosition, reason)
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -328,7 +332,7 @@ class PlaybackService : MediaLibraryService() {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            if (shuffleModeEnabled) shuffleStartingHere()
+            if (shuffleModeEnabled) shuffleStartingHere() else scope.launch { keepHeardBehind() }
             updateLikeButton()
             saveLast()
         }
@@ -817,7 +821,13 @@ class PlaybackService : MediaLibraryService() {
             // Un podcast intero o «Da ascoltare»: una puntata sola, da dove eri (non tutto l'archivio).
             MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return@future episode(it) }
 
-            val (queue, index) = tree.queueFor(single.mediaId)
+            val (whole, chosen) = tree.queueFor(single.mediaId)
+            // La stessa raccolta mentre la ascolti: i brani saltati o già sentiti non tornano (tranne quello che tocchi).
+            val picked = MediaId.parse(single.mediaId)
+            listening = listening.startingOn(if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId, System.currentTimeMillis())
+            val (kept, keptStart) = listening.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
+            val queue = kept.map { whole[it] }
+            val index = keptStart.coerceAtLeast(0)
             shuffleFromCurrent = true
             val shuffle = single.requestMetadata.extras?.getBoolean(EXTRA_SHUFFLE) == true
             val start = if (shuffle && queue.isNotEmpty()) queue.indices.random() else index
@@ -908,9 +918,42 @@ class PlaybackService : MediaLibraryService() {
         val count = player.mediaItemCount
         val current = player.currentMediaItemIndex
         if (count < 2 || current !in 0 until count) return
-        if (player.currentTimeline.getFirstWindowIndex(true) == current) return
-        val order = intArrayOf(current) + (0 until count).filter { it != current }.shuffled().toIntArray()
+        val ids = queueIds()
+        // I brani già sentiti in questo ascolto stanno prima di quello in corso: col casuale rifatto non tornano.
+        val order = listening.shuffleOrder(ids, current)
+        if (order[0] == current && player.currentTimeline.getFirstWindowIndex(true) == current) return
         player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order, System.nanoTime()))
+    }
+
+    private fun queueIds() = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+
+    /** Spento il casuale: i brani già sentiti che in ordine verrebbero dopo si spostano prima di quello in corso. */
+    private fun keepHeardBehind() {
+        val current = player.currentMediaItemIndex
+        if (current == C.INDEX_UNSET) return
+        listening.linearMoves(queueIds(), current).forEach { (from, to) -> player.moveMediaItem(from, to) }
+    }
+
+    /**
+     * Lasciato un brano ([ListeningSession.left]): sentito o saltato. Uno saltato esce subito dalla
+     * coda, così non torna né con «ripeti tutto» né rifacendo il casuale.
+     */
+    private fun noteLeft(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
+        if (old.mediaItemIndex == new.mediaItemIndex) return
+        val item = old.mediaItem ?: return
+        val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION || crossSeek
+        if (!auto && reason != Player.DISCONTINUITY_REASON_SEEK) return
+        val previous = player.currentTimeline.takeUnless { it.isEmpty }
+            ?.getPreviousWindowIndex(old.mediaItemIndex, player.repeatMode, player.shuffleModeEnabled)
+        val forward = new.mediaItemIndex != previous
+        val duration = item.mediaMetadata.durationMs
+        listening = listening.left(item.mediaId, old.positionMs, duration, forward, ended = auto, now = System.currentTimeMillis())
+        if (auto || !listening.wasSkipped(item.mediaId)) return
+        // Fuori dalla coda, dopo che il player ha finito di passare al brano nuovo.
+        scope.launch {
+            val at = old.mediaItemIndex
+            if (at < player.mediaItemCount && at != player.currentMediaItemIndex && player.getMediaItemAt(at).mediaId == item.mediaId) player.removeMediaItem(at)
+        }
     }
 
     /** Una puntata sola, da dove eri arrivato. */
