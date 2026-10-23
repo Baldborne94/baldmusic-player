@@ -101,7 +101,7 @@ class PlaybackService : MediaLibraryService() {
     /** Coda appena impostata: col casuale deve partire dal brano scelto e passare da tutti gli altri. */
     private var shuffleFromCurrent = false
     /** Cosa hai già sentito o saltato nella raccolta che stai ascoltando ([ListeningSession]). */
-    private var session = ListeningSession()
+    private var listening = ListeningSession()
 
     override fun onCreate() {
         super.onCreate()
@@ -824,8 +824,8 @@ class PlaybackService : MediaLibraryService() {
             val (whole, chosen) = tree.queueFor(single.mediaId)
             // La stessa raccolta mentre la ascolti: i brani saltati o già sentiti non tornano (tranne quello che tocchi).
             val picked = MediaId.parse(single.mediaId)
-            session = session.startingOn(if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId, System.currentTimeMillis())
-            val (kept, keptStart) = session.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
+            listening = listening.startingOn(if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId, System.currentTimeMillis())
+            val (kept, keptStart) = listening.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
             val queue = kept.map { whole[it] }
             val index = keptStart.coerceAtLeast(0)
             shuffleFromCurrent = true
@@ -920,7 +920,7 @@ class PlaybackService : MediaLibraryService() {
         if (count < 2 || current !in 0 until count) return
         val ids = queueIds()
         // I brani già sentiti in questo ascolto stanno prima di quello in corso: col casuale rifatto non tornano.
-        val order = session.shuffleOrder(ids, current)
+        val order = listening.shuffleOrder(ids, current)
         if (order[0] == current && player.currentTimeline.getFirstWindowIndex(true) == current) return
         player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order, System.nanoTime()))
     }
@@ -931,7 +931,7 @@ class PlaybackService : MediaLibraryService() {
     private fun keepHeardBehind() {
         val current = player.currentMediaItemIndex
         if (current == C.INDEX_UNSET) return
-        session.linearMoves(queueIds(), current).forEach { (from, to) -> player.moveMediaItem(from, to) }
+        listening.linearMoves(queueIds(), current).forEach { (from, to) -> player.moveMediaItem(from, to) }
     }
 
     /**
@@ -947,8 +947,8 @@ class PlaybackService : MediaLibraryService() {
             ?.getPreviousWindowIndex(old.mediaItemIndex, player.repeatMode, player.shuffleModeEnabled)
         val forward = new.mediaItemIndex != previous
         val duration = item.mediaMetadata.durationMs
-        session = session.left(item.mediaId, old.positionMs, duration, forward, ended = auto, now = System.currentTimeMillis())
-        if (auto || !session.wasSkipped(item.mediaId)) return
+        listening = listening.left(item.mediaId, old.positionMs, duration, forward, ended = auto, now = System.currentTimeMillis())
+        if (auto || !listening.wasSkipped(item.mediaId)) return
         // Fuori dalla coda, dopo che il player ha finito di passare al brano nuovo.
         scope.launch {
             val at = old.mediaItemIndex
