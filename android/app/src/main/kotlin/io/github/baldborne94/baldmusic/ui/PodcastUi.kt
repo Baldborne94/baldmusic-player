@@ -10,6 +10,26 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.rounded.LinkOff
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,6 +96,13 @@ fun PodcastSection() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    if (library.broken().any { it.id == show.id }) {
+                        Text(
+                            "Il link non funziona più: copialo di nuovo e incollalo qui sotto. Le puntate e dove eri arrivato restano.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
                 IconButton(onClick = { podcasts.unfollow(show.id); status = "Non segui più «${show.title}»." }) {
                     Icon(Icons.Rounded.Close, "Smetti di seguire ${show.title}")
@@ -136,4 +163,85 @@ fun PodcastSection() {
         ) { Text(if (busy) "Leggo…" else "Aggiungi podcast") }
         status?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
     }
+}
+
+/**
+ * In Home, quando il link di un podcast non funziona più ([PodcastLibrary.broken]): di solito
+ * Patreon l'ha rinnovato o l'abbonamento è scaduto. Incollando il link nuovo si tiene tutto.
+ */
+@Composable
+fun PodcastLinkBanner(onFix: () -> Unit) {
+    val podcasts = LocalContext.current.app.podcasts
+    val library by podcasts.library.collectAsState()
+    var broken by remember { mutableStateOf<List<Podcast>>(emptyList()) }
+    LaunchedEffect(library.feeds) { broken = podcasts.broken() }
+    var later by rememberSaveable { mutableStateOf(false) }
+    if (broken.isEmpty() || later) return
+    val names = broken.joinToString(", ") { "«${it.title}»" }
+    Column(Modifier.padding(16.dp).clip(RoundedCornerShape(12.dp)).background(Surface2).padding(18.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.LinkOff, null, tint = Accent)
+            Spacer(Modifier.width(10.dp))
+            Text(if (broken.size == 1) "Il link di $names non funziona più" else "I link di $names non funzionano più", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Il server non dà più le puntate con questo link: su Patreon succede quando il link viene rinnovato o l'abbonamento scade. " +
+                "Copialo di nuovo («Ascolta in altre app» → «Copia link») e incollalo in Impostazioni → Podcast: puntate, ascoltate e dove eri arrivato restano.",
+            color = TextMuted,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onFix, colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black)) { Text("Apri le impostazioni") }
+            TextButton(onClick = { later = true }) { Text("Più tardi", color = TextMuted) }
+        }
+    }
+}
+
+/** Gli indirizzi nel testo di una puntata, da toccare. */
+private val URL = Regex("https?://[^\\s()<>]+[^\\s()<>.,;:!?»”']")
+
+/**
+ * «Informazioni sulla puntata»: il testo che il creatore scrive per ogni puntata (di cosa si
+ * parla, ospiti, link), dal feed. I link si aprono nel browser.
+ */
+@Composable
+fun EpisodeInfoDialog(mediaId: String, onDismiss: () -> Unit) {
+    val app = LocalContext.current.app
+    val library by app.podcasts.library.collectAsState()
+    val found = remember(mediaId) { app.podcasts.episodeOf(mediaId) }
+    if (found == null) {
+        // Il podcast non c'è più (smesso di seguire): niente da mostrare.
+        LaunchedEffect(Unit) { onDismiss() }
+        return
+    }
+    val (show, episode) = found
+    val key = PodcastSource.keyOf(show, episode)
+    val details = remember(library.progress[key], episode) { app.podcastSource.subtitle(episode, library.progress[key]) }
+    val linkStyle = TextLinkStyles(SpanStyle(color = Accent, textDecoration = TextDecoration.Underline))
+    val text = remember(episode.description) {
+        val d = episode.description.orEmpty()
+        buildAnnotatedString {
+            var last = 0
+            URL.findAll(d).forEach { m ->
+                append(d.substring(last, m.range.first))
+                withLink(LinkAnnotation.Url(m.value, linkStyle)) { append(m.value) }
+                last = m.range.last + 1
+            }
+            append(d.substring(last))
+        }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface1,
+        title = { Text(episode.title, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(listOf(show.title, details).filter { it.isNotEmpty() }.joinToString(" · "), color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                if (text.isEmpty()) Text("Per questa puntata il podcast non ha scritto una descrizione.", color = TextMuted)
+                else Text(text, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Chiudi", color = Accent) } },
+    )
 }

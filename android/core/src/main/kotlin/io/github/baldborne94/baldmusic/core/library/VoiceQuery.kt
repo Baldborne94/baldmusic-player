@@ -22,6 +22,28 @@ object VoiceQuery {
         return q to null
     }
 
+    private val podcast = Regex(
+        "^(?:(?:il|un|i|un altro|l'ultimo|l’ultimo) )?podcast(?: di| del| della)?(?:\\s+|$)|" +
+            "^(?:(?:la|una|l'ultima|l’ultima|la nuova|la prossima) )?puntata(?: del podcast| di| del| della)?(?:\\s+|$)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** Una richiesta di podcast: il nome (vuoto se non l'ha detto) e se ha chiesto proprio l'ultima uscita. */
+    data class PodcastAsk(val name: String, val latest: Boolean)
+
+    private val latest = Regex("^(?:l'ultim[oa]|l’ultim[oa]|la nuova) ", RegexOption.IGNORE_CASE)
+
+    /**
+     * Una richiesta che parla di podcast ("il podcast Non Aprite Quella Podcast", "l'ultima
+     * puntata di NAQP", "un podcast"). Null: non parla di podcast (ma il nome di un podcast
+     * detto da solo lo trova [pick]).
+     */
+    fun podcast(query: String): PodcastAsk? {
+        val q = query.trim()
+        val m = podcast.find(q) ?: return null
+        return PodcastAsk(q.substring(m.range.last + 1).trim(), latest.containsMatchIn(q))
+    }
+
     /**
      * Il contenitore da suonare per intero, se la richiesta ne nomina uno: lo stesso nome
      * esatto (prima raccolte e playlist, poi artisti, poi album) o, se è stato detto il tipo,

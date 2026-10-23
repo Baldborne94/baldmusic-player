@@ -79,7 +79,11 @@ class Podcasts(
         var changed = false
         _library.value.feeds.forEach { sub ->
             if ((loaded()[sub.id]?.fetchedAt ?: 0) >= now - maxAgeMs) return@forEach
-            val show = fetch(sub.url, sub.id).getOrNull() ?: return@forEach
+            val result = fetch(sub.url, sub.id)
+            // Un link rifiutato (abbonamento scaduto, link rinnovato) si conta; senza rete no.
+            val refused = result.exceptionOrNull() is FeedRefused
+            if (result.isSuccess || refused) update { it.feedChecked(sub.id, refused) }
+            val show = result.getOrNull() ?: return@forEach
             val before = loaded()[sub.id]
             if (show.episodes.map { it.key } != before?.episodes?.map { it.key }) changed = true
             store(show)
@@ -98,9 +102,20 @@ class Podcasts(
             return Result.failure(IllegalArgumentException(PATREON_HINT))
         }
         val id = PodcastFeed.idOf(url)
-        return fetch(url, id).onSuccess { show ->
-            store(show)
-            update { it.follow(url, System.currentTimeMillis()) }
+        return fetch(url, id).map { fresh ->
+            // Il link nuovo di un podcast che segui già: stesso ID, si tiene dove eri arrivato.
+            val old = PodcastFeed.replaces(_library.value.feeds.mapNotNull { loaded()[it.id] }.filter { it.id != id }, fresh)
+            if (old != null) {
+                val show = fresh.copy(id = old.id)
+                store(show)
+                update { it.replaceUrl(old.id, url) }
+                show
+            } else {
+                store(fresh)
+                update { it.follow(url, System.currentTimeMillis()).feedChecked(id, refused = false) }
+                fresh
+            }
+        }.onSuccess {
             onShowsChanged()
             PodcastWorker.schedule(context)
             // Le ultime puntate sul telefono, se c'è il Wi‑Fi.
@@ -257,18 +272,35 @@ class Podcasts(
             val request = Request.Builder().url(url).header("User-Agent", "BaldMusic (https://github.com/Baldborne94/baldmusic-player)").build()
             http.newCall(request).execute().use { res ->
                 when {
-                    res.code == 401 || res.code == 403 || res.code == 404 ->
-                        error("Il link non dà le puntate (errore ${res.code}). Se è di Patreon, copialo di nuovo da «Ascolta in altre app»: i link vecchi smettono di funzionare.")
+                    res.code == 401 || res.code == 403 || res.code == 404 || res.code == 410 ->
+                        throw FeedRefused("Il link non dà le puntate (errore ${res.code}). Se è di Patreon, copialo di nuovo da «Ascolta in altre app»: i link vecchi smettono di funzionare.")
                     !res.isSuccessful -> error("Il server del podcast ha risposto con un errore (${res.code}). Riprova più tardi.")
                 }
                 val text = res.body.string()
                 PodcastFeed.parse(text, id, System.currentTimeMillis())
-                    ?: error(if ("patreon" in url.lowercase()) PATREON_HINT else "Questo link non è un feed di podcast (RSS).")
+                    ?: throw FeedRefused(if ("patreon" in url.lowercase()) PATREON_HINT else "Questo link non è un feed di podcast (RSS).")
             }
         }.recoverCatching { e ->
             throw if (e is java.io.IOException) IllegalStateException("Senza rete o il server del podcast non risponde. Riprova quando sei connesso.") else e
         }
     }
+
+    /** I podcast il cui link non funziona più ([PodcastLibrary.broken]), con il titolo: per l'avviso in Home. */
+    suspend fun broken(): List<Podcast> {
+        val ids = _library.value.broken().mapTo(HashSet()) { it.id }
+        if (ids.isEmpty()) return emptyList()
+        return loaded().values.filter { it.id in ids }
+    }
+
+    /** La puntata [mediaId] con il suo podcast, per «Informazioni sulla puntata». */
+    fun episodeOf(mediaId: String): Pair<Podcast, Episode>? {
+        val key = PodcastSource.episodeKey(mediaId) ?: return null
+        val show = (cached ?: runBlocking { loaded() })[key.substringBefore('~')] ?: return null
+        return show.episodes.firstOrNull { it.key == key.substringAfter('~') }?.let { show to it }
+    }
+
+    /** Il server ha rifiutato il link (o non è più un feed): diverso da «senza rete». */
+    class FeedRefused(message: String) : Exception(message)
 
     companion object {
         /** Ogni quanto si guarda se ci sono puntate nuove. */

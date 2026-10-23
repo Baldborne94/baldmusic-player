@@ -21,6 +21,8 @@ data class Episode(
     val publishedAt: Long? = null,
     val durationMs: Long? = null,
     val image: String? = null,
+    /** Il testo che il creatore scrive per la puntata, già ripulito dall'HTML ([PodcastFeed.plainText]). */
+    val description: String? = null,
 )
 
 /** Un podcast letto dal suo feed: le puntate dalla più recente. */
@@ -41,6 +43,10 @@ data class Podcast(
  */
 object PodcastFeed {
     private const val ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
+    private const val CONTENT = "http://purl.org/rss/1.0/modules/content/"
+
+    /** La descrizione di una puntata più lunga di così si taglia (il file del podcast resta piccolo). */
+    const val MAX_DESCRIPTION = 4_000
 
     /** Un ID corto e stabile per un feed: l'indirizzo (con la chiave privata) non finisce negli ID. */
     fun idOf(feedUrl: String): String = hash(feedUrl.trim()).take(12)
@@ -91,7 +97,59 @@ object PodcastFeed {
             publishedAt = item.text("pubDate")?.let(::date),
             durationMs = item.textNs(ITUNES, "duration")?.let(::duration),
             image = item.childNs(ITUNES, "image")?.getAttribute("href")?.takeIf { it.isNotBlank() },
+            description = (item.text("description") ?: item.textNs(CONTENT, "encoded") ?: item.textNs(ITUNES, "summary"))
+                ?.let(::plainText)?.takeIf { it.isNotEmpty() },
         )
+    }
+
+    /**
+     * Il testo di una descrizione scritta in HTML (come la mandano quasi tutti i feed): a capo dove
+     * c'erano paragrafi e righe, «• » per gli elenchi, i link con il loro indirizzo, niente tag.
+     */
+    fun plainText(html: String): String {
+        var t = html.replace("\r\n", "\n")
+        // Un link il cui testo non dice l'indirizzo: "testo (indirizzo)".
+        t = Regex("<a\\s[^>]*href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)).replace(t) { m ->
+            val url = m.groupValues[1].trim()
+            val text = m.groupValues[2]
+            if (url.isEmpty() || text.contains(url) || !url.startsWith("http")) text else "$text ($url)"
+        }
+        t = Regex("<br\\s*/?>", RegexOption.IGNORE_CASE).replace(t, "\n")
+        t = Regex("<li[^>]*>", RegexOption.IGNORE_CASE).replace(t, "\n• ")
+        t = Regex("</(p|div|ul|ol|h[1-6]|blockquote)>|<(p|div|ul|ol|h[1-6]|blockquote)(\\s[^>]*)?>", RegexOption.IGNORE_CASE).replace(t, "\n\n")
+        t = Regex("<[^>]+>").replace(t, "")
+        t = entities(t)
+        val lines = t.split('\n').map { it.replace(Regex("[ \\t\u00A0]+"), " ").trim() }
+        val text = lines.joinToString("\n").replace(Regex("\n{3,}"), "\n\n").trim()
+        return if (text.length <= MAX_DESCRIPTION) text else text.take(MAX_DESCRIPTION).trimEnd() + "…"
+    }
+
+    private fun entities(text: String): String = Regex("&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);").replace(text) { m ->
+        val code = m.groupValues[1]
+        when {
+            code.startsWith("#x") || code.startsWith("#X") -> code.drop(2).toIntOrNull(16)?.let { String(Character.toChars(it)) }
+            code.startsWith("#") -> code.drop(1).toIntOrNull()?.let { String(Character.toChars(it)) }
+            else -> NAMED[code]
+        } ?: m.value
+    }
+
+    private val NAMED = mapOf(
+        "amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ",
+        "egrave" to "è", "eacute" to "é", "agrave" to "à", "ograve" to "ò", "ugrave" to "ù", "igrave" to "ì",
+        "Egrave" to "È", "hellip" to "…", "rsquo" to "’", "lsquo" to "‘", "rdquo" to "”", "ldquo" to "“",
+        "ndash" to "–", "mdash" to "—", "laquo" to "«", "raquo" to "»",
+    )
+
+    /**
+     * Il podcast che segui già e che [fresh] sostituisce: stesso titolo, o almeno metà delle
+     * puntate in comune. Serve quando Patreon dà un link nuovo (abbonamento rinnovato, link
+     * rigenerato): incollandolo si tiene dove eri arrivato in ogni puntata.
+     */
+    fun replaces(followed: List<Podcast>, fresh: Podcast): Podcast? {
+        val title = fresh.title.trim().lowercase()
+        val keys = fresh.episodes.mapTo(HashSet()) { it.key }
+        return followed.firstOrNull { it.title.trim().lowercase() == title }
+            ?: followed.firstOrNull { old -> keys.isNotEmpty() && old.episodes.count { it.key in keys } * 2 >= keys.size }
     }
 
     /** Puntate uscite da poco: più vecchie di così non sono «nuove» (un creatore che ripubblica l'archivio). */

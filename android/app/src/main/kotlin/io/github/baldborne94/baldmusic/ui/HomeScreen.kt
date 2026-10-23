@@ -137,6 +137,8 @@ fun HomeScreen(vm: PlayerViewModel) {
         item { RestoreBanner(vm) }
         // L'app si è chiusa da sola: proponi di mandare il resoconto.
         item { CrashBanner() }
+        // Il link privato di un podcast (Patreon) non funziona più: va ricopiato.
+        if (hasPodcasts) item { PodcastLinkBanner(onFix = ui.settings) }
 
         if (needsPermission) {
             item {

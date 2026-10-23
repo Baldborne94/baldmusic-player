@@ -66,6 +66,50 @@ class PodcastSource(
         return (started + fresh).take(UPNEXT_MAX)
     }
 
+    /**
+     * La puntata da suonare quando chiedi un podcast intero (con la voce, o «Riproduci» sul
+     * podcast o su «Da ascoltare»): la prima di «Da ascoltare» (quella lasciata a metà, poi una
+     * uscita da poco), altrimenti la più recente non ascoltata. Null [showId]: tra tutti i podcast.
+     */
+    fun nextEpisode(all: List<Podcast>, showId: String?): Pair<Podcast, Episode>? {
+        val shows = if (showId == null) all else all.filter { it.id == showId }
+        upNext(shows).firstOrNull()?.let { return it }
+        val progress = library().progress
+        return shows.flatMap { show -> show.episodes.map { show to it } }
+            .filter { (show, e) -> progress[keyOf(show, e)]?.finished != true }
+            .maxByOrNull { it.second.publishedAt ?: Long.MIN_VALUE }
+    }
+
+    /**
+     * Cosa suonare per un contenitore dei podcast ([SHOW] o [UPNEXT]): una puntata sola
+     * ([nextEpisode]), non tutto l'archivio dalla più recente. Null: non è un contenitore dei podcast.
+     */
+    suspend fun toPlay(id: MediaId): LibraryNode? {
+        if (id.source != KEY || (id.kind != SHOW && id.kind != UPNEXT)) return null
+        val (show, e) = nextEpisode(shows(), if (id.kind == SHOW) id.id else null) ?: return null
+        return track(MediaId.track(KEY, keyOf(show, e), null))
+    }
+
+    /**
+     * Una richiesta vocale che parla di podcast ([io.github.baldborne94.baldmusic.core.library.VoiceQuery.podcast]):
+     * [name] vuoto = tra tutti; altrimenti il podcast con quel nome (uguale, o che lo contiene).
+     * [latest] («l'ultima puntata»): la più recente uscita, anche se ne hai una a metà; se no
+     * [nextEpisode]. Null: nessun podcast con quel nome.
+     */
+    suspend fun forVoice(name: String, latest: Boolean = false): LibraryNode? {
+        val all = shows()
+        val key = ArtistNames.key(name)
+        val show = if (key.isEmpty()) null else
+            all.firstOrNull { ArtistNames.key(it.title) == key } ?: all.firstOrNull { ArtistNames.key(it.title).contains(key) } ?: return null
+        val pick = if (latest) {
+            (if (show == null) all else listOf(show)).flatMap { s -> s.episodes.map { s to it } }.maxByOrNull { it.second.publishedAt ?: Long.MIN_VALUE }
+        } else {
+            nextEpisode(all, show?.id)
+        }
+        val (s, e) = pick ?: return null
+        return track(MediaId.track(KEY, keyOf(s, e), null))
+    }
+
     /** Le puntate dalla più recente, divise per mese ([EpisodeLabels]). */
     override suspend fun children(id: MediaId): List<LibraryNode> {
         if (id.kind == UPNEXT) {

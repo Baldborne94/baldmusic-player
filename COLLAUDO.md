@@ -129,6 +129,12 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-11 | Ascolta fino in fondo una puntata scaricata (o ⋮ → «Segna come ascoltata») | Diventa «ascoltata», esce da «Da ascoltare» e al giro dopo dal telefono; col Wi‑Fi si scarica la successiva non ascoltata. «Segna come da ascoltare» la riporta come nuova |
 | P-12 | Durante una puntata: «In riproduzione», notifica e Android Auto | Al posto di casuale e ripeti (e del cuore in notifica e in Auto) i tasti «indietro di 15 s» e «avanti di 30 s»; con un brano di musica tornano quelli di sempre |
 | P-13 | Home con una puntata iniziata e una uscita da poco | In cima ai podcast «Da ascoltare»: prima quella da finire, poi la nuova; in Libreria → Podcast e in Auto la stessa voce «Da ascoltare» con «Da finire» e «Nuove» |
+| P-14 | In macchina: «Ok Google, metti Non Aprite Quella Podcast su BaldMusic» (o «il podcast Non Aprite Quella Podcast»), con una puntata a metà | Riparte quella puntata da dove eri, una sola; senza puntate a metà parte la più recente non ascoltata, non tutto l'archivio |
+| P-15 | «Ok Google, metti l'ultima puntata di Non Aprite Quella Podcast su BaldMusic» | La puntata uscita per ultima, anche se un'altra è a metà |
+| P-16 | Nella pagina del podcast (app o Auto) tocca «Riproduci» | Una puntata sola, come in P-14 |
+| P-17 | Su Patreon rigenera il link RSS (o prova con un link vecchio); riapri l'app dopo un paio d'ore | In Home «Il link di «Non Aprite Quella Podcast» non funziona più»; in Impostazioni → Podcast la riga lo dice in rosso. Senza rete l'avviso non compare |
+| P-18 | Incolla il link nuovo in Impostazioni → Podcast | «Fatto: …»; il podcast non si raddoppia, l'avviso sparisce, le puntate a metà ripartono da dove eri e le scaricate restano |
+| P-19 | ⋮ su una puntata (nell'elenco e nel lettore) → «Informazioni sulla puntata» | Titolo, podcast, data, durata e la descrizione del creatore senza tag HTML; i link si toccano e si aprono nel browser |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

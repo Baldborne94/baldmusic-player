@@ -55,7 +55,7 @@ class BaldMusicApp : Application() {
     val podcasts: Podcasts by lazy {
         Podcasts(this, http, onShowsChanged = { settings.touch() }, onNewEpisodes = { show, episodes -> PodcastWorker.announce(this, show, episodes) })
     }
-    private val podcastSource: PodcastSource by lazy { PodcastSource(shows = { podcasts.shows() }, library = { podcasts.library.value }, forPlayback = { podcasts.showsForPlayback() }, downloaded = { podcasts.localUri(it) }) }
+    val podcastSource: PodcastSource by lazy { PodcastSource(shows = { podcasts.shows() }, library = { podcasts.library.value }, forPlayback = { podcasts.showsForPlayback() }, downloaded = { podcasts.localUri(it) }) }
 
     /** Aggiornamenti dell'app dalla release "apk-latest" di GitHub. */
     val updater: Updater by lazy { Updater(this, http) }
