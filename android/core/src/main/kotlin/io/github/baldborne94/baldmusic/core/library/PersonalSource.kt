@@ -37,7 +37,7 @@ class PersonalSource(
         return when (id.kind) {
             LIKED -> lib.liked.mapNotNull { trackNode(it, MediaId(KEY, LIKED)) }
             TOP -> lib.topTracks().mapNotNull { trackNode(it, MediaId(KEY, TOP)) }
-            RECENT -> lib.recent.map(::containerNode)
+            RECENT -> lib.recent.mapNotNull { recentNode(lib, it) }
             COLLECTIONS -> lib.collections.sortedBy { it.name.lowercase() }.map(::playlistNode)
             PLAYLISTS -> lib.playlists.filterNot { it.isCollection }.map(::playlistNode)
             PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }?.let { pl ->
@@ -132,6 +132,17 @@ class PersonalSource(
         artwork = artworkOf(pl),
     )
 
+    /**
+     * Un ascoltato di recente com'è adesso: una raccolta o una playlist col nome e i brani di
+     * oggi (cartella rinominata, nome cambiato a mano); se non c'è più, esce. Il resto (album,
+     * artisti) come quando l'hai ascoltato.
+     */
+    private fun recentNode(lib: UserLibrary, c: ContainerRef): LibraryNode? {
+        val id = MediaId.parse(c.id)
+        if (id?.source == KEY && id.kind == PLAYLIST) return lib.playlists.firstOrNull { it.id == id.id }?.let(::playlistNode)
+        return containerNode(c)
+    }
+
     private fun containerNode(c: ContainerRef) = LibraryNode(
         mediaId = c.id,
         title = c.title,
@@ -205,7 +216,8 @@ class PersonalSource(
                 null -> listOf(lib.collections.size, lib.liked.size, lib.playlists.count { !it.isCollection })
                 LIKED -> lib.liked
                 TOP -> lib.plays
-                RECENT -> lib.recent
+                // Anche le playlist: il nome di una raccolta può cambiare senza un ascolto nuovo.
+                RECENT -> lib.recent to lib.playlists
                 PLAYLISTS, COLLECTIONS -> lib.playlists
                 PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }
                 // I mix vengono da preferiti e ascolti.

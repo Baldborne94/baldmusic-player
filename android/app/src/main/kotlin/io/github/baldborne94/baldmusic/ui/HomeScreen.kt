@@ -90,7 +90,8 @@ fun HomeScreen(vm: PlayerViewModel) {
         if (!context.app.local.hasPermission()) askPermission.launch(LocalSource.PERMISSION)
     }
 
-    val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent)
+    // Anche quando una raccolta cambia nome (cartella rinominata): i riquadri in alto prendono quello nuovo.
+    val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent to lib.playlists)
     val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.plays.size)
     val (liked) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.LIKED}", lib.liked.size)
     val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)

@@ -187,7 +187,10 @@ class MediaIdMoreTest {
 
     @Test
     fun `gli ascoltati di recente tengono il loro tipo, un tipo sconosciuto e un album`() = runTest {
-        val lib = UserLibrary(recent = listOf(ContainerRef("me/playlist/p", "Mia", kind = "PLAYLIST"), ContainerRef("local/x/1", "Strano", kind = "BOH")))
+        val lib = UserLibrary(
+            playlists = listOf(UserPlaylist("p", "Mia")),
+            recent = listOf(ContainerRef("me/playlist/p", "Mia", kind = "PLAYLIST"), ContainerRef("local/x/1", "Strano", kind = "BOH")),
+        )
         assertEquals(listOf(Kind.PLAYLIST, Kind.ALBUM), PersonalSource { lib }.children(MediaId(PersonalSource.KEY, PersonalSource.RECENT)).map { it.kind })
     }
 
