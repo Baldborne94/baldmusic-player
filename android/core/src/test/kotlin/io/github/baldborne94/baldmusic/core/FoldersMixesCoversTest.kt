@@ -1,6 +1,7 @@
 package io.github.baldborne94.baldmusic.core
 
 import io.github.baldborne94.baldmusic.core.acoustid.Recognition
+import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.FileTags
 import io.github.baldborne94.baldmusic.core.library.FolderCollection
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
@@ -32,6 +33,31 @@ class MovedFoldersTest {
         lib.syncFolders(folders.toList(), folders.flatMap { f -> f.tracks.map { it.id } }.toSet(), 1) { "c${next++}" }
 
     private val disney = folder("Music/Disney", song(1), song(2), song(3))
+
+    @Test
+    fun `gli ascoltati di recente prendono il nome nuovo della raccolta e una raccolta eliminata esce`() = runTest {
+        var lib = sync(UserLibrary(), disney, folder("Music/Metal Mix", song(5), song(6)))
+        val disneyId = lib.playlists.first { it.folder == "Music/Disney" }.id
+        val metalId = lib.playlists.first { it.folder == "Music/Metal Mix" }.id
+        // Come li salva il servizio quando ascolti: titolo e sottotitolo di quel momento.
+        fun heard(id: String, name: String) =
+            ContainerRef(MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, id).toString(), name, "Raccolta · 3 brani", kind = Kind.PLAYLIST.name)
+        lib = lib.recordPlay(song(5), heard(metalId, "Metal Mix"), 1).recordPlay(song(1), heard(disneyId, "Disney"), 2)
+        // Le cartelle riordinate sul telefono: Disney rinominata, Metal Mix rinominata e poi la raccolta eliminata.
+        lib = sync(lib, folder("Music/Anime e cartoni - Disney", song(1), song(2), song(3)), folder("Music/Metal", song(5), song(6)))
+        lib = lib.deletePlaylist(metalId).copy(recent = lib.recent)
+        val source = PersonalSource(library = { lib })
+        val recent = source.children(MediaId(PersonalSource.KEY, PersonalSource.RECENT))
+        assertEquals(listOf("Anime e cartoni - Disney"), recent.map { it.title })
+        assertEquals("Raccolta · 3 brani", recent.single().subtitle)
+        // Un album o un artista resta com'era.
+        val album = ContainerRef("local/album/x", "Meteora", kind = Kind.ALBUM.name)
+        lib = lib.recordPlay(song(9), album, 3)
+        assertEquals(listOf("Meteora", "Anime e cartoni - Disney"), source.children(MediaId(PersonalSource.KEY, PersonalSource.RECENT)).map { it.title })
+        // La pagina si rilegge quando cambia il nome di una raccolta, anche se gli ascolti sono gli stessi.
+        val page = "${PersonalSource.KEY}/${PersonalSource.RECENT}"
+        assertNotEquals(PersonalSource.shownBy(lib, page), PersonalSource.shownBy(lib.renamePlaylist(disneyId, "Cartoni"), page))
+    }
 
     @Test
     fun `una cartella rinominata si porta dietro la sua raccolta`() {

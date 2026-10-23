@@ -139,6 +139,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-21 | Disinstalla e reinstalla l'app (o un altro telefono), ripristina il backup | Il riepilogo dice che tornano ascoltate e punti di ripresa di «Non Aprite Quella Podcast» e che il link va incollato di nuovo |
 | P-22 | Incolla il link in Impostazioni → Podcast | La puntata a metà riparte da dove eri, quella segnata è «ascoltata», quelle scaricate a mano tornano sul telefono |
 | P-23 | Con un podcast di centinaia di puntate: chiudi l'app, riaprila e apri subito Libreria → Podcast e «Informazioni sulla puntata» | Si apre senza scatti; la descrizione compare subito |
+| P-24 | Ascolta una raccolta, poi rinomina la sua cartella sul telefono con l'app File (o eliminala); riapri BaldMusic | Nei riquadri in cima alla Home e in «Ascoltati di recente» (anche in Auto) c'è il nome nuovo; una raccolta eliminata non c'è più |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 
