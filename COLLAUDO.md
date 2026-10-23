@@ -94,8 +94,6 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-4 | Elimina una raccolta «con i brani dal telefono» | Doppia conferma; i file nel cestino di Android (recuperabili 30 giorni) |
 | P-5 | Salute della libreria | Le cartelle con album diversi per ogni brano in cima; numeri plausibili; tocco su un brano = i suoi tag; «Condividi l'elenco» manda il testo |
 | P-6 | Sistema una cartella con Picard sul PC e ricopiala | Dopo la rilettura gli album si formano e la cartella sparisce (o scende) dalla Salute |
-| P-7 | Apri «Non Aprite Quella Podcast» (in app e in Auto) | Un elenco unico dalla puntata più recente, con le intestazioni dei mesi («Ottobre 2026»…); esclusive e puntate delle stagioni mescolate nell'ordine in cui escono; nei titoli niente «(Patreon Exclusive)»/«(Ad-Free)», che stanno nella riga sotto |
-| P-8 | Aggiungendo il podcast, consenti le notifiche; il lunedì dopo l'uscita di una puntata (o con «Esegui ora» dalle opzioni sviluppatore di WorkManager) | Notifica «Nuova puntata di Non Aprite Quella Podcast» col titolo; toccandola si apre l'app e la puntata è già in «Ultime puntate». Nessuna notifica per le puntate vecchie quando aggiungi il podcast |
 
 ### Riconoscere i brani (dopo modifiche al riconoscimento)
 
@@ -124,6 +122,13 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-4 | Android Auto: scheda «Podcast» | Il podcast e le sue puntate; una puntata riparte da dove eri anche in macchina |
 | P-5 | ⋮ → Segnala un problema dopo aver ascoltato una puntata | Nel resoconto nessun `auth=` né `token-hash=` |
 | P-6 | Impostazioni → Podcast → ✕ accanto al podcast | Sparisce da Libreria, Home e Auto |
+| P-7 | Apri «Non Aprite Quella Podcast» (in app e in Auto) | Un elenco unico dalla puntata più recente, con le intestazioni dei mesi («Ottobre 2026»…); esclusive e puntate delle stagioni mescolate nell'ordine in cui escono; nei titoli niente «(Patreon Exclusive)»/«(Ad-Free)», che stanno nella riga sotto |
+| P-8 | Aggiungendo il podcast, consenti le notifiche; il lunedì dopo l'uscita di una puntata (o con «Esegui ora» dalle opzioni sviluppatore di WorkManager) | Notifica «Nuova puntata di Non Aprite Quella Podcast» col titolo; toccandola si apre l'app e la puntata è già nell'elenco e in Home in «Da ascoltare». Nessuna notifica per le puntate vecchie quando aggiungi il podcast |
+| P-9 | Col Wi‑Fi, dopo aver aggiunto il podcast (Impostazioni → Podcast: «Le ultime 3», di serie) | In pochi minuti «3 puntate sul telefono» con lo spazio occupato; le ultime tre puntate dicono «scaricata»; in modalità aereo suonano lo stesso |
+| P-10 | Con i dati mobili: ⋮ su una puntata vecchia → «Scarica sul telefono» | Si scarica subito anche senza Wi‑Fi; dopo nel ⋮ c'è «Togli dal telefono», che la toglie |
+| P-11 | Ascolta fino in fondo una puntata scaricata (o ⋮ → «Segna come ascoltata») | Diventa «ascoltata», esce da «Da ascoltare» e al giro dopo dal telefono; col Wi‑Fi si scarica la successiva non ascoltata. «Segna come da ascoltare» la riporta come nuova |
+| P-12 | Durante una puntata: «In riproduzione», notifica e Android Auto | Al posto di casuale e ripeti (e del cuore in notifica e in Auto) i tasti «indietro di 15 s» e «avanti di 30 s»; con un brano di musica tornano quelli di sempre |
+| P-13 | Home con una puntata iniziata e una uscita da poco | In cima ai podcast «Da ascoltare»: prima quella da finire, poi la nuova; in Libreria → Podcast e in Auto la stessa voce «Da ascoltare» con «Da finire» e «Nuove» |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

@@ -31,7 +31,11 @@ import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Pause
@@ -65,7 +69,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
+import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
+import io.github.baldborne94.baldmusic.data.Podcasts
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.playback.albumId
@@ -260,6 +267,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                         { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
                     onInfo = localTrackId(item)?.let { id -> { infoFor = id to item.title() } },
+                    extra = podcastActions(context.app.podcasts, item),
                 )
             }
 
@@ -461,6 +469,20 @@ fun personalPlaylistId(mediaId: String): String? =
     MediaId.parse(mediaId)?.takeIf { it.source == PersonalSource.KEY && it.kind == PersonalSource.PLAYLIST }?.id
 
 /** Condivide titolo e artista con le altre app (messaggi, social…). */
+/** Le voci del ⋮ di una puntata: scaricarla (o toglierla) e segnarla come ascoltata o da ascoltare. */
+private fun podcastActions(podcasts: Podcasts, item: MediaItem): List<Triple<ImageVector, String, () -> Unit>> {
+    val id = item.mediaId
+    if (PodcastSource.episodeKey(id) == null) return emptyList()
+    return buildList {
+        when {
+            !podcasts.isDownloaded(id) && !podcasts.isFinished(id) -> add(Triple(Icons.Rounded.Download, "Scarica sul telefono", { podcasts.download(id) }))
+            podcasts.isManualDownload(id) -> add(Triple(Icons.Rounded.Delete, "Togli dal telefono", { podcasts.removeDownload(id) }))
+        }
+        if (podcasts.isFinished(id)) add(Triple(Icons.Rounded.RadioButtonUnchecked, "Segna come da ascoltare", { podcasts.mark(id, false) }))
+        else add(Triple(Icons.Rounded.CheckCircle, "Segna come ascoltata", { podcasts.mark(id, true) }))
+    }
+}
+
 fun shareTrack(context: android.content.Context, item: MediaItem) {
     val text = listOfNotNull(item.title().takeIf { it.isNotBlank() }, item.mediaMetadata.artist?.toString()).joinToString(" – ")
     val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {

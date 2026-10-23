@@ -48,7 +48,9 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Forward30
 import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.SkipNext
@@ -88,6 +90,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.core.lyrics.Lyrics
+import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.playback.albumId
 import io.github.baldborne94.baldmusic.playback.artistId
 import kotlinx.coroutines.delay
@@ -240,8 +243,11 @@ fun NowPlayingScreen(
             ProgressBar(vm)
 
             // Comandi.
+            val episode = remember(vm.current?.mediaId) { vm.current?.mediaId?.let(PodcastSource::episodeKey) != null }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { vm.toggleShuffle() }) {
+                // Una puntata: indietro di 15 s e avanti di 30 s al posto di casuale e ripeti.
+                if (episode) SkipButton(Icons.Rounded.Replay, "15", "Indietro di 15 secondi") { vm.skipBack() }
+                else IconButton(onClick = { vm.toggleShuffle() }) {
                     Icon(Icons.Rounded.Shuffle, "Casuale", tint = if (vm.shuffle) Accent else Color.White)
                 }
                 IconButton(onClick = { vm.previous() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipPrevious, "Precedente", Modifier.size(42.dp)) }
@@ -256,7 +262,8 @@ fun NowPlayingScreen(
                     }
                 }
                 IconButton(onClick = { vm.next() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipNext, "Successivo", Modifier.size(42.dp)) }
-                IconButton(onClick = { vm.cycleRepeat() }) {
+                if (episode) SkipButton(Icons.Rounded.Forward30, null, "Avanti di 30 secondi") { vm.skipForward() }
+                else IconButton(onClick = { vm.cycleRepeat() }) {
                     Icon(
                         if (vm.repeat == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                         "Ripeti",
@@ -476,5 +483,16 @@ fun SleepTimerOptions(current: Long?, onPick: (Int?) -> Unit) {
         }
         SheetAction(Icons.Rounded.Album, "Fine del brano") { onPick(0) }
         if (current != null) SheetAction(Icons.Rounded.Timer, "Spegni il timer", tint = Accent) { onPick(null) }
+    }
+}
+
+/** Indietro o avanti nella puntata; [label] scritto dentro l'icona (Material non ha «indietro di 15»). */
+@Composable
+private fun SkipButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String?, description: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, Modifier.size(48.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, description, Modifier.size(32.dp))
+            label?.let { Text(it, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp)) }
+        }
     }
 }

@@ -387,6 +387,8 @@ fun TrackActionsSheet(
     onShare: (() -> Unit)? = null,
     onInfo: (() -> Unit)? = null,
     onTrash: (() -> Unit)? = null,
+    /** Voci in più (le puntate dei podcast: scarica, segna come ascoltata). */
+    extra: List<Triple<ImageVector, String, () -> Unit>> = emptyList(),
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = Surface1) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -408,6 +410,7 @@ fun TrackActionsSheet(
         onGoAlbum?.let { SheetAction(Icons.Rounded.Album, "Vai all'album", onClick = act(it)) }
         onGoArtist?.let { SheetAction(Icons.Rounded.Person, "Vai all'artista", onClick = act(it)) }
         onShare?.let { SheetAction(Icons.Rounded.Share, "Condividi", onClick = act(it)) }
+        extra.forEach { (icon, label, onClick) -> SheetAction(icon, label, onClick = act(onClick)) }
         onInfo?.let { SheetAction(Icons.Rounded.Info, "Informazioni sul brano", onClick = act(it)) }
         onTrash?.let { SheetAction(Icons.Rounded.Delete, "Elimina dal telefono", tint = Danger, onClick = act(it)) }
         Spacer(Modifier.height(24.dp))

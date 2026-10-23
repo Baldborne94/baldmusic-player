@@ -3,6 +3,7 @@ package io.github.baldborne94.baldmusic.data
 import android.content.Context
 import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
+import io.github.baldborne94.baldmusic.core.podcast.PodcastDownloads
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
@@ -42,6 +43,7 @@ class Podcasts(
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshing = Mutex()
+    private val syncing = Mutex()
 
     private val _library = MutableStateFlow(PodcastLibrary.decode(runCatching { file.readText() }.getOrNull()))
     val library: StateFlow<PodcastLibrary> = _library.asStateFlow()
@@ -101,6 +103,8 @@ class Podcasts(
             update { it.follow(url, System.currentTimeMillis()) }
             onShowsChanged()
             PodcastWorker.schedule(context)
+            // Le ultime puntate sul telefono, se c'è il Wi‑Fi.
+            PodcastWorker.now(context)
         }
     }
 
@@ -108,9 +112,104 @@ class Podcasts(
         update { it.unfollow(id) }
         cached = cached?.minus(id)
         File(dir, "$id.json").delete()
+        audioDir.listFiles { f -> f.name.startsWith("$id~") }?.forEach { it.delete() }
         onShowsChanged()
         PodcastWorker.schedule(context)
     }
+
+    // --- puntate sul telefono ----------------------------------------------------------
+
+    private val audioDir = File(dir, "audio").apply { mkdirs() }
+    private fun audioFile(key: String) = File(audioDir, "$key.audio")
+
+    private val _downloading = MutableStateFlow<Set<String>>(emptySet())
+    /** Le puntate che si stanno scaricando adesso (chiave "<podcast>~<puntata>"). */
+    val downloading: StateFlow<Set<String>> = _downloading.asStateFlow()
+
+    /** L'indirizzo del file sul telefono di una puntata scaricata, o null. */
+    fun localUri(key: String): String? = audioFile(key).takeIf { it.isFile && it.length() > 0 }?.let { android.net.Uri.fromFile(it).toString() }
+
+    fun isDownloaded(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { localUri(it) != null } == true
+
+    /** Chiesta a mano: si può togliere dal telefono (le altre si tolgono da sole quando le ascolti). */
+    fun isManualDownload(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { it in _library.value.downloads } == true
+
+    /** Quante puntate sono sul telefono e quanto spazio occupano. */
+    fun stored(): Pair<Int, Long> = (audioDir.listFiles { f -> f.name.endsWith(".audio") } ?: emptyArray()).let { files -> files.size to files.sumOf { it.length() } }
+
+    /** «Scarica»: subito, con qualsiasi rete. */
+    fun download(mediaId: String) {
+        val key = PodcastSource.episodeKey(mediaId) ?: return
+        update { it.wantDownload(key, true) }
+        PodcastWorker.now(context)
+    }
+
+    /** «Togli dal telefono»: solo per quelle chieste a mano. */
+    fun removeDownload(mediaId: String) {
+        val key = PodcastSource.episodeKey(mediaId) ?: return
+        update { it.wantDownload(key, false) }
+        scope.launch { syncDownloads(downloadNew = false) }
+    }
+
+    fun setAutoDownload(count: Int) {
+        update { it.withAutoDownload(count) }
+        PodcastWorker.now(context)
+    }
+
+    /**
+     * Allinea le puntate sul telefono a [PodcastDownloads.plan]: toglie quelle ascoltate o non
+     * più volute, scarica le altre (quelle da sole solo col Wi‑Fi, quelle chieste con qualsiasi rete).
+     */
+    suspend fun syncDownloads(downloadNew: Boolean = true) = withContext(Dispatchers.IO) { syncing.withLock {
+        val present = (audioDir.listFiles { f -> f.name.endsWith(".audio") } ?: emptyArray()).mapTo(HashSet()) { it.name.removeSuffix(".audio") }
+        var plan = PodcastDownloads.plan(shows(), _library.value, present)
+        var changed = plan.delete.isNotEmpty()
+        plan.delete.forEach { audioFile(it).delete() }
+        if (downloadNew && plan.download.isNotEmpty()) {
+            // Indirizzi dell'audio freschi: quelli di Patreon scadono.
+            plan = PodcastDownloads.plan(showsForPlayback(), _library.value, present - plan.delete)
+            val unmetered = unmetered()
+            for (wanted in plan.download) {
+                if (!wanted.manual && !unmetered) continue
+                if (fetchAudio(wanted.key, wanted.episode.audioUrl)) changed = true
+            }
+        }
+        if (changed) onShowsChanged()
+    } }
+
+    private fun fetchAudio(key: String, url: String): Boolean {
+        _downloading.value = _downloading.value + key
+        val tmp = File(audioDir, "$key.part")
+        return try {
+            val request = Request.Builder().url(url).header("User-Agent", "BaldMusic (https://github.com/Baldborne94/baldmusic-player)").build()
+            http.newCall(request).execute().use { res ->
+                if (!res.isSuccessful) return false
+                tmp.outputStream().use { out -> res.body.byteStream().copyTo(out) }
+            }
+            tmp.length() > 0 && tmp.renameTo(audioFile(key))
+        } catch (e: Exception) {
+            false
+        } finally {
+            tmp.delete()
+            _downloading.value = _downloading.value - key
+        }
+    }
+
+    private fun unmetered(): Boolean {
+        val cm = context.getSystemService(android.net.ConnectivityManager::class.java) ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
+
+    /** «Segna come ascoltata» / «Segna come da ascoltare». */
+    fun mark(mediaId: String, finished: Boolean) {
+        val key = PodcastSource.episodeKey(mediaId) ?: return
+        update { it.mark(key, finished, System.currentTimeMillis()) }
+        onShowsChanged()
+        if (finished) scope.launch { syncDownloads(downloadNew = false) }
+    }
+
+    fun isFinished(mediaId: String) = PodcastSource.episodeKey(mediaId)?.let { _library.value.progress[it]?.finished } == true
 
     /** Dove sei arrivato nella puntata [mediaId] (se è una puntata). */
     fun record(mediaId: String, positionMs: Long, durationMs: Long?) {

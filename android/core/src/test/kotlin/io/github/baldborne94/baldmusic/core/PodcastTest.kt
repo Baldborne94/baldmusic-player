@@ -6,6 +6,7 @@ import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeLabels
 import io.github.baldborne94.baldmusic.core.podcast.EpisodeProgress
+import io.github.baldborne94.baldmusic.core.podcast.PodcastDownloads
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastFeed
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
@@ -131,8 +132,10 @@ class PodcastTest {
         val key = PodcastSource.keyOf(show, show.episodes[1])
         val library = PodcastLibrary().follow(feedUrl, 0).record(key, 20 * 60_000, show.episodes[1].durationMs, 1)
         val source = PodcastSource({ listOf(show) }, { library }, ZoneId.of("Europe/Rome"))
-        val shows = source.sections()
-        assertEquals(listOf("Il mio podcast"), shows.map { it.title })
+        val sections = source.sections()
+        // La puntata iniziata mette in cima «Da ascoltare».
+        assertEquals(listOf("Da ascoltare", "Il mio podcast"), sections.map { it.title })
+        val shows = sections.drop(1)
         assertEquals("podcast/$showId", shows[0].artwork)
         val episodes = source.children(MediaId.parse(shows[0].mediaId)!!)
         assertEquals(LibraryNode.Kind.TRACK, episodes[0].kind)
@@ -239,5 +242,77 @@ class PodcastNewEpisodesTest {
         val s = show()
         assertEquals("Nuova puntata di Non Aprite Quella Podcast" to "Puntata 2", PodcastFeed.notice(s, listOf(ep("2", now))))
         assertEquals("2 puntate nuove di Non Aprite Quella Podcast" to "Puntata 3 · Puntata 2", PodcastFeed.notice(s, listOf(ep("3", now), ep("2", now))))
+    }
+}
+
+class PodcastDownloadsTest {
+    private val day = 24L * 3600 * 1000
+    private val now = 100 * day
+    private fun ep(n: Int, at: Long = now - n * day) = Episode("e$n", "Puntata $n", "https://x/$n.mp3", publishedAt = at)
+    private val show = Podcast("abc", "Non Aprite Quella Podcast", image = "https://x/c.jpg", episodes = (1..6).map { ep(it) })
+    private fun key(n: Int) = "abc~e$n"
+
+    @Test
+    fun `si tengono le ultime non ascoltate e quelle chieste, le ascoltate si tolgono`() {
+        var lib = PodcastLibrary().withAutoDownload(2)
+        // Le ultime due: la 1 e la 2 (la più recente è la 1).
+        var plan = PodcastDownloads.plan(listOf(show), lib, present = emptySet())
+        assertEquals(listOf(key(1), key(2)), plan.download.map { it.key })
+        assertTrue(plan.download.none { it.manual })
+        // Ascoltata la 1: entra la 3, e il file della 1 si toglie.
+        lib = lib.mark(key(1), finished = true, now)
+        plan = PodcastDownloads.plan(listOf(show), lib, present = setOf(key(1), key(2)))
+        assertEquals(listOf(key(3)), plan.download.map { it.key })
+        assertEquals(setOf(key(1)), plan.delete)
+        // Una vecchia chiesta a mano: si scarica per prima, con qualsiasi rete.
+        lib = lib.wantDownload(key(6), on = true)
+        plan = PodcastDownloads.plan(listOf(show), lib, present = setOf(key(2)))
+        assertEquals(key(6), plan.download.first().key)
+        assertTrue(plan.download.first().manual)
+        // Spento lo scaricamento da solo: restano solo quelle chieste; un podcast non più seguito va via.
+        plan = PodcastDownloads.plan(listOf(show), lib.withAutoDownload(0), present = setOf(key(2), key(6), "altro~x"))
+        assertTrue(plan.download.isEmpty())
+        assertEquals(setOf(key(2), "altro~x"), plan.delete)
+        assertEquals(10, PodcastLibrary().withAutoDownload(99).autoDownload)
+    }
+
+    @Test
+    fun `segnare come ascoltata o da ascoltare`() {
+        val lib = PodcastLibrary().wantDownload(key(1), true).record(key(1), 600_000, 3_600_000, 1)
+        val done = lib.mark(key(1), finished = true, 2)
+        assertTrue(done.progress.getValue(key(1)).finished)
+        assertEquals(0, done.resumeAt(key(1)))
+        assertFalse(key(1) in done.downloads)
+        assertNull(done.mark(key(1), finished = false, 3).progress[key(1)])
+        assertTrue(PodcastLibrary().wantDownload(key(1), true).unfollow("abc").downloads.isEmpty())
+        // Finita ascoltandola: esce anche da quelle chieste a mano.
+        assertFalse(key(1) in lib.record(key(1), 3_580_000, 3_600_000, 4).downloads)
+        assertTrue(key(1) in lib.record(key(1), 900_000, 3_600_000, 4).downloads)
+    }
+
+    @Test
+    fun `da ascoltare - prima quelle iniziate, poi le nuove, mai le ascoltate`() = runBlocking {
+        val lib = PodcastLibrary()
+            .record(key(5), 600_000, 3_600_000, now - day)
+            .record(key(4), 900_000, 3_600_000, now)
+            .mark(key(1), finished = true, now)
+        val source = PodcastSource({ listOf(show) }, { lib }, ZoneId.of("Europe/Rome"), now = { now })
+        val next = source.children(MediaId(PodcastSource.KEY, PodcastSource.UPNEXT))
+        // Iniziate dall'ultima ascoltata (4, poi 5), poi nuove non cominciate (2, 3, 6: entro 14 giorni).
+        assertEquals(listOf("Puntata 4", "Puntata 5", "Puntata 2", "Puntata 3", "Puntata 6"), next.map { it.title })
+        assertEquals(listOf("Da finire", "Da finire", "Nuove", "Nuove", "Nuove"), next.map { it.group })
+        assertEquals("Da ascoltare", source.sections().first().title)
+        // Niente da ascoltare: niente sezione.
+        val all = (1..6).fold(PodcastLibrary()) { l, n -> l.mark(key(n), true, now) }
+        assertEquals(listOf("Non Aprite Quella Podcast"), PodcastSource({ listOf(show) }, { all }, now = { now }).sections().map { it.title })
+    }
+
+    @Test
+    fun `una puntata scaricata suona dal telefono`() = runBlocking {
+        val source = PodcastSource({ listOf(show) }, { PodcastLibrary() }, ZoneId.of("Europe/Rome"), downloaded = { if (it == key(2)) "file:///data/podcast/e2.mp3" else null }, now = { now })
+        val episodes = source.children(MediaId(PodcastSource.KEY, PodcastSource.SHOW, "abc"))
+        assertEquals("file:///data/podcast/e2.mp3", episodes[1].streamUri)
+        assertTrue(episodes[1].subtitle!!.endsWith("scaricata"))
+        assertEquals("https://x/1.mp3", episodes[0].streamUri)
     }
 }

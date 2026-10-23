@@ -76,6 +76,8 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
     else -> "Buonasera"
 }
 
+private val upNextId = "${PodcastSource.KEY}/${PodcastSource.UPNEXT}"
+
 @Composable
 fun HomeScreen(vm: PlayerViewModel) {
     val ui = LocalUi.current
@@ -101,7 +103,13 @@ fun HomeScreen(vm: PlayerViewModel) {
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true
     val (serverNew) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.RECENT}") else (null to null)
-    val (podcastShows) = if (roots?.any { it.mediaId == PodcastSource.KEY } == true) rememberChildren(vm, PodcastSource.KEY) else (null to null)
+    val hasPodcasts = roots?.any { it.mediaId == PodcastSource.KEY } == true
+    val podcastLib by context.app.podcasts.library.collectAsStateWithLifecycle()
+    // Si rilegge quando segui un podcast, cominci una puntata o ne finisci una (non a ogni punto salvato).
+    val podcastKey = Triple(podcastLib.feeds, podcastLib.progress.size, podcastLib.progress.values.count { it.finished } to podcastLib.downloads)
+    val (podcastSections) = if (hasPodcasts) rememberChildren(vm, PodcastSource.KEY, podcastKey) else (null to null)
+    val podcastShows = remember(podcastSections) { podcastSections?.filter { it.mediaId != upNextId } }
+    val (upNext) = if (podcastSections?.any { it.mediaId == upNextId } == true) rememberChildren(vm, upNextId, podcastKey) else (null to null)
     val needsPermission = localSections?.any { it.kind == Kind.MESSAGE } == true
 
     // "Riscopri" cambia a ogni apertura dell'app, non a ogni ricomposizione.
@@ -180,6 +188,20 @@ fun HomeScreen(vm: PlayerViewModel) {
         item {
             LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 items(mixes, key = { it.id }) { mix -> MixCard(mix) { vm.playAll(mix.id, shuffled = true, from = mix.title) } }
+            }
+        }
+
+        if (!upNext.isNullOrEmpty()) {
+            item { SectionHeader("Da ascoltare", if (upNext.size > 5) "Mostra tutto" else null) { ui.open(upNextId, "Da ascoltare") } }
+            items(upNext.take(5), key = { "upnext-" + it.mediaId }) { item ->
+                TrackRow(
+                    item,
+                    active = sameTrack(item.mediaId, vm.current?.mediaId),
+                    liked = lib.isLiked(item.mediaId),
+                    onClick = { vm.play(item, from = "Da ascoltare") },
+                    onMenu = { ui.trackMenu(item, null) },
+                    onSwipeQueue = { vm.enqueue(item) },
+                )
             }
         }
 

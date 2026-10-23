@@ -14,7 +14,9 @@ import androidx.core.content.ContextCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -28,7 +30,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Guarda ogni 2 ore, con la rete, se i podcast che segui hanno puntate nuove: così arrivano
- * nell'app (e in Android Auto) anche se non la apri, e una notifica te lo dice.
+ * nell'app (e in Android Auto) anche se non la apri, e una notifica te lo dice. Poi mette sul
+ * telefono le puntate da tenere ([io.github.baldborne94.baldmusic.core.podcast.PodcastDownloads]).
  */
 class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -36,11 +39,14 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
         val podcasts = applicationContext.app.podcasts
         if (!podcasts.hasAny) return Result.success()
         podcasts.refresh(maxAgeMs = RECHECK_MS)
+        // Le ultime puntate sul telefono (col Wi‑Fi) e quelle chieste a mano; via quelle ascoltate.
+        podcasts.syncDownloads()
         return Result.success()
     }
 
     companion object {
         private const val NAME = "podcast-puntate-nuove"
+        private const val NAME_NOW = "podcast-adesso"
         private const val CHANNEL = "podcast"
         /** Un feed letto da meno di così (aprendo l'app) non si rilegge. */
         private const val RECHECK_MS = 30 * 60_000L
@@ -58,6 +64,13 @@ class PodcastWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 .build()
             val request = PeriodicWorkRequestBuilder<PodcastWorker>(2, TimeUnit.HOURS).setConstraints(constraints).build()
             work.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+
+        /** «Scarica» o un'impostazione cambiata: subito, appena c'è la rete. */
+        fun now(context: Context) {
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+            val request = OneTimeWorkRequestBuilder<PodcastWorker>().setConstraints(constraints).build()
+            WorkManager.getInstance(context).enqueueUniqueWork(NAME_NOW, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
 
         /** La notifica delle puntate nuove di [show]; toccandola si apre l'app. Niente se le notifiche sono spente. */
