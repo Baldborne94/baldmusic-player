@@ -49,7 +49,7 @@ class BaldMusicApp : Application() {
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
-    val backups: Backups by lazy { Backups(this, userData, local) { settings } }
+    val backups: Backups by lazy { Backups(this, userData, local, podcasts) { settings } }
 
     /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */
     val podcasts: Podcasts by lazy {

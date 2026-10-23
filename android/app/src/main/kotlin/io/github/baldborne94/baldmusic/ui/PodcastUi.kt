@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.baldborne94.baldmusic.app
+import io.github.baldborne94.baldmusic.core.podcast.Episode
 import io.github.baldborne94.baldmusic.core.podcast.Podcast
 import io.github.baldborne94.baldmusic.core.podcast.PodcastLibrary
 import kotlinx.coroutines.launch
@@ -111,8 +112,9 @@ fun PodcastSection() {
         }
         if (shows.isNotEmpty()) {
             val downloading by podcasts.downloading.collectAsState()
-            // Si rilegge quando cambia cosa c'è sul telefono (scaricata, ascoltata, tolta).
-            val (count, bytes) = remember(library, downloading) { podcasts.stored() }
+            val stored by podcasts.stored.collectAsState()
+            val count = stored.size
+            val bytes = remember(stored) { stored.values.sum() }
             Text("Puntate sul telefono", fontWeight = FontWeight.SemiBold)
             Text(
                 "Le ultime puntate non ascoltate di ogni podcast si scaricano da sole col Wi‑Fi, così le senti anche senza rete. " +
@@ -209,13 +211,14 @@ private val URL = Regex("https?://[^\\s()<>]+[^\\s()<>.,;:!?»”']")
 fun EpisodeInfoDialog(mediaId: String, onDismiss: () -> Unit) {
     val app = LocalContext.current.app
     val library by app.podcasts.library.collectAsState()
-    val found = remember(mediaId) { app.podcasts.episodeOf(mediaId) }
-    if (found == null) {
+    // Letta in sottofondo: la descrizione sta in un file a parte.
+    var found by remember(mediaId) { mutableStateOf<Pair<Podcast, Episode>?>(null) }
+    LaunchedEffect(mediaId) {
+        found = app.podcasts.episodeOf(mediaId)
         // Il podcast non c'è più (smesso di seguire): niente da mostrare.
-        LaunchedEffect(Unit) { onDismiss() }
-        return
+        if (found == null) onDismiss()
     }
-    val (show, episode) = found
+    val (show, episode) = found ?: return
     val key = PodcastSource.keyOf(show, episode)
     val details = remember(library.progress[key], episode) { app.podcastSource.subtitle(episode, library.progress[key]) }
     val linkStyle = TextLinkStyles(SpanStyle(color = Accent, textDecoration = TextDecoration.Underline))

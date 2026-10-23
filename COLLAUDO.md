@@ -135,6 +135,10 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-17 | Su Patreon rigenera il link RSS (o prova con un link vecchio); riapri l'app dopo un paio d'ore | In Home «Il link di «Non Aprite Quella Podcast» non funziona più»; in Impostazioni → Podcast la riga lo dice in rosso. Senza rete l'avviso non compare |
 | P-18 | Incolla il link nuovo in Impostazioni → Podcast | «Fatto: …»; il podcast non si raddoppia, l'avviso sparisce, le puntate a metà ripartono da dove eri e le scaricate restano |
 | P-19 | ⋮ su una puntata (nell'elenco e nel lettore) → «Informazioni sulla puntata» | Titolo, podcast, data, durata e la descrizione del creatore senza tag HTML; i link si toccano e si aprono nel browser |
+| P-20 | Ascolta metà di una puntata, segnane una come ascoltata, poi Impostazioni → Backup → «Salva un backup…» e apri il file | Nel file c'è «Non Aprite Quella Podcast» con le puntate, ma nessun `patreon.com`, `auth=` o `token-hash` |
+| P-21 | Disinstalla e reinstalla l'app (o un altro telefono), ripristina il backup | Il riepilogo dice che tornano ascoltate e punti di ripresa di «Non Aprite Quella Podcast» e che il link va incollato di nuovo |
+| P-22 | Incolla il link in Impostazioni → Podcast | La puntata a metà riparte da dove eri, quella segnata è «ascoltata», quelle scaricate a mano tornano sul telefono |
+| P-23 | Con un podcast di centinaia di puntate: chiudi l'app, riaprila e apri subito Libreria → Podcast e «Informazioni sulla puntata» | Si apre senza scatti; la descrizione compare subito |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

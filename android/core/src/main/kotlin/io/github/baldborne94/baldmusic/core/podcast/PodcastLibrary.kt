@@ -31,6 +31,8 @@ data class PodcastLibrary(
     val downloads: Set<String> = emptySet(),
     /** Quante delle ultime puntate non ascoltate di ogni podcast tenere sul telefono da sole (0 = nessuna). */
     val autoDownload: Int = DEFAULT_AUTO_DOWNLOAD,
+    /** Podcast ripristinati da un backup che aspettano il loro link ([PodcastBackups.adopt]). */
+    val pending: List<ShowBackup> = emptyList(),
 ) {
     fun follow(url: String, now: Long): PodcastLibrary {
         val id = PodcastFeed.idOf(url)

@@ -141,6 +141,17 @@ object PodcastFeed {
     )
 
     /**
+     * Il podcast senza le descrizioni delle puntate, e le descrizioni a parte (per puntata): il
+     * file del podcast resta piccolo e si legge in fretta all'avvio; le descrizioni si leggono
+     * solo aprendo «Informazioni sulla puntata».
+     */
+    fun withoutNotes(show: Podcast): Pair<Podcast, Map<String, String>> {
+        val notes = show.episodes.mapNotNull { e -> e.description?.let { e.key to it } }.toMap()
+        if (notes.isEmpty()) return show to notes
+        return show.copy(episodes = show.episodes.map { if (it.description == null) it else it.copy(description = null) }) to notes
+    }
+
+    /**
      * Il podcast che segui già e che [fresh] sostituisce: stesso titolo, o almeno metà delle
      * puntate in comune. Serve quando Patreon dà un link nuovo (abbonamento rinnovato, link
      * rigenerato): incollandolo si tiene dove eri arrivato in ogni puntata.

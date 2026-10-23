@@ -99,6 +99,13 @@ private fun rememberRestore(onMessage: (String) -> Unit): () -> Unit {
                             color = TextMuted,
                         )
                     }
+                    plan.podcasts?.shows?.takeIf { it.isNotEmpty() }?.let { shows ->
+                        Text(
+                            "Tornano anche ascoltate e punti di ripresa di ${shows.joinToString { "«${it.title}»" }}. " +
+                                "Il link non sta nel backup: se non lo segui già, incollalo di nuovo in Impostazioni → Podcast.",
+                            color = TextMuted,
+                        )
+                    }
                     Text("La tua musica di adesso viene sostituita da quella del backup.", color = TextMuted)
                 }
             },
