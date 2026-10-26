@@ -75,6 +75,8 @@ class UserData(context: Context) {
     fun toggleLike(track: TrackRef) = update { it.toggleLike(track) }
     fun recordPlay(track: TrackRef, container: ContainerRef?) = update { it.recordPlay(track, container, System.currentTimeMillis()) }
 
+    fun touchRecent(container: ContainerRef?) = update { it.touchRecent(container) }
+
     /** Crea una playlist e ne restituisce l'ID. */
     fun createPlaylist(name: String, first: List<TrackRef> = emptyList()): String {
         val id = UUID.randomUUID().toString().take(8)
