@@ -40,6 +40,12 @@ data class ListeningSession(
     fun wasSkipped(trackId: String) = UserLibrary.baseId(trackId) in skipped
 
     /**
+     * Cosa «Continua ad ascoltare» non deve aggiungere: i brani in coda ([queue]) e quelli già
+     * sentiti o saltati in questo ascolto (un saltato è uscito dalla coda, ma non deve tornare).
+     */
+    fun notAgain(queue: Collection<String>): Set<String> = queue.mapTo(HashSet(), UserLibrary::baseId) + heard + skipped
+
+    /**
      * Una coda nuova dello stesso contenitore ([ids], partendo da [start]; -1 = nessun brano
      * scelto): fuori i saltati e i già sentiti, tranne quello che hai scelto tu. Se non resta
      * niente (raccolta già sentita tutta) la coda resta intera. Restituisce gli indici tenuti e
@@ -89,6 +95,12 @@ data class ListeningSession(
          * Saltato se lasciato prima degli ultimi 30 s e prima dei tre quarti (la dissolvenza
          * parte al massimo 12 s prima della fine: non è un salto). Durata sconosciuta: prima di 30 s.
          */
+        /**
+         * Un ascolto conta (più ascoltati, mix, statistiche) quando hai sentito abbastanza da
+         * non essere più un salto ([isSkip]): un brano saltato non è un brano che ti piace.
+         */
+        fun countsAsPlay(playedMs: Long, durationMs: Long?): Boolean = !isSkip(playedMs, durationMs)
+
         fun isSkip(positionMs: Long, durationMs: Long?): Boolean {
             val d = durationMs?.takeIf { it > 0 } ?: return positionMs < 30_000
             return positionMs < minOf(d - 30_000, d * 3 / 4)

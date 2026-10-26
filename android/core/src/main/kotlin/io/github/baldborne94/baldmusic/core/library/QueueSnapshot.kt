@@ -16,6 +16,8 @@ data class QueueSnapshot(
     val shuffle: Boolean = false,
     /** Come `Player.REPEAT_MODE_*`: 0 spento, 1 un brano, 2 tutta la coda. */
     val repeat: Int = 0,
+    /** Col casuale, l'ordine in cui suonano ([ids] per indice): ripresa la coda, resta lo stesso. */
+    val order: List<Int>? = null,
 ) {
     val currentId: String? get() = ids.getOrNull(index)
 
@@ -39,6 +41,25 @@ data class QueueSnapshot(
         return found.indexOfFirst { it in wanted }.coerceAtLeast(0)
     }
 
+    /**
+     * L'ordine del casuale tra i brani ritrovati ([found], come in [indexIn]): quelli spariti
+     * escono, gli altri tengono il loro posto. Null se non c'era un ordine da riprendere.
+     */
+    fun orderIn(found: List<String>): List<Int>? {
+        val saved = order ?: return null
+        val at = HashMap<Int, Int>()
+        var j = 0
+        ids.forEachIndexed { i, id ->
+            if (j < found.size && found[j] == id) {
+                at[i] = j
+                j++
+            }
+        }
+        val mapped = saved.mapNotNull { at[it] }.distinct()
+        // Brani ritrovati che l'ordine non aveva (code che non combaciano): in fondo.
+        return mapped + found.indices.filter { it !in mapped.toSet() }
+    }
+
     fun toJson(): String = json.encodeToString(serializer(), this)
 
     companion object {
@@ -48,14 +69,16 @@ data class QueueSnapshot(
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun of(ids: List<String>, index: Int, positionMs: Long, shuffle: Boolean, repeat: Int): QueueSnapshot? {
+        fun of(ids: List<String>, index: Int, positionMs: Long, shuffle: Boolean, repeat: Int, order: List<Int>? = null): QueueSnapshot? {
             if (ids.isEmpty() || index !in ids.indices) return null
+            val kept = order?.takeIf { shuffle }
             // Si copiano solo i brani tenuti: [ids] può leggere la coda del player un brano alla volta.
-            if (ids.size <= MAX) return QueueSnapshot(ids.toList(), index, positionMs, shuffle, repeat)
+            if (ids.size <= MAX) return QueueSnapshot(ids.toList(), index, positionMs, shuffle, repeat, kept)
             // Verso la fine della coda si tengono più brani prima: sempre MAX in tutto.
             val from = (index - BEFORE).coerceIn(0, ids.size - MAX)
             val to = from + MAX
-            return QueueSnapshot(ids.subList(from, to).toList(), index - from, positionMs, shuffle, repeat)
+            val window = kept?.filter { it in from until to }?.map { it - from }
+            return QueueSnapshot(ids.subList(from, to).toList(), index - from, positionMs, shuffle, repeat, window)
         }
 
         fun fromJson(text: String?): QueueSnapshot? =

@@ -171,9 +171,16 @@ data class UserLibrary(
         val id = baseId(track.id)
         val previous = plays[id]
         val count = PlayCount(track.copy(id = id), (previous?.count ?: 0) + 1, now)
-        val recent = if (container == null) recent
-        else (listOf(container) + recent.filterNot { it.id == container.id }).take(MAX_RECENT)
-        return copy(plays = trimPlays(plays + (id to count)), recent = recent)
+        return copy(plays = trimPlays(plays + (id to count))).touchRecent(container)
+    }
+
+    /**
+     * Il contenitore va in cima agli «ascoltati di recente» appena cominci ad ascoltarlo,
+     * anche prima che l'ascolto conti ([ListeningSession.countsAsPlay]).
+     */
+    fun touchRecent(container: ContainerRef?): UserLibrary {
+        if (container == null || recent.firstOrNull() == container) return this
+        return copy(recent = (listOf(container) + recent.filterNot { it.id == container.id }).take(MAX_RECENT))
     }
 
     /** I brani più ascoltati, a parità di conteggio il più recente prima. */

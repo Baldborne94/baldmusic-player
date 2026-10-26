@@ -144,6 +144,10 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-26 | Stessa raccolta con «Ripeti tutto», arrivando in fondo | Al giro dopo i brani saltati non ci sono; un brano lasciato negli ultimi 30 s (o finito con la dissolvenza) conta come sentito, non saltato |
 | P-27 | In una raccolta, senza casuale, tocca l'ultimo brano | Dopo di lui suonano tutti gli altri della raccolta dal primo; solo alla fine «Continua ad ascoltare» passa ad altro. Nella coda il brano toccato è in cima |
 | P-28 | Stessa raccolta col casuale acceso, tocca l'ultimo brano | Suonano tutti i brani della raccolta (in ordine casuale) prima di passare ad altro |
+| P-29 | Col casuale acceso: ⋮ su un brano → «Riproduci dopo»; poi su un altro «Aggiungi in coda» | Il primo parte subito dopo quello in corso; il secondo dopo tutti gli altri della coda |
+| P-30 | In una raccolta salta un brano dopo pochi secondi e arriva in fondo con «Continua ad ascoltare» acceso | Tra i brani aggiunti non c'è quello saltato |
+| P-31 | Col casuale, ascolta qualche brano, poi chiudi l'app dalle recenti (o riavvia il telefono) e riprendi dalla notifica o da Auto | Riparte lo stesso brano e dopo vengono quelli che mancavano, non di nuovo quelli già sentiti |
+| P-32 | Salta un brano dopo 25 s, poi apri Statistiche o «I più ascoltati» | Il brano saltato non è stato contato; la raccolta però è negli ascoltati di recente |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

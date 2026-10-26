@@ -101,6 +101,10 @@ class PlaybackService : MediaLibraryService() {
 
     /** Coda appena impostata: col casuale deve partire dal brano scelto e passare da tutti gli altri. */
     private var shuffleFromCurrent = false
+    /** L'ordine del casuale della coda ripresa ([QueueSnapshot.orderIn]), da rimettere appena arriva. */
+    private var restoredOrder: List<Int>? = null
+    /** La coda di prima, per riconoscere i brani appena aggiunti ([QueueOrder.insertion]). */
+    private var knownQueue: List<String> = emptyList()
     /** Cosa hai già sentito o saltato nella raccolta che stai ascoltando ([ListeningSession]). */
     private var listening = ListeningSession()
 
@@ -213,6 +217,7 @@ class PlaybackService : MediaLibraryService() {
             positionMs = player.currentPosition,
             shuffle = player.shuffleModeEnabled,
             repeat = player.repeatMode,
+            order = if (player.shuffleModeEnabled) shuffleOrderNow() else null,
         ) ?: return
         queueSave?.cancel()
         if (now) writeQueue(snapshot) else queueSave = scope.launch(Dispatchers.IO) { writeQueue(snapshot) }
@@ -244,6 +249,8 @@ class PlaybackService : MediaLibraryService() {
         val position = if (found[index].mediaId == snapshot.currentId) snapshot.positionMs else 0L
         player.shuffleModeEnabled = snapshot.shuffle
         player.repeatMode = snapshot.repeat
+        // Lo stesso ordine del casuale di prima: chiusa e riaperta l'app, non si rimescola.
+        restoredOrder = if (snapshot.shuffle) snapshot.orderIn(found.map { it.mediaId }) else null
         shuffleFromCurrent = true
         return MediaItemsWithStartPosition(found.toItems(), index, position)
     }
@@ -323,9 +330,21 @@ class PlaybackService : MediaLibraryService() {
         override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
             // Brani aggiunti, tolti o spostati nella coda.
             if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                val ids = queueIds()
+                val inserted = QueueOrder.insertion(knownQueue, ids)
+                knownQueue = ids
                 if (shuffleFromCurrent) {
                     shuffleFromCurrent = false
-                    if (player.shuffleModeEnabled) shuffleStartingHere()
+                    val restored = restoredOrder?.takeIf { it.size == player.mediaItemCount }
+                    restoredOrder = null
+                    if (player.shuffleModeEnabled) {
+                        if (restored != null) player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(restored.toIntArray(), System.nanoTime()))
+                        else shuffleStartingHere()
+                    }
+                } else if (inserted != null && player.shuffleModeEnabled) {
+                    // «Riproduci dopo» / «Aggiungi in coda» col casuale: dove li hai chiesti, non a caso.
+                    val order = QueueOrder.shuffleAfterInsert(shuffleOrderNow(), inserted, player.currentMediaItemIndex)
+                    player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order.toIntArray(), System.nanoTime()))
                 }
                 saveLast()
                 continueAfterQueue()
@@ -372,8 +391,9 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
-     * Un ascolto conta dopo 20 secondi: chi salta un brano non lo vuole tra i
-     * "più ascoltati". Il contenitore (album, playlist…) va negli "ascoltati di recente".
+     * Un ascolto conta quando il brano non è più un salto (tre quarti, o fino a 30 s dalla fine):
+     * chi salta un brano non lo vuole tra i «più ascoltati» né nei mix. Il contenitore (album,
+     * playlist…) va negli «ascoltati di recente» già dopo 20 secondi.
      */
     private fun startListen(item: MediaItem?) {
         listenJob?.cancel()
@@ -392,12 +412,21 @@ class PlaybackService : MediaLibraryService() {
         }
         listenJob = scope.launch {
             var played = 0L
-            while (played < 20_000) {
+            var container: ContainerRef? = null
+            while (true) {
                 delay(1000)
                 if (player.currentMediaItem?.mediaId != item.mediaId) return@launch
                 if (player.isPlaying) played += 1000
+                // Dopo 20 s il contenitore va negli «ascoltati di recente»…
+                if (played == RECENT_AFTER_MS) {
+                    container = containerOf(item, id.parent)
+                    app.userData.touchRecent(container)
+                }
+                // …ma l'ascolto conta solo quando non è più un salto ([ListeningSession.countsAsPlay]).
+                val duration = item.mediaMetadata.durationMs ?: player.duration.takeIf { it > 0 }
+                if (played >= RECENT_AFTER_MS && ListeningSession.countsAsPlay(played, duration)) break
             }
-            app.userData.recordPlay(item.toTrackRef(), containerOf(item, id.parent))
+            app.userData.recordPlay(item.toTrackRef(), container ?: containerOf(item, id.parent))
         }
     }
 
@@ -825,6 +854,7 @@ class PlaybackService : MediaLibraryService() {
             val (whole, chosen) = tree.queueFor(single.mediaId)
             // La stessa raccolta mentre la ascolti: i brani saltati o già sentiti non tornano (tranne quello che tocchi).
             val picked = MediaId.parse(single.mediaId)
+            restoredOrder = null
             val container = if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId
             listening = listening.startingOn(container, System.currentTimeMillis())
             val (kept, keptStart) = listening.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
@@ -899,7 +929,8 @@ class PlaybackService : MediaLibraryService() {
             // Nel frattempo è cambiato qualcosa (salto, coda nuova): niente.
             if (player.currentMediaItem?.mediaId != last.mediaId || player.hasNextMediaItem()) return@launch
             val queue = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
-            val chosen = Autoplay.pick(nodes.map { it.mediaId }, queue).map { nodes[it] }
+            // Né quelli in coda né quelli già sentiti o saltati in questo ascolto (un saltato è uscito dalla coda).
+            val chosen = Autoplay.pick(nodes.map { it.mediaId }, listening.notAgain(queue)).map { nodes[it] }
             if (chosen.isEmpty()) return@launch
             val first = player.mediaItemCount
             player.addMediaItems(chosen.toItems())
@@ -934,6 +965,18 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun queueIds() = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+
+    /** L'ordine in cui suona la coda col casuale. */
+    private fun shuffleOrderNow(): List<Int> {
+        val timeline = player.currentTimeline
+        val out = ArrayList<Int>(timeline.windowCount)
+        var i = timeline.getFirstWindowIndex(true)
+        while (i != C.INDEX_UNSET) {
+            out += i
+            i = timeline.getNextWindowIndex(i, Player.REPEAT_MODE_OFF, true)
+        }
+        return out
+    }
 
     /** Spento il casuale: i brani già sentiti che in ordine verrebbero dopo si spostano prima di quello in corso. */
     private fun keepHeardBehind() {
@@ -999,6 +1042,8 @@ class PlaybackService : MediaLibraryService() {
 
     companion object {
         private const val RECENT_ROOT = "recent"
+        /** Dopo così il contenitore va negli «ascoltati di recente» (l'ascolto conta più tardi). */
+        private const val RECENT_AFTER_MS = 20_000L
         const val CMD_TOGGLE_LIKE = "io.github.baldborne94.baldmusic.TOGGLE_LIKE"
         const val CMD_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
         const val CMD_REPEAT = "io.github.baldborne94.baldmusic.REPEAT"

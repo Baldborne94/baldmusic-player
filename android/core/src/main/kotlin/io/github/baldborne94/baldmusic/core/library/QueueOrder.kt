@@ -21,4 +21,32 @@ object QueueOrder {
     }
 
     private val WRAPPING = setOf(PersonalSource.PLAYLIST, PersonalSource.LIKED, PersonalSource.TOP, PersonalSource.MIX)
+
+    /**
+     * I brani aggiunti tra la coda di prima ([old]) e quella di adesso ([new]): gli indici nuovi,
+     * se [new] è [old] con un blocco in più in un punto solo; null altrimenti (coda nuova, brani
+     * tolti o spostati).
+     */
+    fun insertion(old: List<String>, new: List<String>): IntRange? {
+        val added = new.size - old.size
+        if (added <= 0 || old.isEmpty()) return null
+        var at = 0
+        while (at < old.size && old[at] == new[at]) at++
+        for (i in at until old.size) if (old[i] != new[i + added]) return null
+        return at until at + added
+    }
+
+    /**
+     * Col casuale il lettore mette i brani aggiunti in punti a caso dell'ordine. Qui vanno dove li
+     * hai chiesti: subito dopo quello in corso («Riproduci dopo», aggiunti in [current] + 1) o in
+     * fondo («Aggiungi in coda»). [order] è l'ordine del casuale di adesso, già con i brani nuovi.
+     */
+    fun shuffleAfterInsert(order: List<Int>, inserted: IntRange, current: Int): List<Int> {
+        val rest = order.filter { it !in inserted }
+        val added = inserted.toList()
+        if (inserted.first != current + 1) return rest + added
+        val at = rest.indexOf(current)
+        if (at < 0) return rest + added
+        return rest.subList(0, at + 1) + added + rest.subList(at + 1, rest.size)
+    }
 }
