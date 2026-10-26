@@ -142,6 +142,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-24 | Ascolta una raccolta, poi rinomina la sua cartella sul telefono con l'app File (o eliminala); riapri BaldMusic | Nei riquadri in cima alla Home e in «Ascoltati di recente» (anche in Auto) c'è il nome nuovo; una raccolta eliminata non c'è più |
 | P-25 | Raccolta in casuale: salta due brani dopo pochi secondi, poi spegni e riaccendi «Casuale», poi tocca un altro brano della raccolta | I due saltati spariscono dalla coda e non tornano più in questo ascolto; nemmeno quelli già sentiti; quello che tocchi suona anche se l'avevi saltato |
 | P-26 | Stessa raccolta con «Ripeti tutto», arrivando in fondo | Al giro dopo i brani saltati non ci sono; un brano lasciato negli ultimi 30 s (o finito con la dissolvenza) conta come sentito, non saltato |
+| P-27 | In una raccolta, senza casuale, tocca l'ultimo brano | Dopo di lui suonano tutti gli altri della raccolta dal primo; solo alla fine «Continua ad ascoltare» passa ad altro. Nella coda il brano toccato è in cima |
+| P-28 | Stessa raccolta col casuale acceso, tocca l'ultimo brano | Suonano tutti i brani della raccolta (in ordine casuale) prima di passare ad altro |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

@@ -38,6 +38,7 @@ import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.ListeningSession
+import io.github.baldborne94.baldmusic.core.library.QueueOrder
 import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
@@ -824,10 +825,14 @@ class PlaybackService : MediaLibraryService() {
             val (whole, chosen) = tree.queueFor(single.mediaId)
             // La stessa raccolta mentre la ascolti: i brani saltati o già sentiti non tornano (tranne quello che tocchi).
             val picked = MediaId.parse(single.mediaId)
-            listening = listening.startingOn(if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId, System.currentTimeMillis())
+            val container = if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId
+            listening = listening.startingOn(container, System.currentTimeMillis())
             val (kept, keptStart) = listening.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
-            val queue = kept.map { whole[it] }
-            val index = keptStart.coerceAtLeast(0)
+            // Raccolte e playlist: dal brano toccato alla fine e poi dall'inizio, così suonano tutte
+            // prima di «Continua ad ascoltare», anche partendo dall'ultimo brano ([QueueOrder]).
+            val order = if (QueueOrder.wrapsAround(container)) QueueOrder.fromHere(kept.size, keptStart) else kept.indices.toList()
+            val queue = order.map { whole[kept[it]] }
+            val index = if (order.firstOrNull() == keptStart) 0 else keptStart.coerceAtLeast(0)
             shuffleFromCurrent = true
             val shuffle = single.requestMetadata.extras?.getBoolean(EXTRA_SHUFFLE) == true
             val start = if (shuffle && queue.isNotEmpty()) queue.indices.random() else index
@@ -874,6 +879,9 @@ class PlaybackService : MediaLibraryService() {
      * Si aggiungono subito, così la dissolvenza ha già il brano dopo.
      */
     private fun continueAfterQueue() {
+        // Coda appena arrivata: prima si rifà il casuale dal brano scelto (onTimelineChanged),
+        // altrimenti il brano potrebbe risultare l'ultimo e si passerebbe ad altro troppo presto.
+        if (shuffleFromCurrent) return
         val last = player.currentMediaItem ?: return
         val needed = Autoplay.needed(
             enabled = app.settings.continueListening,
