@@ -53,17 +53,49 @@ class PodcastSource(
 
     /**
      * Le puntate da ascoltare: prima quelle iniziate e non finite (dall'ultima ascoltata), poi
-     * quelle uscite da poco e mai cominciate (dalla più recente).
+     * quelle uscite da poco e mai cominciate (dalla più recente), poi, finché non ce ne sono
+     * almeno [UPNEXT_FILL], quelle dall'archivio ([archive]): così in Home ci sono sempre le
+     * prossime, senza cercarle nella Libreria.
      */
-    fun upNext(all: List<Podcast>): List<Pair<Podcast, Episode>> {
+    fun upNext(all: List<Podcast>): List<Pair<Podcast, Episode>> = upNextGroups(all).map { it.first }
+
+    /** Come [upNext], con l'intestazione di ognuna: «Da finire», «Nuove», «Dall'archivio». */
+    fun upNextGroups(all: List<Podcast>): List<Pair<Pair<Podcast, Episode>, String>> {
         val progress = library().progress
-        val started = all.flatMap { show -> show.episodes.map { show to it } }
-            .mapNotNull { pair -> progress[keyOf(pair.first, pair.second)]?.takeIf { !it.finished && it.positionMs >= PodcastLibrary.START_MS }?.let { pair to it.at } }
-            .sortedByDescending { it.second }.map { it.first }
-        val fresh = all.flatMap { show -> show.episodes.map { show to it } }
-            .filter { (show, e) -> progress[keyOf(show, e)] == null && (e.publishedAt ?: 0) >= now() - PodcastFeed.NEW_FOR_MS }
+        fun p(show: Podcast, e: Episode) = progress[keyOf(show, e)]
+        fun started(show: Podcast, e: Episode) = p(show, e)?.let { !it.finished && it.positionMs >= PodcastLibrary.START_MS } == true
+        // Mai cominciata davvero: niente punto, o aperta per pochi secondi.
+        fun untouched(show: Podcast, e: Episode) = p(show, e)?.let { !it.finished && it.positionMs < PodcastLibrary.START_MS } ?: true
+        val episodes = all.flatMap { show -> show.episodes.map { show to it } }
+        val doing = episodes.filter { (show, e) -> started(show, e) }.sortedByDescending { (show, e) -> p(show, e)!!.at }
+        val fresh = episodes.filter { (show, e) -> untouched(show, e) && (e.publishedAt ?: 0) >= now() - PodcastFeed.NEW_FOR_MS }
             .sortedByDescending { it.second.publishedAt }
-        return (started + fresh).take(UPNEXT_MAX)
+        val taken = (doing + fresh).mapTo(HashSet()) { keyOf(it.first, it.second) }
+        val missing = (UPNEXT_FILL - taken.size).coerceAtLeast(0)
+        val older = archive(all, missing) { show, e -> keyOf(show, e) !in taken && untouched(show, e) }
+        return (doing.map { it to "Da finire" } + fresh.map { it to "Nuove" } + older.map { it to "Dall'archivio" }).take(UPNEXT_MAX)
+    }
+
+    /**
+     * Le prossime [count] dall'archivio, a turno tra i podcast. Per ognuno: se hai finito una
+     * puntata, quelle uscite dopo (dalla più vicina, stai andando avanti) e poi quelle prima
+     * (dalla più recente); se non ne hai finite, dalla più recente.
+     */
+    private fun archive(all: List<Podcast>, count: Int, open: (Podcast, Episode) -> Boolean): List<Pair<Podcast, Episode>> {
+        if (count <= 0) return emptyList()
+        val progress = library().progress
+        val perShow = all.map { show ->
+            val candidates = show.episodes.filter { open(show, it) }
+            val lastDone = show.episodes.filter { progress[keyOf(show, it)]?.finished == true }.maxByOrNull { progress[keyOf(show, it)]!!.at }
+            val at = lastDone?.publishedAt
+            val ordered = if (at == null) candidates.sortedByDescending { it.publishedAt ?: Long.MIN_VALUE }
+            else candidates.filter { (it.publishedAt ?: Long.MIN_VALUE) > at }.sortedBy { it.publishedAt } +
+                candidates.filter { (it.publishedAt ?: Long.MIN_VALUE) <= at }.sortedByDescending { it.publishedAt ?: Long.MIN_VALUE }
+            ArrayDeque(ordered.map { show to it })
+        }
+        val out = ArrayList<Pair<Podcast, Episode>>()
+        while (out.size < count && perShow.any { it.isNotEmpty() }) perShow.forEach { q -> if (out.size < count) q.removeFirstOrNull()?.let(out::add) }
+        return out
     }
 
     /**
@@ -114,9 +146,9 @@ class PodcastSource(
     override suspend fun children(id: MediaId): List<LibraryNode> {
         if (id.kind == UPNEXT) {
             val progress = library().progress
-            return upNext(shows()).map { (show, e) ->
-                val started = progress[keyOf(show, e)] != null
-                episodeNode(show, e, progress[keyOf(show, e)], EpisodeLabels.tags(show.episodes)).copy(group = if (started) "Da finire" else "Nuove")
+            return upNextGroups(shows()).map { (pair, group) ->
+                val (show, e) = pair
+                episodeNode(show, e, progress[keyOf(show, e)], EpisodeLabels.tags(show.episodes)).copy(group = group)
             }
         }
         if (id.kind != SHOW) return emptyList()
@@ -201,6 +233,8 @@ class PodcastSource(
 
         /** Quante puntate al massimo in «Da ascoltare». */
         const val UPNEXT_MAX = 20
+        /** Almeno così tante (quelle che si vedono in Home), riempiendo dall'archivio. */
+        const val UPNEXT_FILL = 5
 
         private val DATE = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ITALIAN)
 
