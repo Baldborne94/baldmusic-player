@@ -495,3 +495,47 @@ class PodcastBackupTest {
         assertEquals(full.episodes.map { it.key }, light.episodes.map { it.key })
     }
 }
+
+class PodcastUpNextFillTest {
+    private val day = 24L * 3600 * 1000
+    private val now = 1000 * day
+    // Puntate vecchie (oltre 14 giorni): la 1 è la più recente, la 30 la più vecchia.
+    private fun ep(n: Int) = Episode("e$n", "Puntata $n", "https://x/$n.mp3", publishedAt = now - (20 + n) * day)
+    private val naqp = Podcast("abc", "NAQP", episodes = (1..30).map(::ep))
+    private fun key(n: Int) = "abc~e$n"
+    private fun titles(lib: PodcastLibrary, shows: List<Podcast> = listOf(naqp)) =
+        runBlocking { PodcastSource({ shows }, { lib }, ZoneId.of("Europe/Rome"), now = { now }).children(MediaId(PodcastSource.KEY, PodcastSource.UPNEXT)) }
+
+    @Test
+    fun `senza puntate nuove da ascoltare si riempie dall'archivio, dalla piu recente`() {
+        val next = titles(PodcastLibrary())
+        assertEquals(listOf("Puntata 1", "Puntata 2", "Puntata 3", "Puntata 4", "Puntata 5"), next.map { it.title })
+        assertTrue(next.all { it.group == "Dall'archivio" })
+        // Finita la 1 (e segnata la 2): salgono le successive, non resta vuota.
+        val after = titles(PodcastLibrary().mark(key(1), true, now).mark(key(2), true, now))
+        assertEquals(listOf("Puntata 3", "Puntata 4", "Puntata 5", "Puntata 6", "Puntata 7"), after.map { it.title })
+    }
+
+    @Test
+    fun `andando avanti nell'archivio propone la puntata dopo l'ultima finita`() {
+        // Finita la 20 (vecchia): le prossime sono 19, 18, 17… (uscite dopo), non la più recente.
+        val lib = PodcastLibrary().mark(key(20), true, now)
+        assertEquals(listOf("Puntata 19", "Puntata 18", "Puntata 17", "Puntata 16", "Puntata 15"), titles(lib).map { it.title })
+    }
+
+    @Test
+    fun `una puntata aperta per pochi secondi resta tra quelle da ascoltare`() {
+        val show = Podcast("abc", "NAQP", episodes = listOf(Episode("n", "Nuova", "https://x/n.mp3", publishedAt = now - day)) + (1..3).map(::ep))
+        val lib = PodcastLibrary().record("abc~n", 5_000, 3_600_000, now)
+        val next = titles(lib, listOf(show))
+        assertEquals("Nuova", next.first().title)
+        assertEquals("Nuove", next.first().group)
+    }
+
+    @Test
+    fun `con piu podcast l'archivio va a turno`() {
+        val other = Podcast("zzz", "Altro", episodes = (1..5).map { Episode("o$it", "Altra $it", "https://y/$it.mp3", publishedAt = now - (30 + it) * day) })
+        val next = titles(PodcastLibrary(), listOf(naqp, other))
+        assertEquals(listOf("Puntata 1", "Altra 1", "Puntata 2", "Altra 2", "Puntata 3"), next.map { it.title })
+    }
+}

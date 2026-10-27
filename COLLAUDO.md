@@ -151,6 +151,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-33 | Cerca un brano metal (es. Slipknot) e toccalo; lascia andare «Continua ad ascoltare» | Dopo vengono brani della sua raccolta e di raccolte con artisti simili (System Of A Down, Rammstein…), niente cartoni o brani tranquilli |
 | P-34 | Libreria → Brani (A–Z): tocca un brano | La coda è la sua radio (vedi «Coda»), non i brani in ordine alfabetico |
 | P-35 | «Informazioni sul brano» su un file col genere nei tag | Compare la riga «Genere» |
+| P-36 | Ascolta (o segna come ascoltate) tutte le puntate nuove di NAQP, poi torna in Home | «Da ascoltare» ha ancora 5 puntate, «Dall'archivio», dalla più recente non ascoltata |
+| P-37 | Ascolta fino in fondo una puntata vecchia dell'archivio | In Home la prima «Dall'archivio» diventa quella uscita subito dopo |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 
