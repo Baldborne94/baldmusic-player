@@ -338,7 +338,7 @@ class LocalSource(
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.DATE_MODIFIED,
             MediaStore.Audio.Media.SIZE,
-        ) + if (Build.VERSION.SDK_INT >= 30) arrayOf(ALBUM_ARTIST) else emptyArray()
+        ) + if (Build.VERSION.SDK_INT >= 30) arrayOf(ALBUM_ARTIST, GENRE) else emptyArray()
         val where = listOfNotNull(
             "${MediaStore.Audio.Media.IS_MUSIC} != 0",
             // I file nel cestino Android li esclude già; detto esplicitamente, un brano buttato non torna mai.
@@ -366,6 +366,7 @@ class LocalSource(
                     folder = folderOf(c.getString(10)),
                     fileName = c.getString(10)?.substringAfterLast('/'),
                     albumArtist = if (c.columnCount > 13) c.getString(13)?.takeUnless { it == UNKNOWN || it.isBlank() } else null,
+                    genre = if (c.columnCount > 14) c.getString(14)?.takeUnless { it == UNKNOWN || it.isBlank() } else null,
                 )
                 out += Row(song, FileStamp(id, modified = c.getLong(11), size = c.getLong(12)))
             }
@@ -388,6 +389,8 @@ class LocalSource(
 
         /** Colonna presente da sempre, ma documentata solo da Android 11. */
         private const val ALBUM_ARTIST = "album_artist"
+        /** Il genere del file: colonna di MediaStore da Android 11. */
+        private const val GENRE = "genre"
 
         /** Segnaposto che MediaStore usa quando il tag manca. */
         private const val UNKNOWN = "<unknown>"
