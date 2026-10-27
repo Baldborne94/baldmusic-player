@@ -14,6 +14,18 @@ object QueueOrder {
         return (start until size) + (0 until start)
     }
 
+    /**
+     * Un brano toccato nell'elenco di tutti i brani del telefono (dalla A alla Z): dopo di lui non
+     * l'ordine alfabetico, che non c'entra niente, ma la sua radio ([MoodRadio]). Null: la coda
+     * resta quella del contenitore.
+     */
+    fun radioInstead(trackId: String): String? {
+        val id = MediaId.parse(trackId)?.takeIf { it.isTrack && it.source == LocalCatalog.KEY } ?: return null
+        val parent = id.parent ?: return null
+        if (parent.source != LocalCatalog.KEY || parent.kind != LocalCatalog.SONGS) return null
+        return MediaId(LocalCatalog.KEY, LocalCatalog.RADIO, id.id).toString()
+    }
+
     /** Le tue raccolte, playlist, preferiti, più ascoltati e mix: sì; album, artisti, cartelle: no. */
     fun wrapsAround(containerId: String?): Boolean {
         val id = MediaId.parse(containerId ?: return false) ?: return false

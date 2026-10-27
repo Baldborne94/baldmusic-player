@@ -148,6 +148,9 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-30 | In una raccolta salta un brano dopo pochi secondi e arriva in fondo con «Continua ad ascoltare» acceso | Tra i brani aggiunti non c'è quello saltato |
 | P-31 | Col casuale, ascolta qualche brano, poi chiudi l'app dalle recenti (o riavvia il telefono) e riprendi dalla notifica o da Auto | Riparte lo stesso brano e dopo vengono quelli che mancavano, non di nuovo quelli già sentiti |
 | P-32 | Salta un brano dopo 25 s, poi apri Statistiche o «I più ascoltati» | Il brano saltato non è stato contato; la raccolta però è negli ascoltati di recente |
+| P-33 | Cerca un brano metal (es. Slipknot) e toccalo; lascia andare «Continua ad ascoltare» | Dopo vengono brani della sua raccolta e di raccolte con artisti simili (System Of A Down, Rammstein…), niente cartoni o brani tranquilli |
+| P-34 | Libreria → Brani (A–Z): tocca un brano | La coda è la sua radio (vedi «Coda»), non i brani in ordine alfabetico |
+| P-35 | «Informazioni sul brano» su un file col genere nei tag | Compare la riga «Genere» |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 

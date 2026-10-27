@@ -51,6 +51,8 @@ data class LocalTrack(
     val fileName: String? = null,
     /** Il numero di traccia (e di disco) viene dal nome del file, non dai tag. */
     val numberFromName: Boolean = false,
+    /** Il genere scritto nel file (come lo legge Android), per la radio del brano ([MoodRadio]). */
+    val genre: String? = null,
 ) {
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
@@ -66,6 +68,7 @@ data class LocalTrack(
             "Artista dell'album" to (albumArtist ?: "—"),
             "Traccia" to (if (track > 0) "$track" else "—") + (if (disc > 0) " · disco $disc" else "") + (if (numberFromName) " (dal nome del file)" else ""),
             "Anno" to (if (year > 0) "$year" else "—"),
+            genre?.takeIf { it.isNotBlank() }?.let { "Genere" to it },
             originalYear.takeIf { it > 0 && it != year }?.let { "Prima uscita" to "$it" },
             releaseTypes.takeIf { it.isNotEmpty() }?.let { "Tipo di uscita" to it.joinToString(", ") },
             "Raccolta" to yes(compilation),
@@ -279,26 +282,21 @@ class LocalCatalog(
      * artista e di altri artisti dello stesso periodo (o della stessa cartella,
      * che spesso vuol dire stesso genere), senza ripetere lo stesso album di fila.
      */
+    /** La radio del brano: mood e stile vicini ([MoodRadio]), dalle tue raccolte, dal genere e dall'energia. */
     private fun radio(ix: Index, seed: LocalTrack, all: List<LocalTrack>): List<LocalTrack> {
-        val artist = ix.primary(seed)
-        val sameArtist = all.filter { ix.primary(it) == artist && it.id != seed.id }.shuffled(random).take(15)
-        val decade = seed.shownYear / 10
-        val related = all.filter {
-            ix.primary(it) != artist && (
-                (seed.shownYear > 0 && it.shownYear / 10 == decade) || it.folder.substringBeforeLast('/') == seed.folder.substringBeforeLast('/')
-                )
-        }.shuffled(random).take(35)
-        val pool = if (related.size < 10) related + all.filter { ix.primary(it) != artist }.shuffled(random).take(30 - related.size) else related
-        // Alterna: due brani "simili", uno dell'artista.
-        val out = mutableListOf(seed)
-        val a = ArrayDeque(sameArtist)
-        val r = ArrayDeque(pool.distinctBy { it.id })
-        while (a.isNotEmpty() || r.isNotEmpty()) {
-            repeat(2) { r.removeFirstOrNull()?.let(out::add) }
-            a.removeFirstOrNull()?.let(out::add)
-        }
-        return out.distinctBy { it.id }.take(50)
+        val byId = all.associateBy { it.id }
+        val songs = all.map { moodSong(ix, it) }
+        return MoodRadio.pick(moodSong(ix, seed), songs, random).mapNotNull { byId[it] ?: seed.takeIf { s -> s.id == it } }
     }
+
+    private fun moodSong(ix: Index, t: LocalTrack) = MoodRadio.Song(
+        id = t.id,
+        artist = ix.primary(t),
+        raccolta = collectionFolder(t.folder),
+        genres = MoodRadio.genres(t.genre),
+        decade = t.shownYear.takeIf { it > 0 }?.div(10),
+        gainDb = t.replayGain?.trackGain,
+    )
 
     fun search(query: String, all: List<LocalTrack>): List<LibraryNode> {
         if (query.isBlank()) return emptyList()

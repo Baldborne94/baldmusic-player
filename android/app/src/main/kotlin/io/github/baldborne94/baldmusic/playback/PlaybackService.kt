@@ -851,11 +851,13 @@ class PlaybackService : MediaLibraryService() {
             // Un podcast intero o «Da ascoltare»: una puntata sola, da dove eri (non tutto l'archivio).
             MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return@future episode(it) }
 
-            val (whole, chosen) = tree.queueFor(single.mediaId)
+            // Dall'elenco di tutti i brani: dopo quello scelto la sua radio (mood e stile), non l'alfabeto.
+            val radio = QueueOrder.radioInstead(single.mediaId)?.let { r -> tree.playableIn(r).takeIf { it.isNotEmpty() }?.let { r to it } }
+            val (whole, chosen) = radio?.let { it.second to 0 } ?: tree.queueFor(single.mediaId)
             // La stessa raccolta mentre la ascolti: i brani saltati o già sentiti non tornano (tranne quello che tocchi).
             val picked = MediaId.parse(single.mediaId)
             restoredOrder = null
-            val container = if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId
+            val container = radio?.first ?: if (picked?.isTrack == true) picked.parent?.toString() else single.mediaId
             listening = listening.startingOn(container, System.currentTimeMillis())
             val (kept, keptStart) = listening.filter(whole.map { it.mediaId }, if (picked?.isTrack == true) chosen else -1)
             // Raccolte e playlist: dal brano toccato alla fine e poi dall'inizio, così suonano tutte
