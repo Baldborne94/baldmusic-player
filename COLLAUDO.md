@@ -153,6 +153,9 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-35 | «Informazioni sul brano» su un file col genere nei tag | Compare la riga «Genere» |
 | P-36 | Ascolta (o segna come ascoltate) tutte le puntate nuove di NAQP, poi torna in Home | «Da ascoltare» ha ancora 5 puntate, «Dall'archivio», dalla più recente non ascoltata |
 | P-37 | Ascolta fino in fondo una puntata vecchia dell'archivio | In Home la prima «Dall'archivio» diventa quella uscita subito dopo |
+| P-38 | Fai partire una puntata vecchia di NAQP e portala agli ultimi 3 minuti (o ascoltala fino in fondo) | Finita, parte da sola la puntata uscita subito dopo; in «Coda» compare già 2 minuti prima. Nessuna dissolvenza tra le due |
+| P-39 | Fai partire la puntata più recente e lasciala finire | Parte la prima di «Da ascoltare» (una a metà, o la più recente non ascoltata); se era a metà riparte da dove eri |
+| P-40 | Con «Continua ad ascoltare» spento, o col timer «a fine brano» | A fine puntata si ferma |
 
 ### Backup (dopo modifiche a backup o alla tua musica)
 
