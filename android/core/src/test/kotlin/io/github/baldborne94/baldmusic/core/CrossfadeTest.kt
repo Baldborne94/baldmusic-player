@@ -17,6 +17,8 @@ class CrossfadeTest {
     fun `mai dentro lo stesso album, mai se spenta, mai su brani corti`() {
         assertFalse(Crossfade.applies(6, 200_000, sameAlbum = true))
         assertFalse(Crossfade.applies(0, 200_000, sameAlbum = false))
+        // Puntata dopo puntata (anche di podcast diversi): niente dissolvenza.
+        assertFalse(Crossfade.applies(6, 3_600_000, sameAlbum = false, episode = true))
         assertFalse(Crossfade.applies(6, 15_000, sameAlbum = false))
     }
 

@@ -264,6 +264,10 @@ class PlaybackService : MediaLibraryService() {
                 endCrossfade()
                 dropOutgoing()
             }
+            // Una puntata partita da sola dopo un'altra riprende da dove eri arrivato.
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && mediaItem != null) {
+                app.podcasts.resumeAt(mediaItem.mediaId).takeIf { it > 0 }?.let { player.seekTo(it) }
+            }
             applyVolume()
             saveLast()
             startScrobble(mediaItem)
@@ -403,9 +407,17 @@ class PlaybackService : MediaLibraryService() {
         if (id.source == PodcastSource.KEY) {
             // Una puntata non va tra i «più ascoltati» né nei mix: si ricorda solo dove sei arrivato.
             listenJob = scope.launch {
+                var queued = false
                 while (player.currentMediaItem?.mediaId == item.mediaId) {
                     delay(10_000)
                     if (player.isPlaying) savePodcastProgress()
+                    // Poco prima della fine, la puntata dopo in coda: l'indirizzo dell'audio di
+                    // Patreon è fresco (scade), e alla fine parte da sola.
+                    val left = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }?.let { it - player.currentPosition }
+                    if (!queued && left != null && left <= NEXT_EPISODE_BEFORE_MS) {
+                        queued = true
+                        queueNextEpisode(item)
+                    }
                 }
             }
             return
@@ -428,6 +440,23 @@ class PlaybackService : MediaLibraryService() {
             }
             app.userData.recordPlay(item.toTrackRef(), container ?: containerOf(item, id.parent))
         }
+    }
+
+    /**
+     * «Puntata dopo puntata» ([PodcastSource.nextAfter]): con «Continua ad ascoltare» acceso,
+     * senza ripeti né timer «a fine brano», e solo se dopo la puntata non c'è già altro in coda.
+     */
+    private suspend fun queueNextEpisode(item: MediaItem) {
+        val needed = Autoplay.needed(
+            enabled = app.settings.continueListening,
+            hasNext = player.hasNextMediaItem(),
+            repeatOff = player.repeatMode == Player.REPEAT_MODE_OFF,
+            endOfTrackTimer = app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK,
+        )
+        if (!needed) return
+        val next = runCatching { app.podcastSource.nextAfter(item.mediaId) }.getOrNull() ?: return
+        if (player.currentMediaItem?.mediaId != item.mediaId || player.hasNextMediaItem()) return
+        player.addMediaItem(next.toMediaItem(this))
     }
 
     private suspend fun containerOf(item: MediaItem, parent: MediaId?): ContainerRef? {
@@ -486,7 +515,11 @@ class PlaybackService : MediaLibraryService() {
         val next = player.nextMediaItemIndex
         val ok = seconds > 0 && player.playWhenReady && current != null && duration != C.TIME_UNSET && next != C.INDEX_UNSET &&
             player.repeatMode != Player.REPEAT_MODE_ONE && app.sleepTimer.value != BaldMusicApp.SLEEP_END_OF_TRACK &&
-            Crossfade.applies(seconds, duration, sameAlbum = current.albumId != null && current.albumId == player.getMediaItemAt(next).albumId)
+            Crossfade.applies(
+                seconds, duration,
+                sameAlbum = current.albumId != null && current.albumId == player.getMediaItemAt(next).albumId,
+                episode = PodcastSource.episodeKey(current.mediaId) != null || PodcastSource.episodeKey(player.getMediaItemAt(next).mediaId) != null,
+            )
         if (!ok) {
             dropOutgoing()
             return
@@ -1044,6 +1077,8 @@ class PlaybackService : MediaLibraryService() {
 
     companion object {
         private const val RECENT_ROOT = "recent"
+        /** Quanto prima della fine di una puntata si mette in coda la successiva. */
+        private const val NEXT_EPISODE_BEFORE_MS = 120_000L
         /** Dopo così il contenitore va negli «ascoltati di recente» (l'ascolto conta più tardi). */
         private const val RECENT_AFTER_MS = 20_000L
         const val CMD_TOGGLE_LIKE = "io.github.baldborne94.baldmusic.TOGGLE_LIKE"

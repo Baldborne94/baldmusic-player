@@ -17,10 +17,12 @@ object Crossfade {
 
     /**
      * Si sfuma? Mai tra due brani dello stesso album (dal vivo e concept restano
-     * attaccati) e mai su brani troppo corti per avere un inizio e una fine.
+     * attaccati), mai su brani troppo corti per avere un inizio e una fine, e mai con una
+     * puntata di un podcast ([episode]): la voce non si sfuma, e la puntata dopo riparte da
+     * dove eri arrivato.
      */
-    fun applies(seconds: Int, durationMs: Long, sameAlbum: Boolean): Boolean =
-        seconds > 0 && !sameAlbum && durationMs >= (seconds * 2 + 5) * 1000L
+    fun applies(seconds: Int, durationMs: Long, sameAlbum: Boolean, episode: Boolean = false): Boolean =
+        seconds > 0 && !sameAlbum && !episode && durationMs >= (seconds * 2 + 5) * 1000L
 
     /**
      * Serve controllare, più volte al secondo, se è ora di sfumare? Solo mentre si suona (o si

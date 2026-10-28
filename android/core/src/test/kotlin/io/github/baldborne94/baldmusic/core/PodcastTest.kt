@@ -539,3 +539,36 @@ class PodcastUpNextFillTest {
         assertEquals(listOf("Puntata 1", "Altra 1", "Puntata 2", "Altra 2", "Puntata 3"), next.map { it.title })
     }
 }
+
+class PodcastNextEpisodeTest {
+    private val day = 24L * 3600 * 1000
+    private val now = 1000 * day
+    // La 1 è la più vecchia, la 6 la più recente (uscite da più di 14 giorni).
+    private fun ep(n: Int) = Episode("e$n", "Puntata $n", "https://x/$n.mp3", publishedAt = now - (100 - n) * day)
+    private val naqp = Podcast("abc", "NAQP", episodes = (6 downTo 1).map(::ep))
+    private fun key(n: Int) = "abc~e$n"
+    private fun next(lib: PodcastLibrary, after: Int, shows: List<Podcast> = listOf(naqp)) =
+        PodcastSource({ shows }, { lib }, ZoneId.of("Europe/Rome"), now = { now }).nextAfter(shows, key(after))?.second?.title
+
+    @Test
+    fun `finita una puntata parte quella uscita subito dopo`() {
+        val lib = PodcastLibrary().record(key(2), 3_590_000, 3_600_000, now)
+        assertEquals("Puntata 3", next(lib, after = 2))
+        // Saltando quelle già ascoltate.
+        assertEquals("Puntata 5", next(lib.mark(key(3), true, now).mark(key(4), true, now), after = 2))
+    }
+
+    @Test
+    fun `finita la piu recente parte la prima di Da ascoltare, mai la stessa`() {
+        // Finita la 6 (la più recente): nessuna dopo, quindi «Da ascoltare» → dall'archivio la 5.
+        val lib = PodcastLibrary().mark(key(6), true, now)
+        assertEquals("Puntata 5", next(lib, after = 6))
+        // Una a metà in un altro podcast viene prima (è «Da finire»).
+        val other = Podcast("zzz", "Altro", episodes = listOf(Episode("o1", "Altra", "https://y/1.mp3", publishedAt = now - 200 * day)))
+        val started = lib.record("zzz~o1", 600_000, 3_600_000, now)
+        assertEquals("Altra", next(started, after = 6, shows = listOf(naqp, other)))
+        // Tutto ascoltato: niente.
+        val all = (1..6).fold(PodcastLibrary()) { l, n -> l.mark(key(n), true, now) }
+        assertEquals(null, next(all, after = 6))
+    }
+}

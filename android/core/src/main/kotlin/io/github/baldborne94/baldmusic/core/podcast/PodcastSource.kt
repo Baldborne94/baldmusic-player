@@ -113,6 +113,31 @@ class PodcastSource(
     }
 
     /**
+     * La puntata da far partire quando finisce [finishedKey] («puntata dopo puntata»): quella dello
+     * stesso podcast uscita subito dopo e non ancora sentita, così si va avanti in ordine di uscita;
+     * se era la più recente, la prima di «Da ascoltare» ([upNext]). Mai la stessa.
+     */
+    fun nextAfter(all: List<Podcast>, finishedKey: String): Pair<Podcast, Episode>? {
+        val progress = library().progress
+        fun open(show: Podcast, e: Episode) = keyOf(show, e) != finishedKey && progress[keyOf(show, e)]?.finished != true
+        val show = all.firstOrNull { finishedKey.startsWith("${it.id}~") }
+        val done = show?.episodes?.firstOrNull { keyOf(show, it) == finishedKey }
+        val at = done?.publishedAt
+        if (show != null && at != null) {
+            show.episodes.filter { open(show, it) && (it.publishedAt ?: Long.MIN_VALUE) > at }
+                .minByOrNull { it.publishedAt!! }?.let { return show to it }
+        }
+        return upNext(all).firstOrNull { (s, e) -> open(s, e) }
+    }
+
+    /** [nextAfter] pronta da suonare (indirizzo dell'audio fresco, o il file sul telefono). */
+    suspend fun nextAfter(finishedMediaId: String): LibraryNode? {
+        val key = episodeKey(finishedMediaId) ?: return null
+        val (show, e) = nextAfter(forPlayback(), key) ?: return null
+        return track(MediaId.track(KEY, keyOf(show, e), null))
+    }
+
+    /**
      * Cosa suonare per un contenitore dei podcast ([SHOW] o [UPNEXT]): una puntata sola
      * ([nextEpisode]), non tutto l'archivio dalla più recente. Null: non è un contenitore dei podcast.
      */
