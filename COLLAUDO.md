@@ -282,6 +282,12 @@ dell'unità principale sul telefono.
 | W-11 | Scorciatoie: Spazio, Maiuscolo+frecce, frecce, S, R, F, / | Fanno quello che dice Impostazioni → Scorciatoie |
 | W-12 | Installa il sito come app (icona ⊕ in Chrome/Edge) | Si apre nella sua finestra e risponde ai tasti multimediali |
 | W-13 | Da fuori casa con Tailscale (`https://…ts.net`) | Funziona; con `http://192.168…` il sito spiega perché non può |
+| W-14 | Apri una raccolta, tocca l'ultimo brano (casuale spento) | Dopo l'ultimo suonano tutti gli altri dall'inizio, poi arriva «Continua ad ascoltare» |
+| W-15 | In una raccolta salta un brano con ⏭ nei primi secondi, poi premi play sulla raccolta (o accendi «ripeti tutto») | Il brano saltato è uscito dalla coda e non torna; toccato apposta nell'elenco suona |
+| W-16 | Casuale acceso, ascolta due brani interi, spegni il casuale | I due brani sentiti restano prima di quello in corso, non dopo |
+| W-17 | Arriva all'ultimo brano di un album con «Continua ad ascoltare» attivo | In coda compaiono brani simili (stessa raccolta, stesso genere), mai quelli sentiti o saltati; spento nelle Impostazioni ci si ferma |
+| W-18 | Metti in pausa a metà brano e ricarica la pagina | Stessa coda e stesso brano; play riparte da quel punto |
+| W-19 | Salta un brano a metà, poi guarda «Più ascoltati» su Navidrome | Il brano saltato non conta un ascolto in più; uno sentito fino ai tre quarti sì |
 
 ## Server
 

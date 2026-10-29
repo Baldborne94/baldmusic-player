@@ -61,6 +61,7 @@ La musica è ordinata in cartelle (`Music/Disney Italia`, `Music/Movie Soundtrac
 - **Trascina** uno o più brani su una raccolta, una playlist o "Brani che ti piacciono" nella barra laterale; nelle pagine di raccolte e playlist selezione multipla (Maiuscolo + clic), riordino trascinando, ordine per titolo o artista.
 - **Pulizia** (doppioni e anteprime) e **Brani nel cestino**: il browser non tocca i file, quindi l'app scarica uno script che si apre col doppio clic e sposta i file nel **Cestino di Windows** (o li rimette al loro posto).
 - **Volume uguale** (ReplayGain), **dissolvenza tra i brani**, **testi sincronizzati**, **radio**, **timer di spegnimento**.
+- **Si ascolta come sul telefono**: una raccolta o una playlist suona tutta anche partendo dall'ultimo brano; un brano saltato esce dalla coda e non torna in quell'ascolto; finita la coda **Continua ad ascoltare** aggiunge brani col mood e lo stile dell'ultimo (stessa raccolta, artisti vicini, genere, energia, decennio); riaprendo la pagina la coda riparte da dov'eri.
 - Tasto destro su un brano per il menu; scorciatoie: <kbd>Spazio</kbd> play/pausa, <kbd>Shift</kbd>+<kbd>←/→</kbd> brano, <kbd>←/→</kbd> 10 secondi, <kbd>S</kbd> casuale, <kbd>R</kbd> ripeti, <kbd>F</kbd> schermo intero, <kbd>/</kbd> cerca.
 
 ## In macchina

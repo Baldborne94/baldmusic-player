@@ -141,3 +141,36 @@ describe("casi limite della coda", () => {
     expect(Q.toggleShuffle(on).index).toBe(-1);
   });
 });
+
+describe("come sul telefono", () => {
+  it("raccolte e playlist dal brano toccato alla fine e poi dall'inizio: anche dall'ultimo suonano tutte", () => {
+    const q = Q.playList(Q.emptyQueue, songs(4), 3, false, Math.random, true);
+    expect(ids(q)).toEqual(["s3", "s0", "s1", "s2"]);
+    expect(Q.current(q)?.id).toBe("s3");
+    // Un album resta in ordine dal brano toccato.
+    expect(ids(Q.playList(Q.emptyQueue, songs(4), 3))).toEqual(["s0", "s1", "s2", "s3"]);
+  });
+
+  it("i già sentiti restano prima del brano in corso, accendendo o spegnendo il casuale", () => {
+    const heard = (id: string) => id === "s3" || id === "s4";
+    const q = Q.playList(Q.emptyQueue, songs(6), 1);
+    const on = Q.toggleShuffle(q, seeded(5), heard);
+    expect(Q.current(on)?.id).toBe("s1");
+    expect(ids(on).slice(on.index + 1).some(heard)).toBe(false);
+    const off = Q.toggleShuffle(on, seeded(5), heard);
+    expect(ids(off)).toEqual(["s0", "s3", "s4", "s1", "s2", "s5"]);
+    expect(Q.current(off)?.id).toBe("s1");
+  });
+
+  it("«Riproduci dopo» e «Aggiungi in coda» sono aggiunte, non brani del contenitore", () => {
+    const q = Q.playNext(Q.enqueue(Q.playList(Q.emptyQueue, songs(2)), songs(1)), songs(1));
+    expect(q.entries.map((e) => !!e.added)).toEqual([false, true, false, true]);
+  });
+
+  it("un brano saltato si toglie restando su quello in corso", () => {
+    const q = Q.jumpTo(Q.playList(Q.emptyQueue, songs(3)), 1);
+    const out = Q.removeUid(q, q.entries[0].uid);
+    expect(ids(out)).toEqual(["s1", "s2"]);
+    expect(Q.current(out)?.id).toBe("s1");
+  });
+});

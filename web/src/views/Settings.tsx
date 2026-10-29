@@ -16,7 +16,7 @@ const RG_MODES: [ReplayGainMode, string][] = [
 
 export function Settings() {
   const client = useClient();
-  const { replayGain: rg, crossfade } = usePlayer();
+  const { replayGain: rg, crossfade, autoplay } = usePlayer();
   const lib = useLibrary();
   const [status, setStatus] = useState<string | null>(null);
   if (!client) return null;
@@ -86,6 +86,21 @@ export function Settings() {
           {CROSSFADE_CHOICES.map((sec) => (
             <button key={sec} className={`chip ${crossfade === sec ? "is-on" : ""}`} onClick={() => player.setCrossfade(sec)}>
               {sec === 0 ? "Spenta" : `${sec} s`}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="panel">
+        <h2>Continua ad ascoltare</h2>
+        <p className="muted">
+          Finita la coda (una raccolta, un album, una playlist) la musica non si ferma: arrivano brani col mood e lo stile dell'ultimo, prima
+          dalla stessa raccolta e da quelle con gli stessi artisti, poi per genere, energia e decennio. Mai quelli già sentiti o saltati in
+          questo ascolto.
+        </p>
+        <div className="chips">
+          {([true, false] as const).map((on) => (
+            <button key={String(on)} className={`chip ${autoplay === on ? "is-on" : ""}`} onClick={() => player.setAutoplay(on)}>
+              {on ? "Attivo" : "Spento"}
             </button>
           ))}
         </div>
