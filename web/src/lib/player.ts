@@ -1,9 +1,13 @@
 import { useSyncExternalStore } from "react";
 import * as Q from "./queue";
+import { autoplayNeeded, autoplayPick, storeAutoplay, storedAutoplay } from "./autoplay";
 import { crossfadeApplies, crossfadeGains, storeCrossfade, storedCrossfade } from "./crossfade";
 import { replayGainVolume, storedReplayGainMode, storeReplayGainMode, type ReplayGainMode } from "./replaygain";
+import * as L from "./listening";
+import { songRadio } from "./radio";
+import { restore, snapshot } from "./resume";
 import { getClient } from "./session";
-import type { Song } from "./subsonic";
+import type { Song, SubsonicClient } from "./subsonic";
 
 // Il player: un solo <audio> per tutta l'app, la coda pura di queue.ts,
 // e la Media Session API (tasti multimediali, schermata di blocco, notifica
@@ -25,6 +29,8 @@ export interface PlayerState {
   replayGain: ReplayGainMode;
   /** Dissolvenza incrociata tra i brani, in secondi; 0 = spenta. */
   crossfade: number;
+  /** «Continua ad ascoltare»: finita la coda, brani simili invece di fermarsi. */
+  autoplay: boolean;
 }
 
 const VOLUME_KEY = "baldmusic.volume";
@@ -38,27 +44,66 @@ function storedVolume(): number {
   }
 }
 
+// La coda di prima (Ripresa), per questo server e utente: un altro server non ha quei brani.
+const queueKey = (c: SubsonicClient) => `baldmusic.coda.${c.creds.url}|${c.creds.user}`;
+
+function savedQueue(): ReturnType<typeof restore> {
+  const c = getClient();
+  try {
+    return c ? restore(localStorage.getItem(queueKey(c))) : null;
+  } catch {
+    return null;
+  }
+}
+
+const resumed = savedQueue();
+
 let state: PlayerState = {
-  queue: Q.emptyQueue,
+  queue: resumed?.queue ?? Q.emptyQueue,
   playing: false,
   buffering: false,
-  position: 0,
-  duration: 0,
+  position: resumed?.position ?? 0,
+  duration: resumed ? (Q.current(resumed.queue)?.duration ?? 0) : 0,
   volume: storedVolume(),
   error: null,
-  from: null,
+  from: resumed?.from ?? null,
   sleepAt: null,
   replayGain: storedReplayGainMode(),
   crossfade: storedCrossfade(),
+  autoplay: storedAutoplay(),
 };
+
+/** Il brano ripreso riparte da qui al primo play. */
+let resumeAt: { uid: number; position: number } | null = resumed ? { uid: resumed.queue.entries[resumed.queue.index].uid, position: resumed.position } : null;
+
+/** Quello che si sta ascoltando adesso: sentiti e saltati (listening.ts). */
+let listening = L.freshListening();
 
 let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<PlayerState>): void {
+  const before = state;
   state = { ...state, ...patch };
+  if (state.queue !== before.queue || state.from !== before.from) saveQueue();
   listeners.forEach((l) => l());
+}
+
+let savedAt = 0;
+
+/** Salva la coda per la Ripresa (a ogni cambio di coda, in pausa, ogni 10 s mentre suona). */
+function saveQueue(): void {
+  savedAt = Date.now();
+  const c = getClient();
+  if (!c) return;
+  try {
+    const snap = snapshot(state.queue, audio?.src ? audio.currentTime : state.position, state.from);
+    if (snap) localStorage.setItem(queueKey(c), JSON.stringify(snap));
+    else localStorage.removeItem(queueKey(c));
+  } catch {
+    // ignorato: la coda semplicemente non si ritrova alla prossima apertura
+  }
 }
 
 function subscribe(l: () => void): () => void {
@@ -101,7 +146,10 @@ function makeAudio(): HTMLAudioElement {
   // Solo l'<audio> che sta suonando aggiorna lo stato: quello di scorta tace.
   const on = (type: string, f: () => void) => a.addEventListener(type, () => a === audio && f());
   on("play", () => set({ playing: true, error: null }));
-  on("pause", () => set({ playing: false }));
+  on("pause", () => {
+    set({ playing: false });
+    saveQueue();
+  });
   on("waiting", () => set({ buffering: true }));
   on("playing", () => set({ buffering: false }));
   on("canplay", () => set({ buffering: false }));
@@ -158,6 +206,8 @@ function maybeCrossfade(a: HTMLAudioElement): void {
 
 function startCrossfade(index: number, seconds: number): void {
   const entry = state.queue.entries[index];
+  // Il brano che sfuma è finito: sentito.
+  noteLeft(true, true);
   const old = el();
   const outVol = old.volume;
   fadingOut = old;
@@ -171,6 +221,7 @@ function startCrossfade(index: number, seconds: number): void {
   applyVolume();
   getClient()?.scrobble(entry.song.id, false).catch(() => {});
   updateMediaSession();
+  maybeContinue();
   el().play().catch(() => {});
   const t0 = performance.now();
   fadeTimer = setInterval(() => {
@@ -225,9 +276,10 @@ function onTime(): void {
   updatePositionState();
   if (a.duration > 0 && a.duration - a.currentTime < PRELOAD_SECONDS) preloadNext();
   maybeCrossfade(a);
-  // Regola di Last.fm/Subsonic: un ascolto conta dopo metà brano o 4 minuti.
+  if (!a.paused && Date.now() - savedAt > 10_000) saveQueue();
+  // Come sul telefono: un ascolto conta (più ascoltati, mix) solo quando non è più un salto.
   const song = Q.current(state.queue);
-  if (song && !scrobbled && a.duration > 0 && (a.currentTime >= a.duration / 2 || a.currentTime >= 240)) {
+  if (song && !scrobbled && a.duration > 0 && L.countsAsPlay(a.currentTime, a.duration)) {
     scrobbled = true;
     getClient()?.scrobble(song.id, true).catch(() => {});
   }
@@ -253,11 +305,16 @@ function load(autoplay: boolean): void {
     loadedUid = entry.uid;
     scrobbled = false;
     if (!swapToSpare(entry.uid)) el().src = client.streamUrl(entry.song.id);
+    // Il brano ripreso dopo aver riaperto la pagina riparte da dov'eri.
+    const from = resumeAt?.uid === entry.uid ? resumeAt.position : 0;
+    resumeAt = null;
+    if (from > 0) el().currentTime = from;
     applyVolume();
-    set({ position: 0, duration: entry.song.duration ?? 0, error: null });
+    set({ position: from, duration: entry.song.duration ?? 0, error: null });
     client.scrobble(entry.song.id, false).catch(() => {});
   }
   updateMediaSession();
+  maybeContinue();
   if (autoplay) {
     set({ buffering: true });
     // el(), non a: dopo lo scambio suona l'<audio> preparato in anticipo.
@@ -271,6 +328,46 @@ function load(autoplay: boolean): void {
 function setQueue(queue: Q.QueueState, autoplay: boolean): void {
   set({ queue });
   load(autoplay);
+}
+
+/**
+ * Si lascia il brano in corso per un altro ([forward] = avanti, [ended] = finito da solo):
+ * sentito o saltato. Restituisce l'uid della voce da togliere dalla coda se è un salto.
+ */
+function noteLeft(forward: boolean, ended: boolean): number | null {
+  const entry = state.queue.entries[state.queue.index];
+  if (!entry) return null;
+  const a = el();
+  const duration = finite(a.duration) || entry.song.duration;
+  listening = L.left(listening, entry.song.id, ended ? (duration ?? 0) : a.currentTime, duration, forward, ended, !entry.added, Date.now());
+  return !ended && forward && !entry.added && listening.skipped.has(entry.song.id) ? entry.uid : null;
+}
+
+/** Va al brano [index]: il brano lasciato, se saltato, esce dalla coda e non torna in questo ascolto. */
+function goTo(index: number, forward: boolean, ended: boolean): void {
+  const gone = noteLeft(forward, ended);
+  const q = Q.jumpTo(state.queue, index);
+  setQueue(gone === null ? q : Q.removeUid(q, gone), true);
+}
+
+let continuedFor: number | null = null;
+
+/** «Continua ad ascoltare»: parte l'ultimo brano della coda, si aggiunge la sua radio. */
+function maybeContinue(): void {
+  const q = state.queue;
+  const entry = q.entries[q.index];
+  if (!entry || continuedFor === entry.uid) return;
+  if (!autoplayNeeded(state.autoplay, q.index < q.entries.length - 1, q.repeat === "off", state.sleepAt === -1)) return;
+  continuedFor = entry.uid;
+  songRadio(entry.song)
+    .then((radio) => {
+      const now = state.queue;
+      // Nel frattempo è cambiato qualcosa (salto, coda nuova): niente.
+      if (now.entries[now.index]?.uid !== entry.uid || now.index < now.entries.length - 1) return;
+      const chosen = autoplayPick(radio, L.notAgain(listening, now.entries.map((e) => e.song.id)));
+      if (chosen.length) set({ queue: Q.enqueue(now, chosen) });
+    })
+    .catch(() => {});
 }
 
 function advance(auto: boolean): void {
@@ -293,21 +390,32 @@ function advance(auto: boolean): void {
     a.play().catch(() => {});
     return;
   }
-  setQueue(Q.jumpTo(state.queue, i), true);
+  goTo(i, true, auto);
 }
 
 // --- azioni --------------------------------------------------------------
 
 export const player = {
-  play(songs: Song[], start = 0, shuffle = false, from?: { label: string; id: string }): void {
+  /**
+   * Una coda nuova. [picked]: il brano [start] l'hai toccato tu, quindi suona anche se in questo
+   * ascolto era già sentito o saltato; gli altri sentiti e saltati dello stesso contenitore restano fuori.
+   */
+  play(songs: Song[], start = 0, shuffle = false, from?: { label: string; id: string }, picked = false): void {
+    const container = from?.id ?? null;
+    listening = L.startingOn(listening, container, Date.now());
+    const kept = L.keepFor(listening, songs.map((s) => s.id), start, picked, shuffle);
+    const list = kept.kept.length === songs.length ? songs : kept.kept.map((i) => songs[i]);
     set({ from: from ?? null });
-    setQueue(Q.playList(state.queue, songs, start, shuffle), true);
+    setQueue(Q.playList(state.queue, list, kept.start, shuffle, Math.random, L.wrapsAround(container)), true);
   },
   /** Timer di spegnimento: minuti, 0 = a fine brano, null = spento. */
   setSleep(minutes: number | null): void {
     if (sleepTimer) clearTimeout(sleepTimer);
     sleepTimer = null;
-    if (minutes === null) return set({ sleepAt: null });
+    if (minutes === null) {
+      set({ sleepAt: null });
+      return maybeContinue();
+    }
     if (minutes === 0) return set({ sleepAt: -1 });
     const at = Date.now() + minutes * 60_000;
     set({ sleepAt: at });
@@ -340,15 +448,19 @@ export const player = {
       a.currentTime = 0;
       return;
     }
-    setQueue(Q.jumpTo(state.queue, Q.prevIndex(state.queue)), true);
+    const i = Q.prevIndex(state.queue);
+    if (i === state.queue.index) return setQueue(state.queue, true);
+    goTo(i, false, false);
   },
   seek(seconds: number): void {
     const a = el();
     if (a.src) a.currentTime = Math.max(0, Math.min(seconds, a.duration || seconds));
+    else if (resumeAt) resumeAt = { ...resumeAt, position: Math.max(0, seconds) };
     set({ position: seconds });
   },
   jumpTo(index: number): void {
-    setQueue(Q.jumpTo(state.queue, index), true);
+    if (index === state.queue.index || index < 0 || index >= state.queue.entries.length) return setQueue(state.queue, true);
+    goTo(index, index > state.queue.index, false);
   },
   enqueue(songs: Song[]): void {
     const wasEmpty = state.queue.entries.length === 0;
@@ -366,10 +478,17 @@ export const player = {
     set({ queue: Q.move(state.queue, from, to) });
   },
   toggleShuffle(): void {
-    set({ queue: Q.toggleShuffle(state.queue) });
+    // I già sentiti restano prima di quello in corso, col casuale acceso o spento.
+    set({ queue: Q.toggleShuffle(state.queue, Math.random, (id) => listening.heard.has(id)) });
   },
   cycleRepeat(): void {
     set({ queue: Q.cycleRepeat(state.queue) });
+    maybeContinue();
+  },
+  setAutoplay(on: boolean): void {
+    set({ autoplay: on });
+    storeAutoplay(on);
+    maybeContinue();
   },
   setVolume(v: number): void {
     const volume = Math.max(0, Math.min(1, v));

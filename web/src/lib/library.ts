@@ -160,6 +160,8 @@ export const isCollection = (p: Playlist) => folderOf(p) !== null;
 let lastFolders = new Map<string, string[]>();
 // I file che Navidrome vedeva all'ultimo allineamento, per "Brani nel cestino".
 let lastPaths: Set<string> | null = null;
+// Tutti i brani e la raccolta (cartella) di ognuno, per la radio con mood e stile.
+let lastIndex: { songs: Song[]; folderOf: Map<string, string> } | null = null;
 let syncing: Promise<void> | null = null;
 
 /** Allinea le raccolte alle cartelle della musica sul server. Una sola volta per volta. */
@@ -178,6 +180,9 @@ async function doSync(): Promise<void> {
   try {
     const [songs, playlists] = await Promise.all([c.allSongs(), c.playlists()]);
     lastFolders = collectionFolders(songs);
+    const folderOf = new Map<string, string>();
+    for (const [folder, ids] of lastFolders) for (const id of ids) folderOf.set(id, folder);
+    lastIndex = { songs, folderOf };
     lastPaths = new Set(songs.flatMap((s) => (s.path ? [s.path] : [])));
     await restoreIntoCollections(c, songs, playlists);
     if (lastFolders.size === 0) {
@@ -197,6 +202,11 @@ async function doSync(): Promise<void> {
     set({ collections: { state: "error", missing: state.collections.missing, error: e instanceof Error ? e.message : String(e) } });
   }
   await refreshLibrary();
+}
+
+/** Tutti i brani del server e la cartella-raccolta di ognuno, dall'ultimo allineamento (null prima). */
+export function libraryIndex(): { songs: Song[]; folderOf: Map<string, string> } | null {
+  return lastIndex;
 }
 
 /** Crea a mano la raccolta di una cartella (eliminata prima, o vista da un altro browser). */

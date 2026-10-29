@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CREDS, fakeFetch, memoryStorage } from "../test/env";
 import { FakeAudio, streamedId } from "../test/fakeAudio";
-import { FakeNavidrome } from "../test/fakeNavidrome";
+import { FakeNavidrome, type FakeInit } from "../test/fakeNavidrome";
 import type { Song } from "./subsonic";
 
 // Il player senza audio vero: <audio> finti (FakeAudio) che il test fa avanzare a mano.
@@ -16,10 +16,10 @@ vi.mock("react", async (importOriginal) => ({
   },
 }));
 
-async function open(storage: Storage = memoryStorage()) {
+async function open(storage: Storage = memoryStorage(), init: FakeInit = {}) {
   vi.resetModules();
   FakeAudio.all = [];
-  const server = new FakeNavidrome();
+  const server = new FakeNavidrome(init);
   vi.stubGlobal("localStorage", storage);
   vi.stubGlobal("fetch", fakeFetch(server));
   vi.stubGlobal("Audio", FakeAudio);
@@ -119,13 +119,16 @@ describe("player: coda", () => {
     expect(audioOf("b")!.paused).toBe(false);
   });
 
-  it("l'ascolto conta dopo metà brano, una volta sola", async () => {
+  it("l'ascolto conta quando non è più un salto (tre quarti o ultimi 30 s), una volta sola", async () => {
     const p = await open();
     p.player.play(list("a"));
     const a = audioOf("a")!.ready(200);
-    a.at(90);
     a.at(100);
+    await flush();
+    // A metà è ancora un salto: non conta tra i più ascoltati (prima contava già qui).
+    expect(p.server.callsOf("scrobble").filter((c) => c.params.get("submission") === "true")).toHaveLength(0);
     a.at(150);
+    a.at(180);
     await flush();
     expect(p.server.callsOf("scrobble").filter((c) => c.params.get("submission") === "true")).toHaveLength(1);
   });
@@ -153,6 +156,113 @@ describe("player: coda", () => {
     p.player.clear();
     a.fire("error");
     expect(p.getPlayerState().error).toBeNull();
+  });
+});
+
+describe("player: come sul telefono", () => {
+  const ids = (p: Awaited<ReturnType<typeof open>>) => p.getPlayerState().queue.entries.map((e) => e.song.id);
+  const RACCOLTA = { label: "Raccolta", id: "playlist/r" };
+
+  it("una raccolta partita dall'ultimo brano suona tutta prima di fermarsi", async () => {
+    const p = await open();
+    p.player.setAutoplay(false);
+    p.player.play(list("a", "b", "c"), 2, false, RACCOLTA, true);
+    expect(ids(p)).toEqual(["c", "a", "b"]);
+    audioOf("c")!.ready(200).end();
+    expect(currentId(p)).toBe("a");
+  });
+
+  it("un brano saltato esce dalla coda e non torna, né con ripeti tutto né ripartendo dalla raccolta", async () => {
+    const p = await open();
+    p.player.setAutoplay(false);
+    p.player.play(list("a", "b", "c"), 0, false, RACCOLTA, true);
+    p.player.cycleRepeat();
+    audioOf("a")!.ready(200).at(20);
+    p.player.next();
+    expect(ids(p)).toEqual(["b", "c"]);
+    expect(currentId(p)).toBe("b");
+    // Ripeti tutto: dopo c si torna a b, non ad a.
+    audioOf("b")!.ready(200).end();
+    audioOf("c")!.ready(200).end();
+    expect(currentId(p)).toBe("b");
+    // Il tasto play della raccolta: fuori il saltato e i già sentiti.
+    p.player.play(list("a", "b", "c", "d"), 0, false, RACCOLTA);
+    expect(ids(p)).toEqual(["d"]);
+    // Toccato apposta, il saltato suona.
+    p.player.play(list("a", "b", "c", "d"), 0, false, RACCOLTA, true);
+    expect(currentId(p)).toBe("a");
+  });
+
+  it("indietro o lasciato quasi alla fine non è un salto; le aggiunte in coda non contano", async () => {
+    const p = await open();
+    p.player.setAutoplay(false);
+    p.player.play(list("a", "b", "c"), 0, false, RACCOLTA, true);
+    p.player.playNext([song("x")]);
+    audioOf("a")!.ready(200).at(185);
+    p.player.next();
+    expect(currentId(p)).toBe("x");
+    audioOf("x")!.ready(200).at(5);
+    p.player.next();
+    expect(ids(p)).toEqual(["a", "x", "b", "c"]);
+    audioOf("b")!.ready(200).at(1);
+    p.player.prev();
+    expect(ids(p)).toEqual(["a", "x", "b", "c"]);
+  });
+
+  it("spento il casuale, i già sentiti non tornano dopo il brano in corso", async () => {
+    const p = await open();
+    p.player.setAutoplay(false);
+    p.player.play(list("a", "b", "c", "d", "e"), 0, true, RACCOLTA, true);
+    const first = currentId(p)!;
+    audioOf(first)!.ready(200).end();
+    const second = currentId(p)!;
+    p.player.toggleShuffle();
+    const order = ids(p);
+    expect(order.indexOf(first)).toBeLessThan(order.indexOf(second));
+    expect(currentId(p)).toBe(second);
+  });
+
+  it("Continua ad ascoltare: all'ultimo brano arrivano brani simili, mai quelli già sentiti o saltati", async () => {
+    const server = { songs: ["a", "b", "c", "d", "e", "f"].map((id) => song(id, { artist: id === "f" ? "Altro" : "Tizio", genre: "Rock" })) };
+    const p = await open(memoryStorage(), server);
+    p.player.play(server.songs.slice(0, 3), 0, false, RACCOLTA, true);
+    audioOf("a")!.ready(200).at(10);
+    p.player.next();
+    audioOf("b")!.ready(200).end();
+    // Parte c, l'ultimo: si aggiunge la radio.
+    expect(currentId(p)).toBe("c");
+    await vi.waitFor(() => expect(ids(p).length).toBeGreaterThan(2));
+    const added = ids(p).slice(2);
+    expect(added).not.toContain("a");
+    expect(added).not.toContain("b");
+    expect(added).not.toContain("c");
+    expect(new Set(added)).toEqual(new Set(["d", "e", "f"]));
+    expect(p.getPlayerState().queue.entries.slice(2).every((e) => e.added)).toBe(true);
+  });
+
+  it("Continua ad ascoltare spento: a fine coda ci si ferma", async () => {
+    const p = await open(memoryStorage(), { songs: list("x", "y") });
+    p.player.setAutoplay(false);
+    p.player.play(list("a"));
+    await flush();
+    expect(ids(p)).toEqual(["a"]);
+    expect(p.server.callsOf("getRandomSongs")).toHaveLength(0);
+  });
+
+  it("riaprendo la pagina la coda è quella di prima e riparte da dov'eri", async () => {
+    const storage = memoryStorage();
+    const p = await open(storage);
+    p.player.setAutoplay(false);
+    p.player.play(list("a", "b", "c"), 1, false, RACCOLTA, true);
+    audioOf("b")!.ready(200).at(73);
+    p.player.pause();
+    const again = await open(storage);
+    expect(again.getPlayerState()).toMatchObject({ playing: false, position: 73, from: RACCOLTA });
+    expect(again.getPlayerState().queue.entries.map((e) => e.song.id)).toEqual(["b", "c", "a"]);
+    again.player.resume();
+    const b = FakeAudio.all.find((x) => streamedId(x) === "b")!;
+    expect(b.currentTime).toBe(73);
+    expect(b.paused).toBe(false);
   });
 });
 

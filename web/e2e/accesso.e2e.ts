@@ -44,7 +44,7 @@ test("Home dopo l'accesso: saluto, raccolte e mix", async ({ page, navidrome, lo
   await expect(page.locator(".main .card__title", { hasText: "Disney Italia" })).toBeVisible();
 });
 
-test("Impostazioni: server, volume uguale, dissolvenza, raccolte, uscita", async ({ page, navidrome, login }) => {
+test("Impostazioni: server, volume uguale, dissolvenza, continua ad ascoltare, raccolte, uscita", async ({ page, navidrome, login }) => {
   await navidrome({ songs: library() });
   await login("#/settings");
   await expect(page.getByRole("heading", { name: "Impostazioni" })).toBeVisible();
@@ -60,11 +60,17 @@ test("Impostazioni: server, volume uguale, dissolvenza, raccolte, uscita", async
   const spenta = page.getByRole("button", { name: "Spenta", exact: true });
   await spenta.click();
   await expect(spenta).toHaveClass(/is-on/);
-  expect(await page.evaluate(() => [localStorage.getItem("baldmusic.replaygain"), localStorage.getItem("baldmusic.crossfade")])).toEqual(["track", "0"]);
+  // Continua ad ascoltare: attivo di serie, come sul telefono.
+  const continua = page.locator(".panel", { has: page.getByRole("heading", { name: "Continua ad ascoltare" }) });
+  await expect(continua.getByRole("button", { name: "Attivo" })).toHaveClass(/is-on/);
+  await continua.getByRole("button", { name: "Spento" }).click();
+  await expect(continua.getByRole("button", { name: "Spento" })).toHaveClass(/is-on/);
+  expect(await page.evaluate(() => [localStorage.getItem("baldmusic.replaygain"), localStorage.getItem("baldmusic.crossfade"), localStorage.getItem("baldmusic.continua")])).toEqual(["track", "0", "off"]);
   // Si ricordano alla prossima apertura.
   await page.reload();
   await expect(page.getByRole("button", { name: "Brano", exact: true })).toHaveClass(/is-on/);
   await expect(page.getByRole("button", { name: "Spenta", exact: true })).toHaveClass(/is-on/);
+  await expect(continua.getByRole("button", { name: "Spento" })).toHaveClass(/is-on/);
 
   await page.getByRole("button", { name: "Esci" }).click();
   await expect(page.getByRole("button", { name: "Entra" })).toBeVisible();

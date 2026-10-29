@@ -4,6 +4,7 @@ import { formatDuration } from "../lib/format";
 import { addToPlaylist, createPlaylist, isCollection, isMine, removeFromPlaylist, toggleLike, useLibrary } from "../lib/library";
 import { player, usePlayer, usePlayerSelect } from "../lib/player";
 import { current } from "../lib/queue";
+import { songRadio } from "../lib/radio";
 import { href, navigate } from "../lib/router";
 import { getClient, useClient } from "../lib/session";
 import { endSongDrag, startSongDrag } from "../lib/songDrag";
@@ -290,28 +291,10 @@ export function PlaylistPicker({ songs, onDone }: { songs: Song[]; onDone: () =>
   );
 }
 
-/**
- * Radio da un brano: i brani simili del server se li sa calcolare,
- * altrimenti i più ascoltati dell'artista e un mix dello stesso genere.
- */
+/** Radio da un brano: dopo di lui brani col suo mood e il suo stile (radio.ts, come sul telefono). */
 export async function startRadio(song: Song): Promise<void> {
-  const c = getClient();
-  if (!c) return;
-  let songs = await c.similarSongs(song.id, 50);
-  if (songs.length < 5) {
-    const [top, genre] = await Promise.all([song.artist ? c.topSongs(song.artist, 15) : [], c.randomSongs(35, song.genre ? { genre: song.genre } : {})]);
-    const mix: Song[] = [];
-    const a = [...top];
-    const g = [...genre];
-    while (a.length || g.length) {
-      g.length && mix.push(g.shift()!);
-      g.length && mix.push(g.shift()!);
-      a.length && mix.push(a.shift()!);
-    }
-    songs = mix;
-  }
-  const unique = [song, ...songs.filter((s) => s.id !== song.id)].filter((s, i, arr) => arr.findIndex((x) => x.id === s.id) === i);
-  player.play(unique, 0, false, { label: `Radio: ${song.title}`, id: `radio/${song.id}` });
+  if (!getClient()) return;
+  player.play(await songRadio(song), 0, false, { label: `Radio: ${song.title}`, id: `radio/${song.id}` });
 }
 
 /** Tabella dei brani, come nelle pagine di Spotify sul PC. */
@@ -373,7 +356,8 @@ export function TrackTable({
   live.current = { songs, from, selection, onMove, dragFrom };
   const actions = useMemo<RowActions>(
     () => ({
-      play: (i) => player.play(live.current.songs, i, false, live.current.from),
+      // Il brano toccato suona anche se in questo ascolto l'avevi già sentito o saltato.
+      play: (i) => player.play(live.current.songs, i, false, live.current.from, true),
       menu: (i, x, y) => setMenu({ song: live.current.songs[i], index: i, x, y }),
       toggle: (i, shift) => live.current.selection?.toggle(i, shift),
       dragStart: (e, i) => {

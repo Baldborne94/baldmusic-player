@@ -8,6 +8,8 @@ export type RepeatMode = "off" | "all" | "one";
 export interface Entry {
   uid: number;
   song: Song;
+  /** Aggiunto a mano («Riproduci dopo», «Aggiungi in coda») o da «Continua ad ascoltare»: non è del contenitore. */
+  added?: boolean;
 }
 
 export interface QueueState {
@@ -21,7 +23,12 @@ export interface QueueState {
 export const emptyQueue: QueueState = { entries: [], unshuffled: null, index: -1, repeat: "off" };
 
 let nextUid = 1;
-const wrap = (songs: Song[]): Entry[] => songs.map((song) => ({ uid: nextUid++, song }));
+const wrap = (songs: Song[], added = false): Entry[] => songs.map((song) => (added ? { uid: nextUid++, song, added } : { uid: nextUid++, song }));
+
+/** Voci nuove per dei brani (per rifare una coda salvata): [added] dice quali erano aggiunte. */
+export function entriesOf(songs: Song[], added: (i: number) => boolean = () => false): Entry[] {
+  return songs.map((song, i) => wrap([song], added(i))[0]);
+}
 
 export function current(q: QueueState): Song | undefined {
   return q.entries[q.index]?.song;
@@ -36,30 +43,44 @@ function shuffled<T>(items: T[], random: () => number): T[] {
   return a;
 }
 
-/** Sostituisce la coda. Con shuffle, il brano scelto resta il primo. */
-export function playList(q: QueueState, songs: Song[], start = 0, shuffle = false, random = Math.random): QueueState {
+/**
+ * Sostituisce la coda. Con shuffle, il brano scelto resta il primo. Con [wrapAround] (raccolte,
+ * playlist, preferiti, mix) dal brano scelto alla fine e poi dall'inizio, così suonano tutti.
+ */
+export function playList(q: QueueState, songs: Song[], start = 0, shuffle = false, random = Math.random, wrapAround = false): QueueState {
   if (songs.length === 0) return { ...emptyQueue, repeat: q.repeat };
   const entries = wrap(songs);
   const idx = Math.min(Math.max(start, 0), entries.length - 1);
+  if (!shuffle && wrapAround && idx > 0) return { entries: [...entries.slice(idx), ...entries.slice(0, idx)], unshuffled: null, index: 0, repeat: q.repeat };
   if (!shuffle) return { entries, unshuffled: null, index: idx, repeat: q.repeat };
   const first = entries[idx];
   const rest = shuffled(entries.filter((_, i) => i !== idx), random);
   return { entries: [first, ...rest], unshuffled: entries, index: 0, repeat: q.repeat };
 }
 
-export function toggleShuffle(q: QueueState, random = Math.random): QueueState {
+/**
+ * Casuale acceso o spento, sul brano corrente. [heard]: i brani già sentiti in questo ascolto,
+ * che stanno sempre prima di quello in corso (così con «ripeti» spento non tornano).
+ */
+export function toggleShuffle(q: QueueState, random = Math.random, heard: (id: string) => boolean = () => false): QueueState {
   const cur = q.entries[q.index];
   if (q.unshuffled) {
     // Spegnendo lo shuffle si torna all'ordine originale, sul brano corrente.
     // Le voci aggiunte durante lo shuffle restano in fondo.
     const known = new Set(q.unshuffled.map((e) => e.uid));
-    const entries = [...q.unshuffled.filter((e) => q.entries.some((x) => x.uid === e.uid)), ...q.entries.filter((e) => !known.has(e.uid))];
-    return { ...q, entries, unshuffled: null, index: cur ? entries.findIndex((e) => e.uid === cur.uid) : -1 };
+    const linear = [...q.unshuffled.filter((e) => q.entries.some((x) => x.uid === e.uid)), ...q.entries.filter((e) => !known.has(e.uid))];
+    if (!cur) return { ...q, entries: linear, unshuffled: null, index: -1 };
+    const at = linear.findIndex((e) => e.uid === cur.uid);
+    // I già sentiti che verrebbero dopo si spostano subito prima di quello in corso.
+    const later = linear.slice(at + 1);
+    const entries = [...linear.slice(0, at), ...later.filter((e) => heard(e.song.id)), cur, ...later.filter((e) => !heard(e.song.id))];
+    return { ...q, entries, unshuffled: null, index: entries.findIndex((e) => e.uid === cur.uid) };
   }
   if (!cur) return { ...q, unshuffled: q.entries };
-  const before = q.entries.slice(0, q.index);
-  const after = shuffled(q.entries.slice(q.index + 1), random);
-  return { ...q, entries: [...before, cur, ...after], unshuffled: q.entries, index: q.index };
+  const later = q.entries.slice(q.index + 1);
+  const before = [...q.entries.slice(0, q.index), ...later.filter((e) => heard(e.song.id))];
+  const after = shuffled(later.filter((e) => !heard(e.song.id)), random);
+  return { ...q, entries: [...before, cur, ...after], unshuffled: q.entries, index: before.length };
 }
 
 export function cycleRepeat(q: QueueState): QueueState {
@@ -89,7 +110,7 @@ export function jumpTo(q: QueueState, index: number): QueueState {
 }
 
 export function enqueue(q: QueueState, songs: Song[]): QueueState {
-  const added = wrap(songs);
+  const added = wrap(songs, true);
   const entries = [...q.entries, ...added];
   return {
     ...q,
@@ -101,7 +122,7 @@ export function enqueue(q: QueueState, songs: Song[]): QueueState {
 
 export function playNext(q: QueueState, songs: Song[]): QueueState {
   if (q.index < 0) return enqueue(q, songs);
-  const added = wrap(songs);
+  const added = wrap(songs, true);
   const entries = [...q.entries.slice(0, q.index + 1), ...added, ...q.entries.slice(q.index + 1)];
   return { ...q, entries, unshuffled: q.unshuffled ? [...q.unshuffled, ...added] : null };
 }
@@ -119,6 +140,12 @@ export function removeAt(q: QueueState, index: number): QueueState {
     unshuffled: q.unshuffled ? q.unshuffled.filter((e) => e.uid !== gone) : null,
     index: entries.length ? newIndex : -1,
   };
+}
+
+/** Toglie la voce [uid] (un brano saltato), ovunque sia, restando sul brano corrente. */
+export function removeUid(q: QueueState, uid: number): QueueState {
+  const i = q.entries.findIndex((e) => e.uid === uid);
+  return i < 0 || i === q.index ? q : removeAt(q, i);
 }
 
 export function move(q: QueueState, from: number, to: number): QueueState {

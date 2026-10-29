@@ -5,7 +5,6 @@ package io.github.baldborne94.baldmusic.playback
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Bundle
-import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -16,7 +15,6 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaLibraryService.LibraryParams
@@ -31,10 +29,8 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
-import io.github.baldborne94.baldmusic.R
 import io.github.baldborne94.baldmusic.core.library.Autoplay
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
-import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.ListeningSession
@@ -43,8 +39,8 @@ import io.github.baldborne94.baldmusic.core.library.Loudness
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.QueueSnapshot
 import io.github.baldborne94.baldmusic.core.library.RecentSearches
-import io.github.baldborne94.baldmusic.core.library.VoiceQuery
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
+import io.github.baldborne94.baldmusic.core.library.SessionControls
 import io.github.baldborne94.baldmusic.core.library.SleepTimer
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
@@ -86,18 +82,11 @@ class PlaybackService : MediaLibraryService() {
     /** Il timer di spegnimento abbassa piano il volume: si moltiplica per quello del ReplayGain. */
     private var fade = 1f
 
-    // Dissolvenza incrociata. Poco prima della fine, il brano in corso si prepara su un
-    // secondo ExoPlayer fermo sul punto in cui partirà la sfumatura ([outgoing]); lì parte
-    // lui e si abbassa ([fadingOut]), mentre il player vero (quello della sessione, della
-    // notifica e di Android Auto) passa al brano dopo e sale ([crossIn]).
-    private lateinit var mediaSources: DefaultMediaSourceFactory
     private val musicAttributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build()
-    private var outgoing: ExoPlayer? = null
-    private var outgoingFor = C.INDEX_UNSET
-    private var fadingOut: ExoPlayer? = null
-    private var crossJob: Job? = null
-    private var crossIn = 1f
-    private var crossSeek = false
+    /** Dissolvenza incrociata tra i brani ([CrossfadeController]). */
+    private lateinit var crossfade: CrossfadeController
+    /** Le richieste a voce e le puntate chieste per intero. */
+    private val voice by lazy { VoiceRequests(this) }
 
     /** Coda appena impostata: col casuale deve partire dal brano scelto e passare da tutti gli altri. */
     private var shuffleFromCurrent = false
@@ -112,7 +101,7 @@ class PlaybackService : MediaLibraryService() {
         super.onCreate()
         // OkHttp anche per lo streaming: stessi timeout e stessa connessione del resto dell'app.
         val dataSources = DefaultDataSource.Factory(this, OkHttpDataSource.Factory(app.http))
-        mediaSources = DefaultMediaSourceFactory(dataSources)
+        val mediaSources = DefaultMediaSourceFactory(dataSources)
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(mediaSources)
             .setAudioAttributes(musicAttributes, /* handleAudioFocus = */ true)
@@ -120,6 +109,12 @@ class PlaybackService : MediaLibraryService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
+        crossfade = CrossfadeController(
+            this, player, mediaSources, musicAttributes, scope,
+            seconds = { app.settings.crossfade.value },
+            endOfTrackTimer = { app.sleepTimer.value == BaldMusicApp.SLEEP_END_OF_TRACK },
+            applyVolume = ::applyVolume,
+        )
         player.addListener(PlayerEvents())
 
         val openApp = PendingIntent.getActivity(
@@ -159,7 +154,7 @@ class PlaybackService : MediaLibraryService() {
             }
         }
         scope.launch { app.settings.replayGain.collect { applyVolume() } }
-        scope.launch { app.settings.crossfade.collect { updateCrossWatch() } }
+        scope.launch { app.settings.crossfade.collect { crossfade.update() } }
 
         // Server collegato o scollegato, permesso concesso: Android Auto rilegge l'albero.
         scope.launch {
@@ -181,21 +176,15 @@ class PlaybackService : MediaLibraryService() {
     override fun onDestroy() {
         // Subito, non in sottofondo: un attimo dopo il servizio non c'è più.
         saveLast(now = true)
-        endCrossfade()
-        dropOutgoing()
+        crossfade.stop()
         scope.cancel()
         session.release()
         player.release()
         super.onDestroy()
     }
 
-    private val queueFile by lazy { java.io.File(filesDir, "coda.json") }
-    private var queueSave: Job? = null
+    private val queueStore by lazy { QueueStore(java.io.File(filesDir, "coda.json"), scope) }
 
-    /**
-     * Salva l'ultimo brano e tutta la coda (ordine, punto, casuale, ripeti): alla
-     * riaccensione dell'auto, o dalla notifica dopo un riavvio, riparte tutto uguale.
-     */
     /** Dove sei arrivato nella puntata in corso, se è una puntata: la prossima volta riparte da lì. */
     private fun savePodcastProgress() {
         val item = player.currentMediaItem ?: return
@@ -203,6 +192,10 @@ class PlaybackService : MediaLibraryService() {
         app.podcasts.record(item.mediaId, player.currentPosition, player.duration.takeIf { it != C.TIME_UNSET })
     }
 
+    /**
+     * Salva l'ultimo brano e tutta la coda (ordine, punto, casuale, ripeti): alla
+     * riaccensione dell'auto, o dalla notifica dopo un riavvio, riparte tutto uguale.
+     */
     private fun saveLast(now: Boolean = false) {
         val item = player.currentMediaItem ?: return
         app.settings.saveLast(item.mediaId, player.currentPosition)
@@ -219,21 +212,12 @@ class PlaybackService : MediaLibraryService() {
             repeat = player.repeatMode,
             order = if (player.shuffleModeEnabled) shuffleOrderNow() else null,
         ) ?: return
-        queueSave?.cancel()
-        if (now) writeQueue(snapshot) else queueSave = scope.launch(Dispatchers.IO) { writeQueue(snapshot) }
-    }
-
-    private fun writeQueue(snapshot: QueueSnapshot) {
-        runCatching {
-            val tmp = java.io.File(queueFile.parentFile, "${queueFile.name}.tmp")
-            tmp.writeText(snapshot.toJson())
-            tmp.renameTo(queueFile)
-        }
+        queueStore.save(snapshot, now)
     }
 
     /** La coda salvata, coi brani che si ritrovano ancora; null se non c'è niente da riprendere. */
     private suspend fun savedQueue(): MediaItemsWithStartPosition? {
-        val snapshot = QueueSnapshot.fromJson(kotlinx.coroutines.withContext(Dispatchers.IO) { runCatching { queueFile.readText() }.getOrNull() }) ?: return null
+        val snapshot = queueStore.read() ?: return null
         // Server spento o fuori rete (Tailscale attivo, PC spento): ogni brano aspetterebbe il suo
         // timeout e la ripresa in auto resterebbe ferma per minuti. Si prova una volta sola.
         val remote = "${RemoteSource.KEY}/"
@@ -258,12 +242,7 @@ class PlaybackService : MediaLibraryService() {
     private inner class PlayerEvents : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             // Il passaggio voluto dalla dissolvenza va avanti; qualunque altro la interrompe.
-            if (crossSeek) {
-                crossSeek = false
-            } else {
-                endCrossfade()
-                dropOutgoing()
-            }
+            if (!crossfade.consumeSeek()) crossfade.stop()
             // Una puntata partita da sola dopo un'altra riprende da dove eri arrivato.
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && mediaItem != null) {
                 app.podcasts.resumeAt(mediaItem.mediaId).takeIf { it > 0 }?.let { player.seekTo(it) }
@@ -296,25 +275,19 @@ class PlaybackService : MediaLibraryService() {
         override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
             // Chiamata, Assistente, navigatore: il player si sospende senza andare in pausa, ma il
             // brano che sfuma (senza audio focus) continuerebbe sopra. Si ferma anche lui.
-            if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) {
-                endCrossfade()
-                dropOutgoing()
-            }
+            if (playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE) crossfade.stop()
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             // Pausa durante la sfumatura: si ferma anche il brano che stava finendo.
-            if (!playWhenReady) {
-                endCrossfade()
-                dropOutgoing()
-            }
+            if (!playWhenReady) crossfade.stop()
             // In pausa il controllo della dissolvenza si ferma; riparte con la musica.
-            updateCrossWatch()
+            crossfade.update()
         }
 
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
             // Si è spostato il punto del brano: il brano preparato per sfumare non vale più.
-            if (reason == Player.DISCONTINUITY_REASON_SEEK && !crossSeek) dropOutgoing()
+            if (reason == Player.DISCONTINUITY_REASON_SEEK && !crossfade.seeking) crossfade.drop()
             noteLeft(oldPosition, newPosition, reason)
         }
 
@@ -369,9 +342,9 @@ class PlaybackService : MediaLibraryService() {
     }
 
     /**
-     * Segnala a Navidrome cosa si sta ascoltando e, dopo metà brano (o 4 minuti),
-     * registra l'ascolto: così "più ascoltati" e "ascoltati di recente" restano veri
-     * anche per quello che si ascolta in macchina.
+     * Segnala a Navidrome cosa si sta ascoltando e, quando non è più un salto
+     * ([ListeningSession.countsAsPlay]), registra l'ascolto: così "più ascoltati" e "ascoltati
+     * di recente" restano veri anche per quello che si ascolta in macchina.
      */
     private fun startScrobble(item: MediaItem?) {
         scrobbleJob?.cancel()
@@ -386,7 +359,7 @@ class PlaybackService : MediaLibraryService() {
                 delay(10_000)
                 val duration = player.duration
                 if (player.currentMediaItem?.mediaId != item.mediaId) return@launch
-                if (duration > 0 && player.currentPosition >= minOf(duration / 2, 240_000L)) {
+                if (duration > 0 && ListeningSession.countsAsPlay(player.currentPosition, duration)) {
                     runCatching { client.scrobble(songId, submission = true) }
                     return@launch
                 }
@@ -483,122 +456,7 @@ class PlaybackService : MediaLibraryService() {
      */
     private fun applyVolume() {
         val rg = Loudness.volume(player.currentMediaItem?.replayGain, app.settings.replayGain.value)
-        player.volume = (rg * fade * crossIn).coerceIn(0f, 1f)
-    }
-
-    private var crossWatch: Job? = null
-
-    /** Il controllo della dissolvenza gira solo mentre si suona con la dissolvenza accesa ([Crossfade.watching]). */
-    private fun updateCrossWatch() {
-        val needed = Crossfade.watching(app.settings.crossfade.value, player.playWhenReady)
-        if (needed == (crossWatch != null)) return
-        crossWatch?.cancel()
-        crossWatch = null
-        if (needed) {
-            crossWatch = scope.launch {
-                while (isActive) {
-                    delay(200)
-                    watchCrossfade()
-                }
-            }
-        } else if (crossJob == null) {
-            dropOutgoing()
-        }
-    }
-
-    /** Ogni 200 ms: è ora di preparare il brano che finisce, o di cominciare a sfumare? */
-    private fun watchCrossfade() {
-        if (crossJob != null) return
-        val seconds = app.settings.crossfade.value
-        val current = player.currentMediaItem
-        val duration = player.duration
-        val next = player.nextMediaItemIndex
-        val ok = seconds > 0 && player.playWhenReady && current != null && duration != C.TIME_UNSET && next != C.INDEX_UNSET &&
-            player.repeatMode != Player.REPEAT_MODE_ONE && app.sleepTimer.value != BaldMusicApp.SLEEP_END_OF_TRACK &&
-            Crossfade.applies(
-                seconds, duration,
-                sameAlbum = current.albumId != null && current.albumId == player.getMediaItemAt(next).albumId,
-                episode = PodcastSource.episodeKey(current.mediaId) != null || PodcastSource.episodeKey(player.getMediaItemAt(next).mediaId) != null,
-            )
-        if (!ok) {
-            dropOutgoing()
-            return
-        }
-        val start = duration - seconds * 1000L
-        val position = player.currentPosition
-        val index = player.currentMediaItemIndex
-        when {
-            position in (start - 3_000) until start && outgoingFor != index -> prepareOutgoing(current!!, start, index)
-            position >= start && outgoingFor == index -> startCrossfade(duration - position)
-        }
-    }
-
-    /** Il brano in corso, su un secondo player fermo sul punto in cui comincerà a sfumare. */
-    private fun prepareOutgoing(item: MediaItem, startMs: Long, index: Int) {
-        dropOutgoing()
-        outgoing = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(mediaSources)
-            // L'audio focus resta al player vero: questo suona solo per pochi secondi.
-            .setAudioAttributes(musicAttributes, /* handleAudioFocus = */ false)
-            .build()
-            .apply {
-                setMediaItem(item, startMs)
-                volume = player.volume
-                prepare()
-            }
-        outgoingFor = index
-    }
-
-    private fun dropOutgoing() {
-        outgoing?.release()
-        outgoing = null
-        outgoingFor = C.INDEX_UNSET
-    }
-
-    /** Il brano che finisce continua sul secondo player e si abbassa; il player vero passa al brano dopo e sale. */
-    private fun startCrossfade(lengthMs: Long) {
-        val out = outgoing ?: return
-        outgoing = null
-        outgoingFor = C.INDEX_UNSET
-        if (out.playbackState != Player.STATE_READY) {
-            // Non è pronto in tempo: passaggio normale, senza buchi.
-            out.release()
-            return
-        }
-        val outVolume = player.volume
-        out.volume = outVolume
-        out.play()
-        fadingOut = out
-        crossIn = 0f
-        crossSeek = true
-        player.seekToNextMediaItem()
-        applyVolume()
-        val total = lengthMs.coerceAtLeast(500L).toFloat()
-        crossJob = scope.launch {
-            val t0 = SystemClock.elapsedRealtime()
-            while (true) {
-                val t = (SystemClock.elapsedRealtime() - t0) / total
-                if (t >= 1f) break
-                val (o, i) = Crossfade.gains(t)
-                out.volume = outVolume * o
-                crossIn = i
-                applyVolume()
-                delay(50)
-            }
-            endCrossfade()
-        }
-    }
-
-    /** Fine (o interruzione) della sfumatura: il brano vecchio si ferma, quello nuovo a volume pieno. */
-    private fun endCrossfade() {
-        val job = crossJob
-        crossJob = null
-        fadingOut?.release()
-        fadingOut = null
-        crossIn = 1f
-        applyVolume()
-        // Chiamata anche dalla sfumatura stessa, alla fine: annullarla lì non fa danni.
-        job?.cancel()
+        player.volume = (rg * fade * crossfade.crossIn).coerceIn(0f, 1f)
     }
 
     /** Timer di spegnimento: abbassa piano il volume nell'ultimo tratto, poi pausa. */
@@ -645,63 +503,23 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    /**
-     * Cuore, casuale, ripeti e timer accanto ai comandi: nella notifica e in Android Auto. Per una
-     * puntata di un podcast invece indietro di 15 s e avanti di 30 s (cuore, casuale e ripeti non servono).
-     */
+    /** I tasti accanto ai comandi, nella notifica e in Android Auto ([SessionControls.layout]). */
     private fun updateLikeButton() {
         val item = player.currentMediaItem
-        val liked = item != null && app.userData.isLiked(item.mediaId)
-        val heart = CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
-            .setDisplayName(if (liked) "Togli da Mi piace" else "Mi piace")
-            .setSessionCommand(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
-            .build()
-        val shuffle = CommandButton.Builder(if (player.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
-            .setDisplayName(if (player.shuffleModeEnabled) "Casuale attivo" else "Casuale")
-            .setSessionCommand(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
-            .build()
-        val repeat = CommandButton.Builder(
-            when (player.repeatMode) {
-                Player.REPEAT_MODE_ONE -> CommandButton.ICON_REPEAT_ONE
-                Player.REPEAT_MODE_ALL -> CommandButton.ICON_REPEAT_ALL
-                else -> CommandButton.ICON_REPEAT_OFF
-            },
+        session.setCustomLayout(
+            SessionButtons.of(
+                SessionControls.layout(item?.mediaId),
+                liked = item != null && app.userData.isLiked(item.mediaId),
+                shuffle = player.shuffleModeEnabled,
+                repeatMode = player.repeatMode,
+                sleepLabel = SleepTimer.label(app.sleepTimer.value, System.currentTimeMillis()),
+            ),
         )
-            .setDisplayName(
-                when (player.repeatMode) {
-                    Player.REPEAT_MODE_ONE -> "Ripeti il brano"
-                    Player.REPEAT_MODE_ALL -> "Ripeti tutto"
-                    else -> "Ripeti"
-                },
-            )
-            .setSessionCommand(SessionCommand(CMD_REPEAT, Bundle.EMPTY))
-            .build()
-        // Timer di spegnimento anche dall'auto: un tocco per passo (SleepTimer), il nome dice quanto manca.
-        val timer = CommandButton.Builder(CommandButton.ICON_UNDEFINED)
-            .setCustomIconResId(R.drawable.ic_timer)
-            .setDisplayName(SleepTimer.label(app.sleepTimer.value, System.currentTimeMillis()))
-            .setSessionCommand(SessionCommand(CMD_SLEEP, Bundle.EMPTY))
-            .build()
-        if (item != null && PodcastSource.episodeKey(item.mediaId) != null) {
-            val back = CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15)
-                .setDisplayName("Indietro di 15 secondi")
-                .setSessionCommand(SessionCommand(CMD_BACK, Bundle.EMPTY))
-                .build()
-            val forward = CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_30)
-                .setDisplayName("Avanti di 30 secondi")
-                .setSessionCommand(SessionCommand(CMD_FORWARD, Bundle.EMPTY))
-                .build()
-            session.setCustomLayout(ImmutableList.of(back, forward, timer))
-            return
-        }
-        session.setCustomLayout(if (item == null) ImmutableList.of() else ImmutableList.of(heart, shuffle, repeat, timer))
     }
 
     /** Indietro o avanti dentro il brano (le puntate): mai prima dell'inizio né oltre la fine. */
     private fun skipWithin(deltaMs: Long) {
-        val duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 }
-        val target = (player.currentPosition + deltaMs).coerceAtLeast(0)
-        player.seekTo(duration?.let { minOf(target, it - 1_000) }?.coerceAtLeast(0) ?: target)
+        player.seekTo(SessionControls.skipTarget(player.currentPosition, player.duration.takeIf { it != C.TIME_UNSET }, deltaMs))
     }
 
     private fun rootItem(id: String) = MediaItem.Builder()
@@ -770,11 +588,7 @@ class PlaybackService : MediaLibraryService() {
             }
             if (customCommand.customAction == CMD_REPEAT) {
                 // Spento → tutta la coda → il brano → spento.
-                player.repeatMode = when (player.repeatMode) {
-                    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                    else -> Player.REPEAT_MODE_OFF
-                }
+                player.repeatMode = SessionControls.nextRepeat(player.repeatMode)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             if (customCommand.customAction == CMD_SLEEP) {
@@ -782,7 +596,7 @@ class PlaybackService : MediaLibraryService() {
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             if (customCommand.customAction == CMD_BACK || customCommand.customAction == CMD_FORWARD) {
-                skipWithin(if (customCommand.customAction == CMD_BACK) -BACK_MS else FORWARD_MS)
+                skipWithin(if (customCommand.customAction == CMD_BACK) -SessionControls.BACK_MS else SessionControls.FORWARD_MS)
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
             return super.onCustomCommand(session, controller, customCommand, args)
@@ -879,10 +693,10 @@ class PlaybackService : MediaLibraryService() {
 
             val query = single.requestMetadata.searchQuery
             if (single.mediaId.isEmpty() && query != null) {
-                return@future voiceSearch(query)
+                return@future voice.play(query)
             }
             // Un podcast intero o «Da ascoltare»: una puntata sola, da dove eri (non tutto l'archivio).
-            MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return@future episode(it) }
+            MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return@future voice.episode(it) }
 
             // Dall'elenco di tutti i brani: dopo quello scelto la sua radio (mood e stile), non l'alfabeto.
             val radio = QueueOrder.radioInstead(single.mediaId)?.let { r -> tree.playableIn(r).takeIf { it.isNotEmpty() }?.let { r to it } }
@@ -1027,7 +841,7 @@ class PlaybackService : MediaLibraryService() {
     private fun noteLeft(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
         if (old.mediaItemIndex == new.mediaItemIndex) return
         val item = old.mediaItem ?: return
-        val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION || crossSeek
+        val auto = reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION || crossfade.seeking
         if (!auto && reason != Player.DISCONTINUITY_REASON_SEEK) return
         val previous = player.currentTimeline.takeUnless { it.isEmpty }
             ?.getPreviousWindowIndex(old.mediaItemIndex, player.repeatMode, player.shuffleModeEnabled)
@@ -1040,39 +854,6 @@ class PlaybackService : MediaLibraryService() {
             val at = old.mediaItemIndex
             if (at < player.mediaItemCount && at != player.currentMediaItemIndex && player.getMediaItemAt(at).mediaId == item.mediaId) player.removeMediaItem(at)
         }
-    }
-
-    /** Una puntata sola, da dove eri arrivato. */
-    private fun episode(node: LibraryNode) =
-        MediaItemsWithStartPosition(listOf(node.toMediaItem(this)), 0, app.podcasts.resumeAt(node.mediaId).takeIf { it > 0 } ?: C.TIME_UNSET)
-
-    private suspend fun voiceSearch(query: String): MediaItemsWithStartPosition {
-        fun all(items: List<MediaItem>) = MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
-        if (query.isBlank()) {
-            // "Metti un po' di musica": mix casuale dalla prima sorgente disponibile.
-            val first = tree.rootNodes().firstOrNull() ?: return all(emptyList())
-            val mix = tree.children(first.mediaId).firstOrNull { it.title.startsWith("Mix") } ?: return all(emptyList())
-            return all(tree.playableIn(mix.mediaId).toItems())
-        }
-        // "Il podcast Non Aprite Quella Podcast", "l'ultima puntata di …": una puntata, da dove eri.
-        if (app.podcasts.hasAny) VoiceQuery.podcast(query)?.let { ask ->
-            app.podcastSource.forVoice(ask.name, ask.latest)?.let { return episode(it) }
-        }
-        val (words, _) = VoiceQuery.parse(query)
-        val results = tree.search(words)
-        // Una raccolta, un artista o un album detti per nome si suonano per intero (un podcast: una puntata).
-        VoiceQuery.pick(query, results)?.let { picked ->
-            MediaId.parse(picked.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return episode(it) }
-            return all(tree.playableIn(picked.mediaId).toItems())
-        }
-        val tracks = results.filter { it.playable }
-        if (tracks.isNotEmpty()) {
-            val items = tracks.mapNotNull { tree.resolve(it) }.toItems()
-            // La prima trovata è una puntata: riparte da dove eri.
-            return MediaItemsWithStartPosition(items, 0, items.firstOrNull()?.let { app.podcasts.resumeAt(it.mediaId) }?.takeIf { it > 0 } ?: C.TIME_UNSET)
-        }
-        val container = results.firstOrNull { it.kind == LibraryNode.Kind.PLAYLIST || it.kind == LibraryNode.Kind.ARTIST || it.kind == LibraryNode.Kind.ALBUM }
-        return all(container?.let { tree.playableIn(it.mediaId).toItems() }.orEmpty())
     }
 
     companion object {
@@ -1088,7 +869,5 @@ class PlaybackService : MediaLibraryService() {
         /** Nelle puntate: indietro di 15 s, avanti di 30 s. */
         const val CMD_BACK = "io.github.baldborne94.baldmusic.BACK_15"
         const val CMD_FORWARD = "io.github.baldborne94.baldmusic.FORWARD_30"
-        const val BACK_MS = 15_000L
-        const val FORWARD_MS = 30_000L
     }
 }
