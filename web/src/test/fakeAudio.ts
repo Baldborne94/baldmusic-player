@@ -37,7 +37,15 @@ export class FakeAudio extends EventTarget {
     this.loads++;
   }
 
+  /** Se c'è, il prossimo play() fallisce con questo errore (come il browser). */
+  failNextPlay: Error | null = null;
+
   play(): Promise<void> {
+    if (this.failNextPlay) {
+      const e = this.failNextPlay;
+      this.failNextPlay = null;
+      return Promise.reject(e);
+    }
     if (this.paused) {
       this.paused = false;
       this.fire("play");
