@@ -5,7 +5,7 @@ import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, LikedArt, PlaylistCards } from "../components/Ui";
 import { isRealAlbum } from "../lib/albums";
 import { plural } from "../lib/format";
-import { addNewToPlaylist, createCollection, createPlaylist, isCollection, isMine, likeAll, useLibrary, type CollectionsStatus } from "../lib/library";
+import { addNewToPlaylist, createCollection, createMissingCollections, createPlaylist, dismissMissingCollections, isCollection, isMine, likeAll, useLibrary, type CollectionsStatus } from "../lib/library";
 import { href, type Route } from "../lib/router";
 import { getClient } from "../lib/session";
 import { draggedSongs, isSongDrag } from "../lib/songDrag";
@@ -276,12 +276,13 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
       </div>
       {filter === "collections" && (
         <>
+          <MissingCollections />
           {collections.length === 0 ? <CollectionsHint status={lib.collections} /> : <PlaylistCards playlists={collections} />}
-          {lib.collections.missing.length > 0 && (
+          {(lib.collections.deleted ?? []).length > 0 && (
             <div className="pad">
-              <p className="muted">Cartelle senza raccolta (eliminata, o creata da un altro browser):</p>
+              <p className="muted">Raccolte che hai eliminato (non si ricreano da sole; tocca per ricrearla):</p>
               <div className="chips">
-                {lib.collections.missing.map((folder) => (
+                {lib.collections.deleted!.map((folder) => (
                   <button key={folder} className="chip" onClick={() => void createCollection(folder)}>
                     <Icon name="plus" size={16} /> {folder}
                   </button>
@@ -302,6 +303,52 @@ export function LibraryPage({ initial }: { initial: Filter | null }) {
       )}
       {filter === "albums" && (albums.loading ? <Loading /> : albums.error ? <ErrorState message={albums.error} /> : <AlbumCards albums={albums.data ?? []} />)}
       {filter === "artists" && (artists.loading ? <Loading /> : artists.error ? <ErrorState message={artists.error} /> : <ArtistCards artists={artists.data ?? []} />)}
+    </div>
+  );
+}
+
+/**
+ * Cartelle senza raccolta da decidere: in cima, non in fondo alla pagina dove non si vedono.
+ * Si creano tutte con un tocco, o si mettono tra le eliminate.
+ */
+export function MissingCollections({ compact = false }: { compact?: boolean }) {
+  const lib = useLibrary();
+  const [busy, setBusy] = useState(false);
+  const missing = lib.collections.missing;
+  if (missing.length === 0) return null;
+  const run = (f: () => Promise<void>) => async () => {
+    setBusy(true);
+    try {
+      await f();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="missing-collections" role="region" aria-label="Cartelle senza raccolta">
+      <h2>{missing.length === 1 ? "1 cartella senza raccolta" : `${missing.length} cartelle senza raccolta`}</h2>
+      <p className="muted">Sul PC ci sono queste cartelle, ma la loro raccolta non c'è: forse l'avevi eliminata. Decidi tu.</p>
+      {compact ? (
+        <p>
+          <a href={href({ name: "collections" })}>Vedi quali sono</a>
+        </p>
+      ) : (
+        <div className="chips">
+          {missing.map((folder) => (
+            <button key={folder} className="chip" disabled={busy} onClick={run(() => createCollection(folder))}>
+              <Icon name="plus" size={16} /> {folder}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="actions">
+        <button className="btn btn--primary" disabled={busy} onClick={run(createMissingCollections)}>
+          Crea tutte
+        </button>
+        <button className="btn" disabled={busy} onClick={run(dismissMissingCollections)}>
+          Non crearle
+        </button>
+      </div>
     </div>
   );
 }

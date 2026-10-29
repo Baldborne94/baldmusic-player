@@ -10,6 +10,7 @@ import { href } from "../lib/router";
 import { getClient } from "../lib/session";
 import type { Album, Artist } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
+import { MissingCollections } from "./Library";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -120,6 +121,7 @@ export function Home() {
         </div>
       )}
 
+      <MissingCollections compact />
       {collections.length > 0 && (
         <Shelf title="Le tue raccolte" more={href({ name: "collections" })}>
           <PlaylistCards playlists={collections.slice(0, 12)} scroll />

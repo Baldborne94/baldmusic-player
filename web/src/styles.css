@@ -1887,6 +1887,24 @@ input[type="range"]:hover::-moz-range-thumb,
   display: block;
 }
 
+/* Cartelle senza raccolta da decidere: in cima a Raccolte e in Home. */
+.missing-collections {
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 0 0 20px;
+  max-width: 720px;
+}
+
+.missing-collections h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.missing-collections .chips {
+  margin: 12px 0;
+}
+
 .keys {
   margin: 0;
   padding-left: 18px;

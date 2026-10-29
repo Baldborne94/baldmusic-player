@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CREDS, fakeFetch, memoryStorage } from "../test/env";
 import { FakeNavidrome, fileSong, folderSongs, MUSIC } from "../test/fakeNavidrome";
-import { collectionComment } from "./collections";
+import { collectionComment, deletedInStore, DELETED_STORE_NAME } from "./collections";
 import type { Song } from "./subsonic";
 import type { TrashRecord } from "./trash";
 
@@ -52,7 +52,7 @@ describe("syncCollections", () => {
       ["Movie Soundtracks", collectionComment("Movie Soundtracks"), ["c"]],
     ]);
     // Lo stato è per server e utente.
-    expect(JSON.parse(storage.getItem(STATE_KEY)!)).toEqual({ known: { "Disney Italia": ["a", "b"], "Movie Soundtracks": ["c"] } });
+    expect(JSON.parse(storage.getItem(STATE_KEY)!)).toEqual({ known: { "Disney Italia": ["a", "b"], "Movie Soundtracks": ["c"] }, v: 2, unsure: [] });
   });
 
   it("una cartella grande va a blocchi di 200 brani per richiesta, senza perderne", async () => {
@@ -93,7 +93,7 @@ describe("syncCollections", () => {
     expect(server.playlists[0].songIds).toEqual(["d-3", "d-1", "d-2"]);
   });
 
-  it("una raccolta eliminata non si ricrea: resta tra le cartelle da creare a mano", async () => {
+  it("una raccolta eliminata fuori dall'app non si ricrea e lo si scrive su Navidrome", async () => {
     const server = new FakeNavidrome({ songs: [...folderSongs("Disney Italia", 2, "d"), ...folderSongs("Rock", 2, "r")] });
     const storage = memoryStorage();
     await (await open(server, storage)).lib.syncCollections();
@@ -101,26 +101,78 @@ describe("syncCollections", () => {
 
     const { lib } = await open(server, storage);
     await lib.syncCollections();
-    expect(server.playlists.map((p) => p.name)).toEqual(["Disney Italia"]);
-    expect(server.callsOf("createPlaylist")).toHaveLength(2);
-    expect(stateOf(lib).collections).toEqual({ state: "ready", missing: ["Rock"] });
+    expect(server.playlistByName("Rock")).toBeUndefined();
+    expect(deletedInStore(server.playlistByName(DELETED_STORE_NAME)!)).toEqual(["Rock"]);
+    expect(stateOf(lib).collections).toEqual({ state: "ready", missing: [], deleted: ["Rock"] });
+    // L'elenco è una playlist solo per l'app: non si vede tra le tue.
+    expect(stateOf(lib).playlists.map((p) => p.name)).toEqual(["Disney Italia"]);
 
-    // Creata a mano dalla Libreria: con tutti i brani della cartella, e non manca più.
+    // Ricreata a mano dalla Libreria: con tutti i brani della cartella, ed esce dall'elenco.
     await lib.createCollection("Rock");
     expect(server.playlistByName("Rock")?.songIds).toEqual(["r-1", "r-2"]);
     expect(server.playlistByName("Rock")?.comment).toBe(collectionComment("Rock"));
-    expect(stateOf(lib).collections.missing).toEqual([]);
+    expect(deletedInStore(server.playlistByName(DELETED_STORE_NAME)!)).toEqual([]);
+    expect(stateOf(lib).collections.deleted).toEqual([]);
   });
 
-  it("un browser nuovo non ricrea le raccolte che mancano se altrove ce ne sono già", async () => {
-    const server = new FakeNavidrome({
-      songs: [...folderSongs("Disney Italia", 2, "d"), ...folderSongs("Rock", 2, "r")],
-      playlists: [collection("p1", "Disney Italia", ["d-1", "d-2"])],
-    });
+  it("un browser nuovo crea le raccolte che mancano, tranne quelle eliminate dall'app (anche da un altro browser)", async () => {
+    const server = new FakeNavidrome({ songs: [...folderSongs("Disney Italia", 2, "d"), ...folderSongs("Rock", 2, "r"), ...folderSongs("Pop", 1, "p")] });
+    const first = await open(server);
+    await first.lib.syncCollections();
+    await first.lib.deletePlaylist(server.playlistByName("Pop")!.id);
+    server.playlists = server.playlists.filter((p) => p.name !== "Rock");
+
+    // Un altro browser (o il tablet): niente stato suo.
     const { lib } = await open(server);
     await lib.syncCollections();
+    // Prima restavano tutte da creare a mano: ora Rock torna, Pop (eliminata dall'app) no.
+    expect(server.playlistByName("Rock")?.songIds).toEqual(["r-1", "r-2"]);
+    expect(server.playlistByName("Pop")).toBeUndefined();
+    expect(stateOf(lib).collections.deleted).toEqual(["Pop"]);
+  });
+
+  it("stato di prima di questa versione: le cartelle senza raccolta le decidi tu (Crea tutte / Non crearle)", async () => {
+    const server = new FakeNavidrome({
+      songs: [...folderSongs("Disney Italia", 2, "d"), ...folderSongs("Rock", 2, "r"), ...folderSongs("Pop", 1, "p")],
+      playlists: [collection("p1", "Disney Italia", ["d-1", "d-2"])],
+    });
+    const storage = memoryStorage({ [STATE_KEY]: JSON.stringify({ known: { "Disney Italia": ["d-1", "d-2"], Rock: ["r-1", "r-2"], Pop: ["p-1"] } }) });
+    let { lib } = await open(server, storage);
+    await lib.syncCollections();
+    expect(stateOf(lib).collections.missing).toEqual(["Pop", "Rock"]);
     expect(server.callsOf("createPlaylist")).toHaveLength(0);
-    expect(stateOf(lib).collections.missing).toEqual(["Rock"]);
+    // Riaprendo restano da decidere: non si creano da sole.
+    ({ lib } = await open(server, storage));
+    await lib.syncCollections();
+    expect(stateOf(lib).collections.missing).toEqual(["Pop", "Rock"]);
+
+    await lib.createCollection("Rock");
+    await lib.dismissMissingCollections();
+    expect(server.playlistByName("Rock")?.songIds).toEqual(["r-1", "r-2"]);
+    expect(deletedInStore(server.playlistByName(DELETED_STORE_NAME)!)).toEqual(["Pop"]);
+    ({ lib } = await open(server, storage));
+    await lib.syncCollections();
+    expect(stateOf(lib).collections).toMatchObject({ missing: [], deleted: ["Pop"] });
+    expect(server.playlistByName("Pop")).toBeUndefined();
+  });
+
+  it("cartella rinominata sul PC: la raccolta la segue col nome nuovo, niente doppione", async () => {
+    // «LINKIN PARK» rinominata in «Linkin Park»: Navidrome tiene gli ID dei file.
+    const server = new FakeNavidrome({
+      songs: [...folderSongs("Linkin Park", 3, "l"), rock()],
+      playlists: [collection("p1", "LINKIN PARK", ["l-1", "l-2", "l-3"]), collection("p2", "Rock", ["r-1"])],
+    });
+    const storage = memoryStorage({ [STATE_KEY]: JSON.stringify({ known: { "LINKIN PARK": ["l-1", "l-2", "l-3"], Rock: ["r-1"] }, v: 2 }) });
+    const { lib } = await open(server, storage);
+    await lib.syncCollections();
+    expect(server.callsOf("createPlaylist")).toHaveLength(0);
+    expect(server.playlist("p1")).toMatchObject({ name: "Linkin Park", comment: collectionComment("Linkin Park"), songIds: ["l-1", "l-2", "l-3"] });
+    expect(JSON.parse(storage.getItem(STATE_KEY)!).known).toEqual({ "Linkin Park": ["l-1", "l-2", "l-3"], Rock: ["r-1"] });
+    // Un nome scelto da te resta.
+    server.playlist("p1")!.name = "I miei Linkin";
+    server.songs = server.songs.map((s) => ({ ...s, path: s.path!.replace("Linkin Park", "Linkin Park (2024)") }));
+    await (await open(server, storage)).lib.syncCollections();
+    expect(server.playlist("p1")).toMatchObject({ name: "I miei Linkin", comment: collectionComment("Linkin Park (2024)") });
   });
 
   it("lo stato è per server e utente: un altro utente sullo stesso browser parte da capo", async () => {

@@ -43,7 +43,8 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
             .map { albumNode(it).copy(group = ArtistNames.letter(it.name)) }
         ARTISTS -> client.artists().sortedBy { ArtistNames.sortKey(it.orderName) }
             .map { artistNode(it).copy(group = ArtistNames.letter(it.orderName)) }
-        PLAYLISTS -> client.playlists().map(::playlistNode)
+        // L'elenco delle raccolte eliminate dell'app web non è una playlist da ascoltare.
+        PLAYLISTS -> client.playlists().filterNot { it.isAppData }.map(::playlistNode)
         STARRED -> client.starred().song.map { songNode(it, id) }
         RANDOM -> {
             val songs = if (id.id == null) client.randomSongs(100).also { lastRandom = it } else lastRandom

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { replaceCopies, type DuplicateGroup } from "./cleanup";
-import { collectionComment, collectionFolders, folderOf, isRealPath, planSync, type CollectionsState } from "./collections";
+import { collectionComment, collectionFolders, deletedInStore, deletedStoreComment, DELETED_STORE_NAME, folderOf, isRealPath, planFollow, planSync, type CollectionsState } from "./collections";
 import { getClient } from "./session";
 import type { Playlist, Song, SubsonicClient } from "./subsonic";
 import { addRecords, putBack, reconcile, type TrashRecord } from "./trash";
@@ -11,11 +11,12 @@ import { addRecords, putBack, reconcile, type TrashRecord } from "./trash";
 /**
  * Raccolte dalle cartelle: "syncing" mentre si allinea, "noRealPath" se Navidrome non manda
  * i percorsi veri dei file (serve "Mostra percorso reale" nel lettore), [missing] le cartelle
- * senza raccolta che si possono creare a mano.
+ * senza raccolta da decidere tu, [deleted] quelle delle raccolte eliminate (si ricreano a mano).
  */
 export interface CollectionsStatus {
   state: "idle" | "syncing" | "ready" | "noRealPath" | "error";
   missing: string[];
+  deleted?: string[];
   error?: string;
 }
 
@@ -57,7 +58,8 @@ export async function refreshLibrary(): Promise<void> {
   set({
     liked: starred ? new Set(starred.song.map((s) => s.id)) : state.liked,
     likedSongs: starred ? starred.song : state.likedSongs,
-    playlists: playlists ?? state.playlists,
+    // L'elenco delle raccolte eliminate è una playlist solo per l'app: non si mostra.
+    playlists: playlists ? playlists.filter((p) => deletedInStore(p) === null) : state.playlists,
     loaded: true,
   });
 }
@@ -149,7 +151,12 @@ export async function renamePlaylist(id: string, name: string): Promise<void> {
 }
 
 export async function deletePlaylist(id: string): Promise<void> {
-  await getClient()?.deletePlaylist(id);
+  const c = getClient();
+  if (!c) return;
+  const folder = folderOf(state.playlists.find((p) => p.id === id) ?? {});
+  await c.deletePlaylist(id);
+  // Una raccolta eliminata non si ricrea, nemmeno da un altro browser: si scrive su Navidrome.
+  if (folder !== null) await rememberDeleted(c, [folder], []).catch(() => {});
   await refreshLibrary();
 }
 
@@ -178,30 +185,84 @@ async function doSync(): Promise<void> {
   set({ collections: { ...state.collections, state: "syncing" } });
   lastPaths = null;
   try {
-    const [songs, playlists] = await Promise.all([c.allSongs(), c.playlists()]);
+    const [songs, all] = await Promise.all([c.allSongs(), c.playlists()]);
     lastFolders = collectionFolders(songs);
-    const folderOf = new Map<string, string>();
-    for (const [folder, ids] of lastFolders) for (const id of ids) folderOf.set(id, folder);
-    lastIndex = { songs, folderOf };
+    const inFolder = new Map<string, string>();
+    for (const [folder, ids] of lastFolders) for (const id of ids) inFolder.set(id, folder);
+    lastIndex = { songs, folderOf: inFolder };
     lastPaths = new Set(songs.flatMap((s) => (s.path ? [s.path] : [])));
+    const deleted = new Set(all.flatMap((p) => deletedInStore(p) ?? []));
+    let playlists = all.filter((p) => deletedInStore(p) === null);
     await restoreIntoCollections(c, songs, playlists);
     if (lastFolders.size === 0) {
       const fake = songs.length > 0 && !songs.some((s) => s.path && isRealPath(s.path));
       set({ collections: { state: fake ? "noRealPath" : "ready", missing: [] } });
       return;
     }
-    const plan = planSync(lastFolders, playlists, loadState(c));
+    const saved = loadState(c);
+    playlists = await followMovedFolders(c, songs, playlists, deleted, saved);
+    const plan = planSync(lastFolders, playlists, saved, deleted);
     for (const k of plan.create) await createFromFolder(c, k.folder, k.songIds);
     for (const a of plan.add) {
       const have = new Set((await c.playlist(a.playlistId)).entry?.map((s) => s.id));
       await addInChunks(c, a.playlistId, a.songIds.filter((id) => !have.has(id)));
     }
+    if (plan.newlyDeleted.length) await rememberDeleted(c, plan.newlyDeleted, []);
     saveState(c, plan.state);
-    set({ collections: { state: "ready", missing: plan.missing } });
+    set({ collections: { state: "ready", missing: plan.missing, deleted: plan.deleted } });
   } catch (e) {
-    set({ collections: { state: "error", missing: state.collections.missing, error: e instanceof Error ? e.message : String(e) } });
+    set({ collections: { ...state.collections, state: "error", error: e instanceof Error ? e.message : String(e) } });
   }
   await refreshLibrary();
+}
+
+/**
+ * Cartelle rinominate sul PC ([planFollow]): la raccolta vecchia passa alla cartella nuova (stesso
+ * ID, nome nuovo se non l'avevi cambiato), invece di restare accanto a una raccolta doppia.
+ */
+async function followMovedFolders(c: SubsonicClient, songs: Song[], playlists: Playlist[], deleted: Set<string>, saved: CollectionsState | null): Promise<Playlist[]> {
+  const orphans = playlists.filter((p) => isMine(p) && folderOf(p) !== null && !lastFolders.has(folderOf(p)!));
+  if (orphans.length === 0) return playlists;
+  const taken = new Set(playlists.flatMap((p) => folderOf(p) ?? []));
+  const byId = new Map(songs.map((s) => [s.id, s]));
+  const folders = new Map([...lastFolders].map(([f, ids]) => [f, ids.map((id) => byId.get(id)!)]));
+  const withSongs = await Promise.all(
+    orphans.map(async (p) => ({ id: p.id, name: p.name, folder: folderOf(p)!, songs: (await c.playlist(p.id)).entry ?? [] })),
+  );
+  const follows = planFollow(folders, withSongs, taken, deleted);
+  if (follows.length === 0) return playlists;
+  const known = saved?.known ?? {};
+  for (const f of follows) {
+    const old = withSongs.find((o) => o.id === f.playlistId)!;
+    await c.updatePlaylist(f.playlistId, { comment: collectionComment(f.folder), ...(f.rename ? { name: f.rename } : {}) });
+    if (f.newIds.size) await c.replacePlaylistSongs(f.playlistId, f.songIds);
+    // I brani della cartella li ha già: da qui in poi entrano solo quelli nuovi.
+    known[f.folder] = lastFolders.get(f.folder)!;
+    delete known[old.folder];
+  }
+  if (saved) saveState(c, { ...saved, known });
+  else saveState(c, { known, v: 2 });
+  // ID nuovi dei file: preferiti e altre playlist passano ai nuovi, come per i doppioni.
+  const moved = new Map(follows.flatMap((f) => [...f.newIds]));
+  if (moved.size) {
+    // Preferiti e playlist di adesso, non quelli di prima dell'allineamento.
+    await refreshLibrary();
+    await moveSongs(c, moved, new Set(follows.map((f) => f.playlistId)));
+  }
+  return c.playlists().then((ps) => ps.filter((p) => deletedInStore(p) === null));
+}
+
+/** Aggiunge e toglie cartelle dall'elenco delle raccolte eliminate su Navidrome. */
+async function rememberDeleted(c: SubsonicClient, add: string[], remove: string[]): Promise<void> {
+  const store = (await c.playlists()).find((p) => isMine(p) && deletedInStore(p) !== null);
+  const before = new Set(store ? deletedInStore(store) : []);
+  const after = new Set([...before, ...add].filter((f) => !remove.includes(f)));
+  if (after.size === before.size && [...after].every((f) => before.has(f))) return;
+  if (store) await c.updatePlaylist(store.id, { comment: deletedStoreComment(after) });
+  else if (after.size) {
+    const pl = await c.createPlaylist(DELETED_STORE_NAME);
+    await c.updatePlaylist(pl.id, { comment: deletedStoreComment(after) });
+  }
 }
 
 /** Tutti i brani del server e la cartella-raccolta di ognuno, dall'ultimo allineamento (null prima). */
@@ -209,14 +270,35 @@ export function libraryIndex(): { songs: Song[]; folderOf: Map<string, string> }
   return lastIndex;
 }
 
-/** Crea a mano la raccolta di una cartella (eliminata prima, o vista da un altro browser). */
+/** Crea a mano la raccolta di una cartella (eliminata prima, o da decidere). */
 export async function createCollection(folder: string): Promise<void> {
   const c = getClient();
   const ids = lastFolders.get(folder);
   if (!c || !ids) return;
   await createFromFolder(c, folder, ids);
-  set({ collections: { ...state.collections, missing: state.collections.missing.filter((f) => f !== folder) } });
+  await rememberDeleted(c, [], [folder]).catch(() => {});
+  const saved = loadState(c) ?? { known: {}, v: 2 as const };
+  saveState(c, { ...saved, known: { ...saved.known, [folder]: ids }, unsure: (saved.unsure ?? []).filter((f) => f !== folder) });
+  const cs = state.collections;
+  set({ collections: { ...cs, missing: cs.missing.filter((f) => f !== folder), deleted: (cs.deleted ?? []).filter((f) => f !== folder) } });
   await refreshLibrary();
+}
+
+/** «Crea tutte»: le cartelle da decidere diventano raccolte. */
+export async function createMissingCollections(): Promise<void> {
+  for (const folder of state.collections.missing) await createCollection(folder);
+}
+
+/** «Non crearle»: le cartelle da decidere vanno tra le eliminate (si possono ricreare a mano). */
+export async function dismissMissingCollections(): Promise<void> {
+  const c = getClient();
+  const missing = state.collections.missing;
+  if (!c || missing.length === 0) return;
+  await rememberDeleted(c, missing, []);
+  const saved = loadState(c);
+  if (saved) saveState(c, { ...saved, unsure: [] });
+  const cs = state.collections;
+  set({ collections: { ...cs, missing: [], deleted: [...(cs.deleted ?? []), ...missing] } });
 }
 
 // Gli ID vanno nell'indirizzo della richiesta: a blocchi, per non farlo troppo lungo.
@@ -261,7 +343,13 @@ export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
   if (!c) return;
   const keptFor = new Map(groups.flatMap((g) => g.others.map((o) => [o.id, g.keep.id] as const)));
   if (keptFor.size === 0) return;
-  const mine = state.playlists.filter(isMine);
+  await moveSongs(c, keptFor);
+  await refreshLibrary();
+}
+
+/** Le tue playlist e i preferiti passano da un brano all'altro ([keptFor]: vecchio → nuovo), tranne [skip]. */
+async function moveSongs(c: SubsonicClient, keptFor: Map<string, string>, skip: Set<string> = new Set()): Promise<void> {
+  const mine = state.playlists.filter((p) => isMine(p) && !skip.has(p.id));
   for (const p of mine) {
     const ids = ((await c.playlist(p.id)).entry ?? []).map((s) => s.id);
     if (ids.some((id) => keptFor.has(id))) await c.replacePlaylistSongs(p.id, replaceCopies(ids, keptFor));
@@ -273,7 +361,6 @@ export async function mergeDuplicates(groups: DuplicateGroup[]): Promise<void> {
     await c.setStar(kept, true);
     liked.add(kept);
   }
-  await refreshLibrary();
 }
 
 // File mandati nel Cestino di Windows da questo browser, per server e utente.

@@ -288,6 +288,9 @@ dell'unità principale sul telefono.
 | W-17 | Arriva all'ultimo brano di un album con «Continua ad ascoltare» attivo | In coda compaiono brani simili (stessa raccolta, stesso genere), mai quelli sentiti o saltati; spento nelle Impostazioni ci si ferma |
 | W-18 | Metti in pausa a metà brano e ricarica la pagina | Stessa coda e stesso brano; play riparte da quel punto |
 | W-19 | Salta un brano a metà, poi guarda «Più ascoltati» su Navidrome | Il brano saltato non conta un ascolto in più; uno sentito fino ai tre quarti sì |
+| W-20 | Elimina una raccolta dal sito, poi apri il sito su un altro browser (o in una finestra anonima) | Le cartelle senza raccolta diventano raccolte da sole, quella eliminata no (è in fondo a Raccolte, «Raccolte che hai eliminato»); la playlist «BaldMusic · raccolte eliminate» non si vede né nel sito né sul telefono |
+| W-21 | Rinomina una cartella in `E:\BalbMusic` (es. `LINKIN PARK` → `Linkin Park`), Quick Scan, ricarica il sito | Una sola raccolta, col nome nuovo e gli stessi brani; un nome scelto da te resta |
+| W-22 | Primo avvio dopo l'aggiornamento con cartelle senza raccolta | In cima a Raccolte (e in Home) «N cartelle senza raccolta»: «Crea tutte» le crea, «Non crearle» le mette tra le eliminate |
 
 ## Server
 

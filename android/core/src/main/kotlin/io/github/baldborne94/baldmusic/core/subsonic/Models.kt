@@ -79,8 +79,17 @@ data class Playlist(
     val name: String = "",
     val songCount: Int? = null,
     val coverArt: String? = null,
+    val comment: String? = null,
     val entry: List<Song> = emptyList(),
-)
+) {
+    /** La playlist vuota in cui l'app web tiene l'elenco delle raccolte eliminate: non è da ascoltare. */
+    val isAppData: Boolean get() = comment?.startsWith(DELETED_COLLECTIONS_MARK) == true
+
+    companion object {
+        /** Lo stesso segno di `web/src/lib/collections.ts`. */
+        const val DELETED_COLLECTIONS_MARK = "BaldMusic: raccolte eliminate "
+    }
+}
 
 @Serializable
 data class SearchResult(
