@@ -72,7 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
-import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
+import io.github.baldborne94.baldmusic.core.podcast.EpisodeActions
 import io.github.baldborne94.baldmusic.data.Podcasts
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -472,18 +472,25 @@ fun personalPlaylistId(mediaId: String): String? =
     MediaId.parse(mediaId)?.takeIf { it.source == PersonalSource.KEY && it.kind == PersonalSource.PLAYLIST }?.id
 
 /** Condivide titolo e artista con le altre app (messaggi, social…). */
-/** Le voci del ⋮ di una puntata: scaricarla (o toglierla) e segnarla come ascoltata o da ascoltare. */
+/** Le voci del ⋮ di una puntata ([EpisodeActions]), con la loro icona e cosa fanno. */
 private fun podcastActions(podcasts: Podcasts, item: MediaItem, onInfo: () -> Unit): List<Triple<ImageVector, String, () -> Unit>> {
     val id = item.mediaId
-    if (PodcastSource.episodeKey(id) == null) return emptyList()
-    return buildList {
-        when {
-            !podcasts.isDownloaded(id) && !podcasts.isFinished(id) -> add(Triple(Icons.Rounded.Download, "Scarica sul telefono", { podcasts.download(id) }))
-            podcasts.isManualDownload(id) -> add(Triple(Icons.Rounded.Delete, "Togli dal telefono", { podcasts.removeDownload(id) }))
+    return EpisodeActions.of(id, podcasts.isDownloaded(id), podcasts.isManualDownload(id), podcasts.isFinished(id)).map { action ->
+        val icon = when (action) {
+            EpisodeActions.Action.DOWNLOAD -> Icons.Rounded.Download
+            EpisodeActions.Action.REMOVE_DOWNLOAD -> Icons.Rounded.Delete
+            EpisodeActions.Action.MARK_FINISHED -> Icons.Rounded.CheckCircle
+            EpisodeActions.Action.MARK_UNFINISHED -> Icons.Rounded.RadioButtonUnchecked
+            EpisodeActions.Action.INFO -> Icons.Rounded.Info
         }
-        if (podcasts.isFinished(id)) add(Triple(Icons.Rounded.RadioButtonUnchecked, "Segna come da ascoltare", { podcasts.mark(id, false) }))
-        else add(Triple(Icons.Rounded.CheckCircle, "Segna come ascoltata", { podcasts.mark(id, true) }))
-        add(Triple(Icons.Rounded.Info, "Informazioni sulla puntata", onInfo))
+        val run: () -> Unit = when (action) {
+            EpisodeActions.Action.DOWNLOAD -> fun() { podcasts.download(id) }
+            EpisodeActions.Action.REMOVE_DOWNLOAD -> fun() { podcasts.removeDownload(id) }
+            EpisodeActions.Action.MARK_FINISHED -> fun() { podcasts.mark(id, true) }
+            EpisodeActions.Action.MARK_UNFINISHED -> fun() { podcasts.mark(id, false) }
+            EpisodeActions.Action.INFO -> onInfo
+        }
+        Triple(icon, action.label, run)
     }
 }
 
