@@ -31,6 +31,24 @@ test.describe("Libreria e raccolte", () => {
     expect(server.callsOf("createPlaylist")).toHaveLength(2);
   });
 
+  test("cartelle senza raccolta da decidere: in cima a Raccolte e in Home, «Crea tutte» le crea", async ({ page, navidrome, login }) => {
+    const disney = folderSongs("Disney Italia", 2, "d");
+    const rock = folderSongs("Rock", 2, "r");
+    const pop = folderSongs("Pop", 1, "p");
+    const server = await navidrome({ songs: [...disney, ...rock, ...pop], playlists: [collection("p1", "Disney Italia", disney)] });
+    // Stato salvato da una versione di prima: per Rock e Pop non si sa se erano state eliminate.
+    const old = JSON.stringify({ known: { "Disney Italia": ["d-1", "d-2"], Rock: ["r-1", "r-2"], Pop: ["p-1"] } });
+    await login("#/", { "baldmusic.raccolte.http://nd.test|b": old });
+    await expect(page.locator(".main .missing-collections")).toContainText("2 cartelle senza raccolta");
+    await page.locator(".main .missing-collections").getByRole("link", { name: "Vedi quali sono" }).click();
+    const box = page.locator(".main .missing-collections");
+    await expect(box.locator(".chip")).toHaveText(["Pop", "Rock"]);
+    await box.getByRole("button", { name: "Crea tutte" }).click();
+    await expect(box).toHaveCount(0);
+    await expect(page.locator(".main .card", { hasText: "Rock" })).toContainText("Raccolta · 2 brani");
+    expect(server.playlistByName("Pop")?.songIds).toEqual(["p-1"]);
+  });
+
   test("senza percorso reale spiega come attivare «Report Real Path»", async ({ page, navidrome, login }) => {
     await navidrome({ songs: [{ id: "a", title: "Numb", artist: "Linkin Park", path: "Linkin Park/Meteora/01 - Numb.mp3", duration: 185 }] });
     await login("#/library");

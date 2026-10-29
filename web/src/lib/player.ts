@@ -318,7 +318,12 @@ function load(autoplay: boolean): void {
   if (autoplay) {
     set({ buffering: true });
     // el(), non a: dopo lo scambio suona l'<audio> preparato in anticipo.
-    el().play().catch((e: unknown) => {
+    const a = el();
+    a.play().catch((e: unknown) => {
+      // AbortError: un altro brano (o una pausa) ha preso il suo posto mentre partiva: niente errore.
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      // Il brano di adesso è già un altro: l'errore non è suo.
+      if (a !== audio || state.queue.entries[state.queue.index]?.uid !== entry.uid) return;
       // NotAllowedError: il browser vuole un gesto dell'utente prima di suonare.
       set({ playing: false, buffering: false, error: e instanceof DOMException && e.name === "NotAllowedError" ? null : "Riproduzione non riuscita" });
     });

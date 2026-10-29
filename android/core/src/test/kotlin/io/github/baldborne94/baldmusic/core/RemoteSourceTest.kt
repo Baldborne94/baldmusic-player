@@ -281,7 +281,8 @@ class RemoteSourceTest {
         nd["getPlaylists"] = """"playlists":{"playlist":[
             {"id":"p1","name":"Viaggio","songCount":1,"coverArt":"pl-p1"},
             {"id":"p2","name":"Palestra","songCount":12},
-            {"id":"p3","name":"Vuota"}
+            {"id":"p3","name":"Vuota"},
+            {"id":"p4","name":"BaldMusic · raccolte eliminate","songCount":0,"comment":"BaldMusic: raccolte eliminate [\"Rock\"]"}
         ]}"""
         nd["getPlaylist?id=p2"] = """"playlist":{"id":"p2","name":"Palestra","entry":[${song("t1", "Uno")},${song("t2", "Due", "al2")}]}"""
         val lists = source.children(id(RemoteSource.PLAYLISTS))

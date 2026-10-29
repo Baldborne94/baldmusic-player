@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectionComment, collectionFolders, folderOf, isRealPath, planSync } from "./collections";
+import { collectionComment, collectionFolders, deletedInStore, deletedStoreComment, folderOf, isRealPath, planFollow, planSync } from "./collections";
 
 describe("collectionFolders", () => {
   it("una raccolta per ogni prima cartella, brani in ordine di percorso", () => {
@@ -56,23 +56,83 @@ describe("planSync", () => {
     expect(plan.create).toEqual([]);
   });
 
-  it("una raccolta eliminata non si ricrea", () => {
-    const plan = planSync(folders, [disney], { known: { "Disney Italia": ["a", "b"], "Sum 41": ["c"] } });
+  it("una raccolta sparita da quando questo browser l'ha vista è eliminata: non si ricrea e va nell'elenco", () => {
+    const plan = planSync(folders, [disney], { known: { "Disney Italia": ["a", "b"], "Sum 41": ["c"] }, v: 2 });
     expect(plan.create).toEqual([]);
-    expect(plan.missing).toEqual(["Sum 41"]);
+    expect(plan.deleted).toEqual(["Sum 41"]);
+    expect(plan.newlyDeleted).toEqual(["Sum 41"]);
+    expect(plan.state.known).toEqual({ "Disney Italia": ["a", "b"] });
   });
 
   it("una cartella nuova diventa una raccolta", () => {
-    const plan = planSync(folders, [disney], { known: { "Disney Italia": ["a", "b"] } });
+    const plan = planSync(folders, [disney], { known: { "Disney Italia": ["a", "b"] }, v: 2 });
     expect(plan.create).toEqual([{ folder: "Sum 41", songIds: ["c"] }]);
   });
 
-  it("su un browser nuovo non ricrea quelle che mancano e non aggiunge niente", () => {
-    const plan = planSync(folders, [disney], null);
+  it("su un browser nuovo crea quelle che mancano, tranne le eliminate, e non aggiunge niente", () => {
+    expect(planSync(folders, [disney], null).create).toEqual([{ folder: "Sum 41", songIds: ["c"] }]);
+    const plan = planSync(folders, [disney], null, new Set(["Sum 41"]));
     expect(plan.create).toEqual([]);
     expect(plan.add).toEqual([]);
+    expect(plan.deleted).toEqual(["Sum 41"]);
+    expect(plan.newlyDeleted).toEqual([]);
+    expect(plan.state.known).toEqual({ "Disney Italia": ["a", "b"] });
+  });
+
+  it("con lo stato di prima (senza versione) le cartelle senza raccolta restano da decidere", () => {
+    const plan = planSync(folders, [disney], { known: { "Disney Italia": ["a", "b"], "Sum 41": ["c"] } });
     expect(plan.missing).toEqual(["Sum 41"]);
-    expect(plan.state.known).toEqual({ "Disney Italia": ["a", "b"], "Sum 41": ["c"] });
+    expect(plan.create).toEqual([]);
+    expect(planSync(folders, [disney], plan.state).missing).toEqual(["Sum 41"]);
+  });
+
+  it("l'elenco delle eliminate sta nel commento di una playlist sua", () => {
+    const store = { comment: deletedStoreComment(["Rock", "AC/DC «live»", "Rock"]) };
+    expect(deletedInStore(store)).toEqual(["AC/DC «live»", "Rock"]);
+    expect(deletedInStore(disney)).toBeNull();
+    expect(deletedInStore({ comment: "BaldMusic: raccolte eliminate {rotto" })).toEqual([]);
+  });
+});
+
+describe("planFollow", () => {
+  const t = (id: string, title: string, duration = 200) => ({ id, title, duration });
+
+  it("la raccolta di una cartella sparita segue quella nuova con almeno metà dei suoi brani", () => {
+    const folders = new Map([
+      ["Linkin Park", [t("1", "Numb"), t("2", "In the End"), t("3", "Faint")]],
+      ["Rock", [t("9", "Altro")]],
+    ]);
+    const orphan = { id: "p1", name: "LINKIN PARK", folder: "LINKIN PARK", songs: [t("1", "Numb"), t("2", "In the End")] };
+    const [f] = planFollow(folders, [orphan], new Set(["Rock"]), new Set());
+    expect(f).toMatchObject({ playlistId: "p1", folder: "Linkin Park", rename: "Linkin Park", songIds: ["1", "2"] });
+    expect(f.newIds.size).toBe(0);
+    // Nome cambiato da te: resta.
+    expect(planFollow(folders, [{ ...orphan, name: "Mia" }], new Set(["Rock"]), new Set())[0].rename).toBeNull();
+  });
+
+  it("ID nuovi dei file: si ritrovano per titolo e durata entro 2 s", () => {
+    const folders = new Map([["Nuova", [t("n1", "Numb", 186), t("n2", "In The End!", 217)]]]);
+    const orphan = { id: "p1", name: "Vecchia", folder: "Vecchia", songs: [t("o1", "Numb", 187), t("o2", "In the End", 216), t("x", "Messo a mano")] };
+    const [f] = planFollow(folders, [orphan], new Set(), new Set());
+    expect(f.songIds).toEqual(["n1", "n2", "x"]);
+    expect([...f.newIds]).toEqual([["o1", "n1"], ["o2", "n2"]]);
+  });
+
+  it("meno di metà dei brani, cartella già raccolta o eliminata: non segue", () => {
+    const folders = new Map([["Nuova", [t("1", "A"), t("5", "E")]]]);
+    const orphan = { id: "p1", name: "V", folder: "V", songs: [t("1", "A"), t("2", "B"), t("3", "C")] };
+    expect(planFollow(folders, [orphan], new Set(), new Set())).toEqual([]);
+    const half = { ...orphan, songs: orphan.songs.slice(0, 2) };
+    expect(planFollow(folders, [half], new Set(["Nuova"]), new Set())).toEqual([]);
+    expect(planFollow(folders, [half], new Set(), new Set(["Nuova"]))).toEqual([]);
+    expect(planFollow(folders, [half], new Set(), new Set())).toHaveLength(1);
+  });
+
+  it("due raccolte e una cartella: la prende la più somigliante", () => {
+    const folders = new Map([["Nuova", [t("1", "A"), t("2", "B")]]]);
+    const a = { id: "a", name: "X", folder: "X", songs: [t("1", "A")] };
+    const b = { id: "b", name: "Y", folder: "Y", songs: [t("1", "A"), t("2", "B")] };
+    expect(planFollow(folders, [a, b], new Set(), new Set()).map((f) => f.playlistId)).toEqual(["b"]);
   });
 });
 
@@ -121,10 +181,10 @@ describe("casi limite delle cartelle", () => {
     expect(plan.create).toEqual([]);
   });
 
-  it("una cartella sparita resta ricordata, se torna non si ricrea da sola", () => {
-    const plan = planSync(new Map(), [], { known: { Vecchia: ["a"] } });
+  it("una cartella sparita resta ricordata, se torna senza la sua raccolta non si ricrea da sola", () => {
+    const plan = planSync(new Map(), [], { known: { Vecchia: ["a"] }, v: 2 });
     expect(plan.state.known).toEqual({ Vecchia: ["a"] });
-    expect(planSync(new Map([["Vecchia", ["a"]]]), [], plan.state).missing).toEqual(["Vecchia"]);
+    expect(planSync(new Map([["Vecchia", ["a"]]]), [], plan.state).deleted).toEqual(["Vecchia"]);
   });
 
   it("nomi di cartella con caratteri strani passano dal commento", () => {

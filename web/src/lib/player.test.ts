@@ -143,6 +143,21 @@ describe("player: coda", () => {
     expect(p.getPlayerState()).toMatchObject({ sleepAt: null, playing: false });
   });
 
+  it("un brano interrotto da un altro mentre partiva non dà errore; un file che il browser non legge sì", async () => {
+    const p = await open();
+    p.player.play(list("a", "b"));
+    const a = FakeAudio.all[0];
+    // Il browser annulla il play() di prima quando arriva un brano nuovo (doppio tocco, salto veloce).
+    a.failNextPlay = new DOMException("The play() request was interrupted by a new load request.", "AbortError");
+    p.player.jumpTo(1);
+    await flush();
+    expect(p.getPlayerState().error).toBeNull();
+    a.failNextPlay = new DOMException("The element has no supported sources.", "NotSupportedError");
+    p.player.jumpTo(0);
+    await flush();
+    expect(p.getPlayerState().error).toBe("Riproduzione non riuscita");
+  });
+
   it("un errore di caricamento si dice; quello di un <audio> svuotato no", async () => {
     const p = await open();
     p.player.play(list("a"));
