@@ -55,6 +55,7 @@ import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.library.LocalSource
+import io.github.baldborne94.baldmusic.playback.group
 import io.github.baldborne94.baldmusic.playback.kind
 import java.util.Calendar
 
@@ -196,15 +197,25 @@ fun HomeScreen(vm: PlayerViewModel) {
 
         if (!upNext.isNullOrEmpty()) {
             item { SectionHeader("Da ascoltare", if (upNext.size > 5) "Mostra tutto" else null) { ui.open(upNextId, "Da ascoltare") } }
-            items(upNext.take(5), key = { "upnext-" + it.mediaId }) { item ->
-                TrackRow(
-                    item,
-                    active = sameTrack(item.mediaId, vm.current?.mediaId),
-                    liked = lib.isLiked(item.mediaId),
-                    onClick = { vm.play(item, from = "Da ascoltare") },
-                    onMenu = { ui.trackMenu(item, null) },
-                    onSwipeQueue = { vm.enqueue(item) },
-                )
+            val shown = upNext.take(5)
+            shown.forEachIndexed { i, item ->
+                // «Da finire», «Prossime», «Dall'archivio»: senza le intestazioni l'ordine sembrerebbe a caso.
+                val group = item.group
+                if (group != null && (i == 0 || shown[i - 1].group != group)) {
+                    item(key = "upnext-gruppo-$group") {
+                        Text(group, color = TextMuted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp))
+                    }
+                }
+                item(key = "upnext-" + item.mediaId) {
+                    TrackRow(
+                        item,
+                        active = sameTrack(item.mediaId, vm.current?.mediaId),
+                        liked = lib.isLiked(item.mediaId),
+                        onClick = { vm.play(item, from = "Da ascoltare") },
+                        onMenu = { ui.trackMenu(item, null) },
+                        onSwipeQueue = { vm.enqueue(item) },
+                    )
+                }
             }
         }
 

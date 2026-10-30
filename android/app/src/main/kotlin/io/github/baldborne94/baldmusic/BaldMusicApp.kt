@@ -2,6 +2,7 @@ package io.github.baldborne94.baldmusic
 
 import android.app.Application
 import android.content.Context
+import io.github.baldborne94.baldmusic.core.library.FolderCollection
 import io.github.baldborne94.baldmusic.core.library.LibraryTree
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.MediaId
@@ -69,6 +70,9 @@ class BaldMusicApp : Application() {
      */
     val sleepTimer = MutableStateFlow<Long?>(null)
 
+    /** Le cartelle del telefono all'ultima lettura: per ricreare le raccolte eliminate. */
+    val phoneFolders = MutableStateFlow<List<FolderCollection>>(emptyList())
+
     private var remote: RemoteSource? = null
     private var remoteCreds: Credentials? = null
 
@@ -82,7 +86,11 @@ class BaldMusicApp : Application() {
             this,
             onTagsRead = { settings.touch() },
             // Le cartelle diventano raccolte, e restano allineate ai file.
-            onSongs = { songs -> userData.syncFolders(LocalCatalog.folderCollections(songs), songs.mapTo(HashSet()) { LocalCatalog.ref(it).id }) },
+            onSongs = { songs ->
+                val folders = LocalCatalog.folderCollections(songs)
+                phoneFolders.value = folders
+                userData.syncFolders(folders, songs.mapTo(HashSet()) { LocalCatalog.ref(it).id })
+            },
             plays = { userData.value.plays.mapValues { it.value.count } },
             http = http,
             acoustIdKey = { settings.acoustIdKey },

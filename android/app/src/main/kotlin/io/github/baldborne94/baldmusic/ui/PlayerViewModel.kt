@@ -75,6 +75,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
 
     val library: StateFlow<UserLibrary> = app.userData.state
+    /** Le cartelle del telefono, per «Raccolte che hai eliminato». */
+    val phoneFolders: StateFlow<List<io.github.baldborne94.baldmusic.core.library.FolderCollection>> = app.phoneFolders
     val sleepTimer: StateFlow<Long?> = app.sleepTimer
     var lyricsOnline: Boolean
         get() = app.settings.lyricsOnline
@@ -263,6 +265,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun isLiked(lib: UserLibrary, item: MediaItem?) = item != null && lib.isLiked(item.mediaId)
     fun toggleLike(item: MediaItem) = app.userData.toggleLike(item.toTrackRef())
+    fun restoreCollection(folder: io.github.baldborne94.baldmusic.core.library.FolderCollection) = app.userData.restoreFolder(folder)
     fun createPlaylist(name: String, first: List<MediaItem> = emptyList()) = app.userData.createPlaylist(name, first.map { it.toTrackRef() })
     fun addToPlaylist(playlistId: String, items: List<MediaItem>) = app.userData.addToPlaylist(playlistId, items.map { it.toTrackRef() })
     fun removeFromPlaylist(playlistId: String, item: MediaItem) = app.userData.removeFromPlaylist(playlistId, item.mediaId)

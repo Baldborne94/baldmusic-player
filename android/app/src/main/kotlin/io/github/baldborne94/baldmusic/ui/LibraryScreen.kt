@@ -74,6 +74,8 @@ fun LibraryScreen(vm: PlayerViewModel) {
     val (artists) = if (filter == Filter.ARTIST) rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}") else (null to null)
     val (podcastShows) = if (filter == Filter.PODCAST) rememberChildren(vm, PodcastSource.KEY) else (null to null)
     val (serverPlaylists) = if (hasServer) rememberChildren(vm, "${RemoteSource.KEY}/${RemoteSource.PLAYLISTS}") else (null to null)
+    val phoneFolders by vm.phoneFolders.collectAsStateWithLifecycle()
+    val deletedFolders = remember(lib, phoneFolders) { lib.deletedFolders(phoneFolders) }
 
     // Una volta per elenco, non a ogni ridisegno; la chiave d'ordine si calcola una volta per elemento.
     val items: List<MediaItem> = remember(filter, alphabetical, collections, playlists, recent, albums, artists, serverPlaylists, podcastShows) {
@@ -147,6 +149,25 @@ fun LibraryScreen(vm: PlayerViewModel) {
                     item(key = "lettera-$i-$group") { SectionHeader(group) }
                 }
                 item(key = item.mediaId) { ContainerRow(item) { ui.open(item.mediaId, item.title()) } }
+            }
+            // Le raccolte eliminate non si ricreano da sole: qui, con un tocco, se cambi idea.
+            if (filter == Filter.COLLECTION && deletedFolders.isNotEmpty()) {
+                item(key = "eliminate") { SectionHeader("Raccolte che hai eliminato") }
+                items(deletedFolders, key = { "eliminata-" + it.folder }) { folder ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { vm.restoreCollection(folder) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(Surface2), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Rounded.Add, null)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        androidx.compose.foundation.layout.Column(Modifier.weight(1f)) {
+                            Text(folder.name, fontWeight = FontWeight.SemiBold)
+                            Text("Tocca per ricrearla · ${PersonalSource.count(folder.tracks.size)}", color = TextMuted, fontSize = 13.sp)
+                        }
+                    }
+                }
             }
             if (items.isEmpty() && filter == null) {
                 item { Message("Crea la tua prima playlist con il + qui sopra, oppure tocca il cuore sui brani che ti piacciono.") }

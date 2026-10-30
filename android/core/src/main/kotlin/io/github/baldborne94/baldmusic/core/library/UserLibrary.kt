@@ -205,6 +205,22 @@ data class UserLibrary(
         recent = recent.filterNot { it.id == MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, id).toString() },
     )
 
+    /**
+     * Le cartelle del telefono ([folders]) la cui raccolta hai eliminato e che hanno ancora brani:
+     * non si ricreano da sole, ma si possono ricreare a mano ([restoreFolder]).
+     */
+    fun deletedFolders(folders: List<FolderCollection>): List<FolderCollection> {
+        val used = playlists.mapNotNullTo(HashSet()) { it.folder }
+        return folders.filter { it.folder in ignoredFolders && it.folder !in used && it.tracks.isNotEmpty() }
+    }
+
+    /** Ricrea la raccolta di una cartella eliminata, con tutti i suoi brani: da qui segue di nuovo la cartella. */
+    fun restoreFolder(folder: FolderCollection, now: Long, newId: () -> String): UserLibrary {
+        val ignored = ignoredFolders - folder.folder
+        if (playlists.any { it.folder == folder.folder }) return copy(ignoredFolders = ignored)
+        return copy(ignoredFolders = ignored, playlists = playlists + UserPlaylist(newId(), folder.name, folder.tracks, now, folder = folder.folder))
+    }
+
     /** Aggiunge in fondo; un brano già presente non viene duplicato. */
     fun addToPlaylist(id: String, tracks: List<TrackRef>) = copy(
         playlists = playlists.map { pl ->

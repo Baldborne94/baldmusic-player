@@ -95,6 +95,8 @@ class UserData(context: Context) {
     fun removeFromPlaylist(id: String, trackIds: Collection<String>) = update { lib -> trackIds.fold(lib) { l, t -> l.removeFromPlaylist(id, t) } }
     fun reorderPlaylist(id: String, orderedIds: List<String>) = update { it.reorderPlaylist(id, orderedIds) }
     fun sortPlaylist(id: String, byArtist: Boolean) = update { it.sortPlaylist(id, byArtist) }
+    fun restoreFolder(folder: FolderCollection) =
+        update { it.restoreFolder(folder, System.currentTimeMillis()) { UUID.randomUUID().toString().take(8) } }
     fun syncFolders(folders: List<FolderCollection>, present: Set<String>) =
         update { it.syncFolders(folders, present, System.currentTimeMillis()) { UUID.randomUUID().toString().take(8) } }
 

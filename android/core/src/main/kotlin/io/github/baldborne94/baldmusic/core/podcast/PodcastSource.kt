@@ -52,14 +52,14 @@ class PodcastSource(
     }
 
     /**
-     * Le puntate da ascoltare: prima quelle iniziate e non finite (dall'ultima ascoltata), poi
-     * quelle uscite da poco e mai cominciate (dalla più recente), poi, finché non ce ne sono
-     * almeno [UPNEXT_FILL], quelle dall'archivio ([archive]): così in Home ci sono sempre le
-     * prossime, senza cercarle nella Libreria.
+     * Le puntate da ascoltare, nell'ordine in cui le suona «puntata dopo puntata» ([nextAfter]):
+     * prima quelle iniziate e non finite (dall'ultima ascoltata), poi le prossime in ordine di
+     * uscita, dalla più vecchia ([nextInOrder]); se sono meno di [UPNEXT_FILL], le altre
+     * dall'archivio ([archive]): così in Home ci sono sempre le prossime, senza cercarle.
      */
     fun upNext(all: List<Podcast>): List<Pair<Podcast, Episode>> = upNextGroups(all).map { it.first }
 
-    /** Come [upNext], con l'intestazione di ognuna: «Da finire», «Nuove», «Dall'archivio». */
+    /** Come [upNext], con l'intestazione di ognuna: «Da finire», «Prossime», «Dall'archivio». */
     fun upNextGroups(all: List<Podcast>): List<Pair<Pair<Podcast, Episode>, String>> {
         val progress = library().progress
         fun p(show: Podcast, e: Episode) = progress[keyOf(show, e)]
@@ -68,30 +68,39 @@ class PodcastSource(
         fun untouched(show: Podcast, e: Episode) = p(show, e)?.let { !it.finished && it.positionMs < PodcastLibrary.START_MS } ?: true
         val episodes = all.flatMap { show -> show.episodes.map { show to it } }
         val doing = episodes.filter { (show, e) -> started(show, e) }.sortedByDescending { (show, e) -> p(show, e)!!.at }
-        val fresh = episodes.filter { (show, e) -> untouched(show, e) && (e.publishedAt ?: 0) >= now() - PodcastFeed.NEW_FOR_MS }
-            .sortedByDescending { it.second.publishedAt }
-        val taken = (doing + fresh).mapTo(HashSet()) { keyOf(it.first, it.second) }
+        val next = nextInOrder(all) { show, e -> untouched(show, e) }
+        val taken = (doing + next).mapTo(HashSet()) { keyOf(it.first, it.second) }
         val missing = (UPNEXT_FILL - taken.size).coerceAtLeast(0)
         val older = archive(all, missing) { show, e -> keyOf(show, e) !in taken && untouched(show, e) }
-        return (doing.map { it to "Da finire" } + fresh.map { it to "Nuove" } + older.map { it to "Dall'archivio" }).take(UPNEXT_MAX)
+        return (doing.map { it to "Da finire" } + next.map { it to "Prossime" } + older.map { it to "Dall'archivio" }).take(UPNEXT_MAX)
+    }
+
+    /** Fin dove sei arrivato in un podcast: la data dell'ultima puntata finita (per ultima ascoltata), o null. */
+    private fun reached(show: Podcast): Long? {
+        val progress = library().progress
+        return show.episodes.filter { progress[keyOf(show, it)]?.finished == true }.maxByOrNull { progress[keyOf(show, it)]!!.at }?.publishedAt
     }
 
     /**
-     * Le prossime [count] dall'archivio, a turno tra i podcast. Per ognuno: se hai finito una
-     * puntata, quelle uscite dopo (dalla più vicina, stai andando avanti) e poi quelle prima
-     * (dalla più recente); se non ne hai finite, dalla più recente.
+     * Le prossime in ordine di uscita, dalla più vecchia, di tutti i podcast insieme: per ognuno
+     * quelle uscite dopo l'ultima finita; se non ne hai finite, quelle uscite da [PodcastFeed.NEW_FOR_MS].
+     */
+    private fun nextInOrder(all: List<Podcast>, open: (Podcast, Episode) -> Boolean): List<Pair<Podcast, Episode>> =
+        all.flatMap { show ->
+            val from = reached(show) ?: (now() - PodcastFeed.NEW_FOR_MS - 1)
+            show.episodes.filter { e -> open(show, e) && (e.publishedAt ?: Long.MIN_VALUE) > from }.map { show to it }
+        }.sortedBy { it.second.publishedAt }
+
+    /**
+     * Le altre [count] dall'archivio (quando le prossime sono poche), a turno tra i podcast: per
+     * ognuno quelle uscite prima di dove sei arrivato, dalla più vicina; se non ne hai finite,
+     * dalla più recente.
      */
     private fun archive(all: List<Podcast>, count: Int, open: (Podcast, Episode) -> Boolean): List<Pair<Podcast, Episode>> {
         if (count <= 0) return emptyList()
-        val progress = library().progress
         val perShow = all.map { show ->
-            val candidates = show.episodes.filter { open(show, it) }
-            val lastDone = show.episodes.filter { progress[keyOf(show, it)]?.finished == true }.maxByOrNull { progress[keyOf(show, it)]!!.at }
-            val at = lastDone?.publishedAt
-            val ordered = if (at == null) candidates.sortedByDescending { it.publishedAt ?: Long.MIN_VALUE }
-            else candidates.filter { (it.publishedAt ?: Long.MIN_VALUE) > at }.sortedBy { it.publishedAt } +
-                candidates.filter { (it.publishedAt ?: Long.MIN_VALUE) <= at }.sortedByDescending { it.publishedAt ?: Long.MIN_VALUE }
-            ArrayDeque(ordered.map { show to it })
+            val at = reached(show) ?: Long.MAX_VALUE
+            ArrayDeque(show.episodes.filter { open(show, it) && (it.publishedAt ?: Long.MIN_VALUE) <= at }.sortedByDescending { it.publishedAt ?: Long.MIN_VALUE }.map { show to it })
         }
         val out = ArrayList<Pair<Podcast, Episode>>()
         while (out.size < count && perShow.any { it.isNotEmpty() }) perShow.forEach { q -> if (out.size < count) q.removeFirstOrNull()?.let(out::add) }
