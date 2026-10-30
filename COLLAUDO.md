@@ -61,6 +61,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | R-5 | Copertina di una raccolta con brani di 4+ dischi | Mosaico 2×2; anche in Android Auto |
 | R-6 | Rinomina una raccolta | Il nome nuovo resta; la raccolta continua a ricevere i brani nuovi della cartella |
 | R-7 | Home → I tuoi mix, dopo qualche settimana di ascolti | «Riscopri» (brani ascoltati spesso e non sentiti da due mesi, o piaciuti e mai sentiti di recente) e «Per la macchina» (i più ascoltati e i preferiti); nello stesso giorno lo stesso mix ha lo stesso ordine, il giorno dopo cambia |
+| R-8 | Elimina una raccolta (solo la raccolta), poi Libreria → filtro «Raccolte» | In fondo «Raccolte che hai eliminato» con quella cartella; un tocco la ricrea con tutti i brani della cartella, e i brani nuovi tornano a entrare da soli |
 
 ### Ascolto (dopo modifiche a riproduzione, volume, dissolvenza)
 
@@ -128,7 +129,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-10 | Con i dati mobili: ⋮ su una puntata vecchia → «Scarica sul telefono» | Si scarica subito anche senza Wi‑Fi; dopo nel ⋮ c'è «Togli dal telefono», che la toglie |
 | P-11 | Ascolta fino in fondo una puntata scaricata (o ⋮ → «Segna come ascoltata») | Diventa «ascoltata», esce da «Da ascoltare» e al giro dopo dal telefono; col Wi‑Fi si scarica la successiva non ascoltata. «Segna come da ascoltare» la riporta come nuova |
 | P-12 | Durante una puntata: «In riproduzione», notifica e Android Auto | Al posto di casuale e ripeti (e del cuore in notifica e in Auto) i tasti «indietro di 15 s» e «avanti di 30 s»; con un brano di musica tornano quelli di sempre |
-| P-13 | Home con una puntata iniziata e una uscita da poco | In cima ai podcast «Da ascoltare»: prima quella da finire, poi la nuova; in Libreria → Podcast e in Auto la stessa voce «Da ascoltare» con «Da finire» e «Nuove» |
+| P-13 | Home con una puntata iniziata e alcune non ancora ascoltate | In «Da ascoltare» le intestazioni «Da finire», «Prossime», «Dall'archivio»: prima quella da finire, poi le prossime in ordine di uscita dalla più vecchia (le suona in quell'ordine, una dopo l'altra); le stesse in Libreria → Podcast e in Auto |
 | P-14 | In macchina: «Ok Google, metti Non Aprite Quella Podcast su BaldMusic» (o «il podcast Non Aprite Quella Podcast»), con una puntata a metà | Riparte quella puntata da dove eri, una sola; senza puntate a metà parte la più recente non ascoltata, non tutto l'archivio |
 | P-15 | «Ok Google, metti l'ultima puntata di Non Aprite Quella Podcast su BaldMusic» | La puntata uscita per ultima, anche se un'altra è a metà |
 | P-16 | Nella pagina del podcast (app o Auto) tocca «Riproduci» | Una puntata sola, come in P-14 |

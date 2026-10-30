@@ -325,4 +325,27 @@ class UserLibraryRulesTest {
         lib = lib.recordPlay(song(2, artist = "Lorena Brancucci", album = "Disney Hits", art = "local/20"), null, 2)
         assertEquals(listOf(2), ListeningStats.from(lib).topAlbums.map { it.plays })
     }
+
+    @Test
+    fun `una raccolta eliminata non torna da sola ma si puo ricreare, con tutti i brani`() {
+        val anime = FolderCollection("Music/Anime", "Anime", listOf(TrackRef("local/track/1", "Uno"), TrackRef("local/track/2", "Due")))
+        val rock = FolderCollection("Music/Rock", "Rock", listOf(TrackRef("local/track/3", "Tre")))
+        val vuota = FolderCollection("Music/Vuota", "Vuota", emptyList())
+        var n = 0
+        var lib = UserLibrary().syncFolders(listOf(anime, rock), setOf("local/track/1", "local/track/2", "local/track/3"), 1) { "p${n++}" }
+        lib = lib.deletePlaylist(lib.playlists.first { it.folder == "Music/Anime" }.id)
+        lib = lib.syncFolders(listOf(anime, rock), setOf("local/track/1", "local/track/2", "local/track/3"), 2) { "x" }
+        assertEquals(listOf("Rock"), lib.collections.map { it.name })
+        assertEquals(listOf("Music/Anime"), lib.deletedFolders(listOf(anime, rock, vuota)).map { it.folder })
+
+        lib = lib.restoreFolder(anime, 3) { "nuova" }
+        val back = lib.collections.first { it.folder == "Music/Anime" }
+        assertEquals(listOf("local/track/1", "local/track/2"), back.tracks.map { it.id })
+        assertEquals("Anime", back.name)
+        assertTrue(lib.deletedFolders(listOf(anime, rock)).isEmpty())
+        // E torna a seguire la cartella: un brano nuovo entra da solo.
+        val more = anime.copy(tracks = anime.tracks + TrackRef("local/track/4", "Quattro"))
+        lib = lib.syncFolders(listOf(more, rock), setOf("local/track/1", "local/track/2", "local/track/3", "local/track/4"), 4) { "y" }
+        assertEquals(listOf("local/track/1", "local/track/2", "local/track/4"), lib.collections.first { it.folder == "Music/Anime" }.tracks.map { it.id })
+    }
 }

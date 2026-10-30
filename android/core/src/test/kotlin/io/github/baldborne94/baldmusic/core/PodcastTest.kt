@@ -297,16 +297,21 @@ class PodcastDownloadsTest {
     }
 
     @Test
-    fun `da ascoltare - prima quelle iniziate, poi le nuove, mai le ascoltate`() = runBlocking {
+    fun `da ascoltare - prima quelle iniziate, poi le altre, mai le ascoltate`() = runBlocking {
         val lib = PodcastLibrary()
             .record(key(5), 600_000, 3_600_000, now - day)
             .record(key(4), 900_000, 3_600_000, now)
             .mark(key(1), finished = true, now)
         val source = PodcastSource({ listOf(show) }, { lib }, ZoneId.of("Europe/Rome"), now = { now })
         val next = source.children(MediaId(PodcastSource.KEY, PodcastSource.UPNEXT))
-        // Iniziate dall'ultima ascoltata (4, poi 5), poi nuove non cominciate (2, 3, 6: entro 14 giorni).
+        // Iniziate dall'ultima ascoltata (4, poi 5); finita la 1, la più recente: nessuna dopo, quindi
+        // le altre non cominciate dall'archivio, dalla più vicina (2, 3, 6).
         assertEquals(listOf("Puntata 4", "Puntata 5", "Puntata 2", "Puntata 3", "Puntata 6"), next.map { it.title })
-        assertEquals(listOf("Da finire", "Da finire", "Nuove", "Nuove", "Nuove"), next.map { it.group })
+        assertEquals(listOf("Da finire", "Da finire", "Dall'archivio", "Dall'archivio", "Dall'archivio"), next.map { it.group })
+        // Niente finito: le uscite da 14 giorni in ordine di uscita, dalla più vecchia (prima dalla più recente).
+        val fresh = PodcastSource({ listOf(show) }, { PodcastLibrary() }, ZoneId.of("Europe/Rome"), now = { now }).children(MediaId(PodcastSource.KEY, PodcastSource.UPNEXT))
+        assertEquals(listOf("Puntata 6", "Puntata 5", "Puntata 4", "Puntata 3", "Puntata 2", "Puntata 1"), fresh.map { it.title })
+        assertTrue(fresh.all { it.group == "Prossime" })
         assertEquals("Da ascoltare", source.sections().first().title)
         // Niente da ascoltare: niente sezione.
         val all = (1..6).fold(PodcastLibrary()) { l, n -> l.mark(key(n), true, now) }
@@ -518,9 +523,21 @@ class PodcastUpNextFillTest {
 
     @Test
     fun `andando avanti nell'archivio propone la puntata dopo l'ultima finita`() {
-        // Finita la 20 (vecchia): le prossime sono 19, 18, 17… (uscite dopo), non la più recente.
+        // Finita la 20 (vecchia): le prossime sono 19, 18, 17… (uscite dopo, in ordine di uscita), non la più recente.
         val lib = PodcastLibrary().mark(key(20), true, now)
-        assertEquals(listOf("Puntata 19", "Puntata 18", "Puntata 17", "Puntata 16", "Puntata 15"), titles(lib).map { it.title })
+        val next = titles(lib)
+        assertEquals(listOf("Puntata 19", "Puntata 18", "Puntata 17", "Puntata 16", "Puntata 15"), next.take(5).map { it.title })
+        assertEquals((19 downTo 1).map { "Puntata $it" }, next.map { it.title })
+        assertTrue(next.all { it.group == "Prossime" })
+    }
+
+    @Test
+    fun `due podcast - le prossime di tutti e due insieme, in ordine di uscita`() {
+        val other = Podcast("zzz", "Altro", episodes = (1..3).map { Episode("o$it", "Altra $it", "https://y/$it.mp3", publishedAt = now - (20 + it) * day - day / 2) })
+        // Finite la 4 di NAQP e la 3 dell'altro: dopo vengono, mescolate per data, 3, Altra 2, 2, Altra 1, 1.
+        val lib = PodcastLibrary().mark(key(4), true, now).mark("zzz~o3", true, now)
+        val next = titles(lib, listOf(naqp, other)).filter { it.group == "Prossime" }
+        assertEquals(listOf("Puntata 3", "Altra 2", "Puntata 2", "Altra 1", "Puntata 1"), next.map { it.title })
     }
 
     @Test
@@ -529,7 +546,7 @@ class PodcastUpNextFillTest {
         val lib = PodcastLibrary().record("abc~n", 5_000, 3_600_000, now)
         val next = titles(lib, listOf(show))
         assertEquals("Nuova", next.first().title)
-        assertEquals("Nuove", next.first().group)
+        assertEquals("Prossime", next.first().group)
     }
 
     @Test
