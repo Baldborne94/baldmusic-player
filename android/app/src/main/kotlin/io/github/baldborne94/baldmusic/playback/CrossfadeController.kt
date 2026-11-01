@@ -90,7 +90,14 @@ internal class CrossfadeController(
             player.repeatMode != Player.REPEAT_MODE_ONE && !endOfTrackTimer() &&
             Crossfade.applies(
                 seconds, duration,
-                sameAlbum = current.albumId != null && current.albumId == player.getMediaItemAt(next).albumId,
+                // Solo un disco ascoltato in ordine resta attaccato, non lo stesso album in una raccolta o in casuale.
+                sameAlbum = player.getMediaItemAt(next).let { n ->
+                    Crossfade.inSequence(
+                        sameAlbum = current.albumId != null && current.albumId == n.albumId,
+                        disc = current.mediaMetadata.discNumber, track = current.mediaMetadata.trackNumber,
+                        nextDisc = n.mediaMetadata.discNumber, nextTrack = n.mediaMetadata.trackNumber,
+                    )
+                },
                 episode = PodcastSource.episodeKey(current.mediaId) != null || PodcastSource.episodeKey(player.getMediaItemAt(next).mediaId) != null,
             )
         if (!ok) {
@@ -129,7 +136,14 @@ internal class CrossfadeController(
         outgoingFor = C.INDEX_UNSET
     }
 
-    /** Il brano che finisce continua sul secondo player e si abbassa; il player vero passa al brano dopo e sale. */
+    /**
+     * Il brano che finisce continua sul secondo player e si abbassa; il player vero passa al brano
+     * dopo e sale. Prima il player vero cambiava brano subito, e nel tempo che serve al secondo
+     * player per far uscire il suono il brano che finiva si interrompeva per un attimo. Ora il
+     * secondo parte un po' più avanti ([LEAD_MS]), muto; quando suona davvero ed è allo stesso
+     * punto del player vero, il brano che finisce passa dall'uno all'altro in [HANDOVER_MS]
+     * (stesso suono, volumi che si sommano a uno) e solo allora il player vero cambia brano.
+     */
     private fun start(lengthMs: Long) {
         val out = outgoing ?: return
         outgoing = null
@@ -140,15 +154,40 @@ internal class CrossfadeController(
             return
         }
         val outVolume = player.volume
-        out.volume = outVolume
+        val from = player.currentPosition + LEAD_MS
+        out.volume = 0f
+        out.seekTo(from)
         out.play()
         fadingOut = out
-        crossIn = 0f
-        seeking = true
-        player.seekToNextMediaItem()
-        applyVolume()
-        val total = lengthMs.coerceAtLeast(500L).toFloat()
+        val begun = SystemClock.elapsedRealtime()
         crossJob = scope.launch {
+            // Il secondo player suona davvero (la posizione avanza) ed è arrivato dove è il player vero.
+            while (SystemClock.elapsedRealtime() - begun < HANDOVER_WAIT_MS) {
+                if (out.isPlaying && out.currentPosition >= from + 20 && out.currentPosition >= player.currentPosition) break
+                delay(10)
+            }
+            if (!out.isPlaying || out.currentPosition < from + 20) {
+                // Non è partito: si lascia finire il brano sul player vero, passaggio normale.
+                fadingOut = null
+                out.release()
+                crossJob = null
+                return@launch
+            }
+            // Lo stesso brano passa dal player vero al secondo, senza buchi né colpi di volume.
+            val h0 = SystemClock.elapsedRealtime()
+            while (true) {
+                val k = ((SystemClock.elapsedRealtime() - h0) / HANDOVER_MS.toFloat()).coerceAtMost(1f)
+                out.volume = outVolume * k
+                crossIn = 1f - k
+                applyVolume()
+                if (k >= 1f) break
+                delay(10)
+            }
+            crossIn = 0f
+            seeking = true
+            player.seekToNextMediaItem()
+            applyVolume()
+            val total = (lengthMs - (SystemClock.elapsedRealtime() - begun)).coerceAtLeast(500L).toFloat()
             val t0 = SystemClock.elapsedRealtime()
             while (true) {
                 val t = (SystemClock.elapsedRealtime() - t0) / total
@@ -173,5 +212,14 @@ internal class CrossfadeController(
         applyVolume()
         // Chiamata anche dalla sfumatura stessa, alla fine: annullarla lì non fa danni.
         job?.cancel()
+    }
+
+    private companion object {
+        /** Quanto aspettare che il secondo player suoni prima di passare al brano dopo. */
+        const val HANDOVER_WAIT_MS = 800L
+        /** Quanto più avanti parte il secondo player: il tempo che gli serve per far uscire il suono. */
+        const val LEAD_MS = 150L
+        /** Il passaggio dello stesso brano dal player vero al secondo. */
+        const val HANDOVER_MS = 120L
     }
 }

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 import * as Q from "./queue";
 import { autoplayNeeded, autoplayPick, storeAutoplay, storedAutoplay } from "./autoplay";
-import { crossfadeApplies, crossfadeGains, storeCrossfade, storedCrossfade } from "./crossfade";
+import { crossfadeApplies, crossfadeGains, inSequence, storeCrossfade, storedCrossfade } from "./crossfade";
 import { replayGainVolume, storedReplayGainMode, storeReplayGainMode, type ReplayGainMode } from "./replaygain";
 import * as L from "./listening";
 import { songRadio } from "./radio";
@@ -198,7 +198,9 @@ function maybeCrossfade(a: HTMLAudioElement): void {
   if (i === null || i === state.queue.index) return;
   const cur = Q.current(state.queue);
   const next = state.queue.entries[i];
-  if (!crossfadeApplies(secs, a.duration, !!cur?.albumId && cur.albumId === next.song.albumId)) return;
+  // Solo un disco ascoltato in ordine resta attaccato, non lo stesso album in una raccolta o in casuale.
+  const sameAlbum = !!cur?.albumId && cur.albumId === next.song.albumId;
+  if (!crossfadeApplies(secs, a.duration, inSequence(sameAlbum, cur?.discNumber, cur?.track, next.song.discNumber, next.song.track))) return;
   // Il brano dopo dev'essere già caricato: altrimenti si passa normalmente, senza buchi.
   if (!spare || spareUid !== next.uid || spare.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return;
   startCrossfade(i, Math.max(remaining, 0.5));
