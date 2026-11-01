@@ -33,4 +33,20 @@ class CrossfadeTest {
         val (om, im) = Crossfade.gains(0.5f)
         assertEquals(1f, om * om + im * im, 0.0001f)
     }
+
+    @Test
+    fun `stesso album resta attaccato solo con la traccia dopo, non in casuale ne in una raccolta`() {
+        // Disco ascoltato in ordine: 3 → 4, ultima del disco 1 → prima del disco 2.
+        assertTrue(Crossfade.inSequence(true, 1, 3, 1, 4))
+        assertTrue(Crossfade.inSequence(true, 1, 12, 2, 1))
+        assertTrue(Crossfade.inSequence(true, null, 3, null, 4))
+        // Stesso album in un altro ordine: si sfuma.
+        assertFalse(Crossfade.inSequence(true, 1, 7, 1, 2))
+        assertFalse(Crossfade.inSequence(true, 1, 4, 1, 4))
+        // Senza numeri di traccia (file scaricati: Android mette come album il nome della cartella): si sfuma.
+        assertFalse(Crossfade.inSequence(true, null, null, null, null))
+        assertFalse(Crossfade.inSequence(true, 0, 0, 0, 0))
+        // Album diversi: si sfuma sempre.
+        assertFalse(Crossfade.inSequence(false, 1, 3, 1, 4))
+    }
 }

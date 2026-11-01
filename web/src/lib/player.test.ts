@@ -378,11 +378,11 @@ describe("player: volume", () => {
 });
 
 describe("player: dissolvenza", () => {
-  async function fading(albums: [string, string], secs = 6) {
+  async function fading(albums: [string, string], secs = 6, tracks: [number?, number?] = [1, 2]) {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "performance"] });
     const p = await open();
     p.player.setCrossfade(secs);
-    p.player.play([song("a", { albumId: albums[0] }), song("b", { albumId: albums[1] })]);
+    p.player.play([song("a", { albumId: albums[0], track: tracks[0] }), song("b", { albumId: albums[1], track: tracks[1] })]);
     const a = audioOf("a")!.ready(200);
     a.at(180);
     const b = audioOf("b")!.ready(200);
@@ -420,10 +420,21 @@ describe("player: dissolvenza", () => {
     expect(b.volume).toBeCloseTo(0.5 * 0.501, 3);
   });
 
-  it("mai tra due brani dello stesso album", async () => {
+  it("mai tra due brani attaccati dello stesso disco (traccia 1 → 2)", async () => {
     const { p, a } = await fading(["x", "x"]);
     a.at(196);
     expect(currentId(p)).toBe("a");
+  });
+
+  it("lo stesso album in un altro ordine o senza numeri di traccia sfuma", async () => {
+    // Raccolta o casuale: traccia 7 → 2 dello stesso album.
+    const { p, a } = await fading(["x", "x"], 6, [7, 2]);
+    a.at(196);
+    expect(currentId(p)).toBe("b");
+    // File scaricati senza tag dell'album: stesso «album» (il nome della cartella), niente numeri.
+    const second = await fading(["x", "x"], 6, [undefined, undefined]);
+    second.a.at(196);
+    expect(currentId(second.p)).toBe("b");
   });
 
   it("spenta, o col brano dopo non ancora pronto, non sfuma", async () => {

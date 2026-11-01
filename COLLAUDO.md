@@ -68,7 +68,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
 | A-1 | Album dal vivo o concept, ascolta il passaggio tra due brani | Nessuna pausa e nessuna dissolvenza (stesso album) |
-| A-2 | Impostazioni → Dissolvenza: prova Spenta, 3, 12 s | Spenta = passaggio netto; 12 s = sfumatura lunga; mai dentro lo stesso album |
+| A-2 | Impostazioni → Dissolvenza: prova Spenta, 3, 12 s | Spenta = passaggio netto; 12 s = sfumatura lunga; un disco ascoltato in ordine (traccia 3 → 4) resta attaccato |
+| A-2b | Una raccolta di file scaricati (anche senza tag dell'album), dissolvenza 6 s, lascia finire un brano da solo | Il brano che finisce si abbassa senza interrompersi nemmeno un attimo all'inizio della sfumatura, il successivo sale; lo stesso in casuale con brani dello stesso album |
 | A-3 | Durante una dissolvenza premi pausa, poi «avanti», poi trascina la barra | La dissolvenza si interrompe subito, niente due brani insieme |
 | A-4 | Volume uguale: Album / Brano / Spento con brani vecchi e recenti | Con Album o Brano i brani vecchi e nuovi hanno volume simile; mai distorsione |
 | A-5 | Impostazioni → «Misura adesso», poi lascia il telefono in carica | Il numero di brani misurati cresce; dopo, i brani scaricati hanno volume simile |

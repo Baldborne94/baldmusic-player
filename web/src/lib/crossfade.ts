@@ -7,11 +7,24 @@ export const CROSSFADE_CHOICES = [0, 3, 6, 9, 12];
 export const DEFAULT_CROSSFADE = 6;
 
 /**
- * Si sfuma? Mai tra due brani dello stesso album (dal vivo e concept restano
- * attaccati) e mai su brani troppo corti per avere un inizio e una fine.
+ * Si sfuma? Mai tra due brani attaccati nello stesso disco ([sameAlbum], vedi `inSequence`:
+ * dal vivo e concept restano attaccati) e mai su brani troppo corti per avere un inizio e una fine.
  */
 export function crossfadeApplies(seconds: number, durationSeconds: number, sameAlbum: boolean): boolean {
   return seconds > 0 && !sameAlbum && durationSeconds >= seconds * 2 + 5;
+}
+
+/**
+ * Due brani attaccati nel disco: stesso album e il secondo è la traccia dopo (o la prima del disco
+ * dopo). Solo questi restano senza dissolvenza (dal vivo, concept ascoltati in ordine); lo stesso
+ * album in un altro ordine (casuale, raccolte) o senza numeri di traccia si sfuma. Come
+ * `Crossfade.inSequence` sul telefono.
+ */
+export function inSequence(sameAlbum: boolean, disc: number | undefined, track: number | undefined, nextDisc: number | undefined, nextTrack: number | undefined): boolean {
+  if (!sameAlbum || !track || !nextTrack || track <= 0 || nextTrack <= 0) return false;
+  const d = disc && disc > 0 ? disc : 1;
+  const nd = nextDisc && nextDisc > 0 ? nextDisc : 1;
+  return (nd === d && nextTrack === track + 1) || (nd === d + 1 && nextTrack === 1);
 }
 
 /** Volumi a metà sfumatura ([t] da 0 a 1): uscente ed entrante, a potenza costante. */
