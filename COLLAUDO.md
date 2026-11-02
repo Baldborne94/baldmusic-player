@@ -85,6 +85,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-14 | Metti un album, salta all'ultimo brano e lascialo finire (Continua ad ascoltare attivo, ripeti spento) | Quando parte l'ultimo brano la coda si allunga con brani simili (stesso artista, periodo o cartella); finito l'album la musica continua, con la dissolvenza |
 | A-15 | Lo stesso con ripeti attivo, con il timer «a fine brano», con Continua ad ascoltare spento | Non si aggiunge niente: ripete / si ferma / si ferma a fine coda |
 | A-16 | Casuale su una raccolta, arriva all'ultimo brano | I brani aggiunti suonano dopo, non tornano quelli già sentiti |
+| A-17 | Mentre suona un brano (o una puntata), tocca la ✕ accanto a play nel mini player | La musica si ferma, il mini player e la notifica spariscono; una puntata riparte poi da dove eri; in macchina «riprendi» ritrova la coda di prima |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 
