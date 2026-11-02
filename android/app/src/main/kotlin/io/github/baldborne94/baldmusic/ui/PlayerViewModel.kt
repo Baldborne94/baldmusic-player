@@ -256,6 +256,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * La ✕ del mini player: la musica si ferma e la coda si svuota, così il mini player e la
+     * notifica spariscono. Prima la pausa, che salva dove eri (anche in una puntata): la coda
+     * salvata resta per la ripresa (in macchina o dalla notifica).
+     */
+    fun close() = browser?.run {
+        pause()
+        stop()
+        clearMediaItems()
+    }
+
     fun clearUpcoming() = browser?.run {
         val from = currentMediaItemIndex + 1
         if (from < mediaItemCount) removeMediaItems(from, mediaItemCount)

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
@@ -413,7 +414,7 @@ private fun androidx.compose.foundation.layout.RowScope.NavItem(label: String, s
 }
 
 /**
- * Il mini-player sopra la barra: colorato con la copertina, cuore, play/pausa.
+ * Il mini-player sopra la barra: colorato con la copertina, cuore, play/pausa, ✕ per chiuderlo.
  * Si scorre di lato per cambiare brano e si tocca per aprire il player.
  */
 @Composable
@@ -452,6 +453,10 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
                     vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = Color.White, modifier = Modifier.size(30.dp))
                     else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
+            }
+            // Chiude il lettore: la musica si ferma e il mini player sparisce.
+            IconButton(onClick = { vm.close() }) {
+                Icon(Icons.Rounded.Close, "Chiudi il lettore", tint = Color.White.copy(alpha = 0.85f))
             }
         }
         // La posizione si legge mentre si disegna: la barra avanza senza ridisegnare il mini player.
