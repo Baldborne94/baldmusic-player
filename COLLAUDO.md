@@ -72,6 +72,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-2b | Una raccolta di file scaricati (anche senza tag dell'album), dissolvenza 6 s, lascia finire un brano da solo | Il brano che finisce si abbassa senza interrompersi nemmeno un attimo all'inizio della sfumatura, il successivo sale; lo stesso in casuale con brani dello stesso album |
 | A-3 | Durante una dissolvenza premi pausa, poi «avanti», poi trascina la barra | La dissolvenza si interrompe subito, niente due brani insieme |
 | A-4 | Volume uguale: Album / Brano / Spento con brani vecchi e recenti | Con Album o Brano i brani vecchi e nuovi hanno volume simile; mai distorsione |
+| A-4b | Volume uguale su «Album», casuale su una raccolta di file scaricati (anche senza tag dell'album) | Le canzoni hanno tutte più o meno lo stesso volume; aprendo un disco vero e ascoltandolo in ordine restano le differenze del disco |
 | A-5 | Impostazioni → «Misura adesso», poi lascia il telefono in carica | Il numero di brani misurati cresce; dopo, i brani scaricati hanno volume simile |
 | A-6 | Timer di spegnimento: 15 minuti e «fine brano», anche con «Ripeti il brano» e sull'ultimo brano della coda | Si abbassa e si ferma al momento giusto; finita la coda il timer si spegne e la volta dopo la musica non si ferma da sola |
 | A-7 | Cuffie Bluetooth: tasti play/pausa/avanti | Funzionano anche con l'app chiusa |

@@ -5,6 +5,8 @@ import io.github.baldborne94.baldmusic.core.library.ReplayGain
 import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class LoudnessTest {
 
@@ -38,5 +40,25 @@ class LoudnessTest {
         near(1f, Loudness.volume(null, ReplayGainMode.ALBUM))
         near(1f, Loudness.volume(ReplayGain(), ReplayGainMode.ALBUM))
         near(1f, Loudness.volume(ReplayGain(trackGain = -8f), ReplayGainMode.OFF))
+    }
+
+    @Test
+    fun `album solo ascoltando un disco, in raccolte e casuale ogni brano al suo livello`() {
+        // Due brani di una raccolta che Android mette nello stesso «album» (la cartella): guadagno
+        // dell'album uguale, guadagni dei brani diversi.
+        val forte = ReplayGain(trackGain = -9f, albumGain = -5f)
+        val piano = ReplayGain(trackGain = -1f, albumGain = -5f)
+        // Dalla raccolta: ognuno al suo livello (prima tutti e due con l'album, uno più alto dell'altro).
+        assertEquals(Loudness.volume(forte, ReplayGainMode.TRACK), Loudness.volume(forte, ReplayGainMode.ALBUM, fromAlbum = false))
+        assertEquals(Loudness.volume(piano, ReplayGainMode.TRACK), Loudness.volume(piano, ReplayGainMode.ALBUM, fromAlbum = false))
+        // Dal disco: il guadagno dell'album.
+        assertEquals(Loudness.volume(forte, ReplayGainMode.ALBUM, fromAlbum = true), Loudness.volume(piano, ReplayGainMode.ALBUM, fromAlbum = true))
+        // Solo il guadagno dell'album: si usa quello.
+        assertEquals(Loudness.volume(ReplayGain(albumGain = -6f), ReplayGainMode.ALBUM, fromAlbum = true), Loudness.volume(ReplayGain(albumGain = -6f), ReplayGainMode.ALBUM, fromAlbum = false))
+        assertTrue(Loudness.fromAlbum("local/track/42|local/album/rg:abc"))
+        assertTrue(Loudness.fromAlbum("remote/track/7|remote/album/a1"))
+        assertFalse(Loudness.fromAlbum("local/track/42|me/playlist/p"))
+        assertFalse(Loudness.fromAlbum("local/track/42"))
+        assertFalse(Loudness.fromAlbum(null))
     }
 }

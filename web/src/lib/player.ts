@@ -269,7 +269,10 @@ const finite = (n: number) => (Number.isFinite(n) ? n : 0);
 
 /** Il volume scelto dall'utente per quello del ReplayGain del brano in corso. */
 function applyVolume(): void {
-  el().volume = state.volume * replayGainVolume(Q.current(state.queue)?.replayGain, state.replayGain) * crossIn;
+  // Il guadagno dell'album solo ascoltando un disco: in una raccolta ogni brano al suo livello.
+  const entry = state.queue.entries[state.queue.index];
+  const fromAlbum = !!state.from?.id.startsWith("album/") && !entry?.added;
+  el().volume = state.volume * replayGainVolume(entry?.song.replayGain, state.replayGain, fromAlbum) * crossIn;
 }
 
 function onTime(): void {
