@@ -347,7 +347,11 @@ describe("player: senza pause tra i brani", () => {
 describe("player: volume", () => {
   it("volume scelto × ReplayGain del brano, subito anche cambiando modalità", async () => {
     const p = await open();
-    p.player.play([song("a", { replayGain: { trackGain: -12, albumGain: -6 } })]);
+    // Da una raccolta: il guadagno del brano, anche in modalità Album.
+    p.player.play([song("a", { replayGain: { trackGain: -12, albumGain: -6 } })], 0, false, { label: "Raccolta", id: "playlist/r" });
+    expect(audioOf("a")!.volume).toBeCloseTo(0.2512, 3);
+    // Dal suo disco: il guadagno dell'album.
+    p.player.play([song("a", { replayGain: { trackGain: -12, albumGain: -6 } })], 0, false, { label: "Disco", id: "album/x" });
     const a = audioOf("a")!;
     expect(a.volume).toBeCloseTo(0.501, 3);
     p.player.setVolume(0.5);

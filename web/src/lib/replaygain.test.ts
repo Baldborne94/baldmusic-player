@@ -24,3 +24,15 @@ describe("replayGainVolume", () => {
     expect(replayGainVolume({ trackGain: -8 }, "off")).toBe(1);
   });
 });
+
+describe("album solo ascoltando un disco", () => {
+  it("in raccolte e casuale ogni brano al suo livello, come sul telefono", () => {
+    const loud = { trackGain: -9, albumGain: -5 };
+    const soft = { trackGain: -1, albumGain: -5 };
+    expect(replayGainVolume(loud, "album", false)).toBeCloseTo(replayGainVolume(loud, "track"), 6);
+    expect(replayGainVolume(soft, "album", false)).toBeCloseTo(replayGainVolume(soft, "track"), 6);
+    expect(replayGainVolume(loud, "album", true)).toBeCloseTo(replayGainVolume(soft, "album", true), 6);
+    // Solo il guadagno dell'album: si usa quello.
+    expect(replayGainVolume({ albumGain: -6 }, "album", false)).toBeCloseTo(Math.pow(10, -6 / 20), 6);
+  });
+});

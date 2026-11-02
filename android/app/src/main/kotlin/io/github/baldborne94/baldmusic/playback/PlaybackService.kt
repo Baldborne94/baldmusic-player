@@ -455,7 +455,9 @@ class PlaybackService : MediaLibraryService() {
      * la sfumatura del timer. Il volume del telefono resta all'utente.
      */
     private fun applyVolume() {
-        val rg = Loudness.volume(player.currentMediaItem?.replayGain, app.settings.replayGain.value)
+        val item = player.currentMediaItem
+        // Il guadagno dell'album solo ascoltando un disco: in una raccolta ogni brano al suo livello.
+        val rg = Loudness.volume(item?.replayGain, app.settings.replayGain.value, fromAlbum = Loudness.fromAlbum(item?.mediaId))
         player.volume = (rg * fade * crossfade.crossIn).coerceIn(0f, 1f)
     }
 

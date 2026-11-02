@@ -64,8 +64,9 @@ export function Settings() {
       <div className="panel">
         <h2>Volume uguale tra i brani</h2>
         <p className="muted">
-          Abbassa i brani più forti allo stesso livello degli altri, con i valori di ReplayGain che Navidrome legge dai file. Album: dentro un
-          disco restano le differenze volute. Brano: ogni brano allo stesso livello, per mix e raccolte. I brani senza questi valori suonano
+          Abbassa i brani più forti allo stesso livello degli altri, con i valori di ReplayGain che Navidrome legge dai file. Album: ascoltando un
+          disco restano le differenze volute, in raccolte, playlist e casuale ogni brano allo stesso livello. Brano: sempre ogni brano allo
+          stesso livello. I brani senza questi valori suonano
           com'è; si scrivono con Picard (plugin ReplayGain 2.0) o rsgain.
         </p>
         <div className="chips">
