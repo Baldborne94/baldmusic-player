@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duplicates, folderName, isWindowsPath, nameKey, previews, psQuote, replaceCopies, trashScript } from "./cleanup";
+import { duplicates, folderName, isWindowsPath, nameKey, previews, psQuote, replaceCopies, trashScript, songVersion } from "./cleanup";
 import type { Song } from "./subsonic";
 
 const song = (id: string, title: string, artist: string, duration: number, extra: Partial<Song> = {}): Song => ({
@@ -124,5 +124,20 @@ describe("casi limite della pulizia", () => {
     expect(s.split("\r\n").length).toBeGreaterThan(10);
     expect(s).not.toMatch(/Remove-Item|\bdel\b|DeletePermanently/i);
     expect(s).toContain("'C:\\Music\\a.mp3',\r\n  'C:\\Music\\b.mp3'");
+  });
+});
+
+describe("versioni censurate ed esplicite", () => {
+  it("non sono doppioni: la pulizia le lascia tutte e due, come sul telefono", () => {
+    const base = { title: "Break Stuff", artist: "Limp Bizkit", duration: 166 };
+    const clean = { ...base, id: "c", path: "E:\\Musica\\Metal\\Break Stuff (Clean).mp3" };
+    const explicit = { ...base, id: "e", album: "Significant Other [Explicit]", path: "E:\\Musica\\Nu Metal\\Break Stuff.mp3" };
+    const plain = { ...base, id: "p", path: "E:\\Musica\\Altro\\Break Stuff.mp3" };
+    expect(duplicates([clean, explicit])).toEqual([]);
+    expect(duplicates([clean, plain])).toEqual([]);
+    expect(duplicates([plain, { ...plain, id: "p2", path: "E:\\Musica\\Copia\\Break Stuff.mp3" }])).toHaveLength(1);
+    expect(songVersion(["Break Stuff - Radio Edit.mp3"])).toBe("clean");
+    expect(songVersion(["Break Stuff (Uncensored)"])).toBe("explicit");
+    expect(songVersion(["Clean", "Mr. Clean.mp3"])).toBe("unknown");
   });
 });

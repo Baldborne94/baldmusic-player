@@ -33,6 +33,8 @@ object LibraryCleanup {
             .groupBy { ArtistNames.key(it.artist.orEmpty()) to ArtistNames.key(it.title) }
             .values
             .flatMap(::byLength)
+            // La versione censurata e quella esplicita non sono doppioni: ognuna resta.
+            .flatMap { copies -> copies.groupBy(::version).values }
             .filter { it.size > 1 }
             .map { copies ->
                 val keep = copies.maxWith(betterCopy)
@@ -44,7 +46,35 @@ object LibraryCleanup {
     fun sameSong(a: LocalTrack, b: LocalTrack) =
         ArtistNames.key(a.artist.orEmpty()) == ArtistNames.key(b.artist.orEmpty()) &&
             ArtistNames.key(a.title) == ArtistNames.key(b.title) &&
-            abs(a.durationMs - b.durationMs) <= SAME_LENGTH_MS
+            abs(a.durationMs - b.durationMs) <= SAME_LENGTH_MS &&
+            version(a) == version(b)
+
+    /** Che versione è un file: censurata («Clean», «Radio Edit»…), esplicita o non si sa. */
+    enum class Version { CLEAN, EXPLICIT, UNKNOWN }
+
+    /**
+     * La versione scritta tra parentesi o dopo un trattino in titolo, album o nome del file
+     * («Break Stuff (Clean)», «Significant Other [Explicit]», «… - Radio Edit.mp3»). Due copie
+     * con versioni diverse non sono doppioni: prima la pulizia poteva tenere la censurata e
+     * buttare quella esplicita. Una sola delle due segnata («Clean» e niente) non basta per
+     * dire che l'altra è la stessa: anche lì restano tutte e due.
+     */
+    fun version(t: LocalTrack): Version = versionOf(listOfNotNull(t.title, t.album, t.fileName))
+
+    fun versionOf(texts: List<String>): Version {
+        val text = texts.joinToString(" ").lowercase()
+        val marks = MARK.findAll(text).map { it.groupValues[1].trim() }.toList()
+        return when {
+            marks.any { EXPLICIT.matches(it) } -> Version.EXPLICIT
+            marks.any { CLEAN.matches(it) } -> Version.CLEAN
+            else -> Version.UNKNOWN
+        }
+    }
+
+    // Quello che sta tra parentesi o dopo un trattino; dentro, le parole delle versioni.
+    private val MARK = Regex("(?:[(\\[]|[-–—]\\s*)([^)\\]\\-–—(\\[]+)")
+    private val EXPLICIT = Regex(".*\\b(explicit|dirty|uncensored|non censurat[ao])\\b.*")
+    private val CLEAN = Regex(".*\\b(clean|censored|censurat[ao]|radio edit|radio version|radio mix|edited|edit version|clean version)\\b.*")
 
     /**
      * Brani ripescati dal cestino: tornano al loro posto nella raccolta della loro cartella.

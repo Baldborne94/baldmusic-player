@@ -93,6 +93,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
 | P-1 | Pulizia: un doppione tra due cartelle → «Butta le copie doppie»; una seconda volta ruota il telefono mentre è aperta la finestra di Android | Conferma dell'app e poi di Android; il file va nel cestino; le raccolte che lo avevano hanno ancora il brano (la copia tenuta), anche dopo la rotazione |
+| P-1b | Due copie della stessa canzone, una «(Clean)» o «Radio Edit» nel nome del file o nell'album e l'altra no (o «Explicit») | Pulizia → doppioni non le propone: restano tutte e due; Brani nel cestino ripristina quella buttata prima |
 | P-2 | Pulizia: anteprime di 30 s | Elencate solo brani da 25–35 s |
 | P-3 | Brani nel cestino → ripristina un doppione | Il file torna nella sua cartella e nella sua raccolta, al posto della copia che lo aveva sostituito |
 | P-4 | Elimina una raccolta «con i brani dal telefono» | Doppia conferma; i file nel cestino di Android (recuperabili 30 giorni) |

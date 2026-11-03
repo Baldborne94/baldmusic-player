@@ -53,15 +53,37 @@ function betterCopy(a: Song, b: Song): number {
   return (a.created ?? "").localeCompare(b.created ?? "") || a.id.localeCompare(b.id);
 }
 
+export type SongVersion = "clean" | "explicit" | "unknown";
+
+const MARK = /(?:[([]|[-–—]\s*)([^)\]\-–—([]+)/g;
+const EXPLICIT = /\b(explicit|dirty|uncensored|non censurat[ao])\b/;
+const CLEAN = /\b(clean|censored|censurat[ao]|radio edit|radio version|radio mix|edited|edit version|clean version)\b/;
+
+/**
+ * La versione scritta tra parentesi o dopo un trattino in titolo, album o nome del file
+ * («Break Stuff (Clean)», «Significant Other [Explicit]», «… - Radio Edit.mp3»), come
+ * `LibraryCleanup.version` sul telefono. Due copie con versioni diverse non sono doppioni.
+ */
+export function songVersion(texts: (string | undefined)[]): SongVersion {
+  const text = texts.filter(Boolean).join(" ").toLowerCase();
+  const marks = [...text.matchAll(MARK)].map((m) => m[1].trim());
+  if (marks.some((m) => EXPLICIT.test(m))) return "explicit";
+  if (marks.some((m) => CLEAN.test(m))) return "clean";
+  return "unknown";
+}
+
+const versionOf = (s: Song) => songVersion([s.title, s.album, s.path?.split(/[\\/]/).pop()]);
+
 /**
  * Lo stesso brano in più file: stesso titolo e stesso artista (senza badare a maiuscole
- * e accenti) e la stessa durata, entro pochi secondi. Le anteprime non contano.
+ * e accenti), la stessa durata entro pochi secondi e la stessa versione (la censurata e
+ * l'esplicita restano tutte e due). Le anteprime non contano.
  */
 export function duplicates(songs: Song[]): DuplicateGroup[] {
   const byName = new Map<string, Song[]>();
   for (const s of songs) {
     if (isPreview(s) || !s.duration) continue;
-    const k = `${nameKey(s.artist ?? "")}|${nameKey(s.title)}`;
+    const k = `${nameKey(s.artist ?? "")}|${nameKey(s.title)}|${versionOf(s)}`;
     byName.set(k, [...(byName.get(k) ?? []), s]);
   }
   const groups: DuplicateGroup[] = [];
