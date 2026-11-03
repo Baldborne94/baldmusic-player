@@ -8,6 +8,7 @@ import io.github.baldborne94.baldmusic.core.library.TrackRef
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CleanupTest {
@@ -40,6 +41,23 @@ class CleanupTest {
         val preview = t("Alice", "Avril Lavigne", 30_000, "Music/C")
         assertTrue(LibraryCleanup.duplicates(listOf(studio, extended, preview)).isEmpty())
         assertEquals(listOf(preview.id), LibraryCleanup.previews(listOf(studio, extended, preview)).map { it.id })
+    }
+
+    @Test
+    fun `versione censurata ed esplicita non sono doppioni, la pulizia le lascia tutte e due`() {
+        // Break Stuff in due cartelle, stessa durata: una scaricata «Clean», l'altra esplicita.
+        val clean = t("Break Stuff", "Limp Bizkit", 166_000, "Music/Metal").copy(fileName = "Limp Bizkit - Break Stuff (Clean).mp3")
+        val explicit = t("Break Stuff", "Limp Bizkit", 167_000, "Music/Nu Metal").copy(album = "Significant Other [Explicit]")
+        val plain = t("Break Stuff", "Limp Bizkit", 166_500, "Music/Altro")
+        assertTrue(LibraryCleanup.duplicates(listOf(clean, explicit)).isEmpty())
+        // Una segnata e una no: non si sa se sono uguali, restano tutte e due.
+        assertTrue(LibraryCleanup.duplicates(listOf(clean, plain)).isEmpty())
+        assertFalse(LibraryCleanup.sameSong(clean, explicit))
+        // Due copie senza versione restano doppioni come prima.
+        assertEquals(1, LibraryCleanup.duplicates(listOf(plain, plain.copy(id = 999, folder = "Music/Copia"))).size)
+        assertEquals(LibraryCleanup.Version.CLEAN, LibraryCleanup.versionOf(listOf("Break Stuff - Radio Edit.mp3")))
+        assertEquals(LibraryCleanup.Version.EXPLICIT, LibraryCleanup.versionOf(listOf("Break Stuff (Uncensored)")))
+        assertEquals(LibraryCleanup.Version.UNKNOWN, LibraryCleanup.versionOf(listOf("Clean", "Mr. Clean.mp3")))
     }
 
     @Test
