@@ -88,6 +88,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-15 | Lo stesso con ripeti attivo, con il timer «a fine brano», con Continua ad ascoltare spento | Non si aggiunge niente: ripete / si ferma / si ferma a fine coda |
 | A-16 | Casuale su una raccolta, arriva all'ultimo brano | I brani aggiunti suonano dopo, non tornano quelli già sentiti |
 | A-17 | Mentre suona un brano (o una puntata), tocca la ✕ accanto a play nel mini player | La musica si ferma, il mini player e la notifica spariscono; una puntata riparte poi da dove eri; in macchina «riprendi» ritrova la coda di prima |
+| A-18 | Casuale su una raccolta: ascolta due brani, salta il terzo nei primi secondi, poi ⏮ nei primi 3 s del quarto (anche da notifica e in Auto) | Torna al terzo (saltato, rimesso in coda); ⏮ di nuovo → il secondo; poi ⏭ torna in avanti nello stesso ordine. Oltre 3 s ⏮ ricomincia il brano |
+| A-19 | In «In riproduzione» apri il testo, poi tocca il tasto in alto a destra (e prova il tasto indietro del telefono) | Il testo si riduce e torna la copertina, il lettore resta aperto |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 

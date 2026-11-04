@@ -31,6 +31,7 @@ import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.Autoplay
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.GoBack
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode
 import io.github.baldborne94.baldmusic.core.library.ListeningSession
@@ -97,6 +98,12 @@ class PlaybackService : MediaLibraryService() {
     /** Cosa hai già sentito o saltato nella raccolta che stai ascoltando ([ListeningSession]). */
     private var listening = ListeningSession()
 
+    /** I brani suonati prima di quello in corso, il più recente in fondo: per «precedente» ([GoBack]). */
+    private val history = ArrayDeque<MediaItem>()
+    private var lastItem: MediaItem? = null
+    /** Il passaggio di adesso l'ha chiesto «precedente»: non è un salto e non va nella cronologia. */
+    private var goingBack = false
+
     override fun onCreate() {
         super.onCreate()
         // OkHttp anche per lo streaming: stessi timeout e stessa connessione del resto dell'app.
@@ -121,7 +128,12 @@ class PlaybackService : MediaLibraryService() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        session = MediaLibrarySession.Builder(this, player, LibraryCallback())
+        // «Precedente» (dall'app, dalla notifica, da Auto, dalle cuffie) torna al brano sentito davvero prima ([GoBack]).
+        val sessionPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
+            override fun seekToPrevious() = goBack()
+            override fun seekToPreviousMediaItem() = goBack()
+        }
+        session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
             .build()
 
@@ -241,6 +253,18 @@ class PlaybackService : MediaLibraryService() {
 
     private inner class PlayerEvents : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // La cronologia per «precedente»: il brano lasciato, tranne quando ci si torna indietro.
+            val left = lastItem
+            lastItem = mediaItem
+            when {
+                // Una coda nuova: «precedente» segue quella, non la coda di prima.
+                reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED -> { history.clear(); goingBack = false }
+                goingBack -> goingBack = false
+                left != null && left.mediaId != mediaItem?.mediaId -> {
+                    history.addLast(left)
+                    while (history.size > HISTORY_MAX) history.removeFirst()
+                }
+            }
             // Il passaggio voluto dalla dissolvenza va avanti; qualunque altro la interrompe.
             if (!crossfade.consumeSeek()) crossfade.stop()
             // Una puntata partita da sola dopo un'altra riprende da dove eri arrivato.
@@ -517,6 +541,32 @@ class PlaybackService : MediaLibraryService() {
                 sleepLabel = SleepTimer.label(app.sleepTimer.value, System.currentTimeMillis()),
             ),
         )
+    }
+
+    /** «Precedente» ([GoBack]): ricomincia il brano, o torna a quello sentito prima, rimettendolo in coda se era uscito. */
+    private fun goBack() {
+        val ids = queueIds()
+        val current = player.currentMediaItemIndex
+        val previous = player.previousMediaItemIndex.takeIf { it != C.INDEX_UNSET }
+        when (val step = GoBack.step(player.currentPosition, ids, current, history.map { it.mediaId }, previous)) {
+            GoBack.Step.Restart -> player.seekTo(0)
+            is GoBack.Step.Seek -> {
+                if (history.lastOrNull()?.mediaId == ids[step.index]) history.removeLast()
+                goingBack = true
+                player.seekTo(step.index, 0)
+            }
+            is GoBack.Step.Reinsert -> {
+                val item = history.removeLast()
+                player.addMediaItem(current, item)
+                // Col casuale il lettore lo metterebbe a caso: subito prima di quello da cui eri partito.
+                if (player.shuffleModeEnabled) {
+                    val order = QueueOrder.justBefore(shuffleOrderNow(), item = current, before = current + 1)
+                    player.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order.toIntArray(), System.nanoTime()))
+                }
+                goingBack = true
+                player.seekTo(current, 0)
+            }
+        }
     }
 
     /** Indietro o avanti dentro il brano (le puntate): mai prima dell'inizio né oltre la fine. */
@@ -847,7 +897,8 @@ class PlaybackService : MediaLibraryService() {
         if (!auto && reason != Player.DISCONTINUITY_REASON_SEEK) return
         val previous = player.currentTimeline.takeUnless { it.isEmpty }
             ?.getPreviousWindowIndex(old.mediaItemIndex, player.repeatMode, player.shuffleModeEnabled)
-        val forward = new.mediaItemIndex != previous
+        // Tornare indietro con «precedente» non è mai un salto, qualunque sia l'ordine del casuale.
+        val forward = !goingBack && new.mediaItemIndex != previous
         val duration = item.mediaMetadata.durationMs
         listening = listening.left(item.mediaId, old.positionMs, duration, forward, ended = auto, now = System.currentTimeMillis())
         if (auto || !listening.wasSkipped(item.mediaId)) return
@@ -860,6 +911,8 @@ class PlaybackService : MediaLibraryService() {
 
     companion object {
         private const val RECENT_ROOT = "recent"
+        /** Quanti brani ricorda «precedente». */
+        private const val HISTORY_MAX = 50
         /** Quanto prima della fine di una puntata si mette in coda la successiva. */
         private const val NEXT_EPISODE_BEFORE_MS = 120_000L
         /** Dopo così il contenitore va negli «ascoltati di recente» (l'ascolto conta più tardi). */

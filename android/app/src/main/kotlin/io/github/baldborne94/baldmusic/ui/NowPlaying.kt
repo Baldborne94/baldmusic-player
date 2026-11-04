@@ -42,6 +42,7 @@ import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
@@ -113,6 +114,8 @@ fun NowPlayingScreen(
     val color by rememberArtworkColor(item.mediaMetadata.artworkUri)
     val liked = vm.isLiked(lib, item)
     var showLyrics by rememberSaveable { mutableStateOf(false) }
+    // Col testo aperto il tasto indietro lo riduce, invece di chiudere il lettore.
+    androidx.activity.compose.BackHandler(enabled = showLyrics) { showLyrics = false }
     var sleepSheet by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf(false) }
@@ -214,7 +217,14 @@ fun NowPlayingScreen(
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 AnimatedContent(targetState = showLyrics, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "copertina-testo") { lyricsMode ->
                     if (lyricsMode) {
-                        LyricsView(vm, lyrics, lyricsLoading, color)
+                        // Il testo si riduce da qui (o col tasto indietro), senza chiudere il lettore.
+                        Box(Modifier.fillMaxSize()) {
+                            LyricsView(vm, lyrics, lyricsLoading, color)
+                            IconButton(
+                                onClick = { showLyrics = false },
+                                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
+                            ) { Icon(Icons.Rounded.CloseFullscreen, "Riduci il testo", tint = Color.White) }
+                        }
                     } else {
                         SwipeArtwork(vm, item)
                     }
