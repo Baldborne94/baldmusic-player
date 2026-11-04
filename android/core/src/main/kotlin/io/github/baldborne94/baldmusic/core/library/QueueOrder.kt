@@ -61,4 +61,15 @@ object QueueOrder {
         if (at < 0) return rest + added
         return rest.subList(0, at + 1) + added + rest.subList(at + 1, rest.size)
     }
+
+    /**
+     * L'ordine del casuale con [item] subito prima di [before]: il brano rimesso in coda da
+     * «precedente» ([GoBack]) suona adesso, e dopo si torna a quello da cui eri partito.
+     */
+    fun justBefore(order: List<Int>, item: Int, before: Int): List<Int> {
+        val rest = order.filter { it != item }
+        val at = rest.indexOf(before)
+        if (at < 0) return rest + item
+        return rest.subList(0, at) + item + rest.subList(at, rest.size)
+    }
 }
