@@ -651,6 +651,18 @@ class LocalCatalog(
                 }
                 .sortedBy { it.name.lowercase() }
 
+        /**
+         * Audio di WhatsApp (vocali e audio ricevuti), che Android segna come musica: non entra
+         * nella libreria. Cartelle di WhatsApp ("Android/media/com.whatsapp/WhatsApp/Media/WhatsApp
+         * Voice Notes/…", le vecchie "WhatsApp/Media/WhatsApp Audio") o un nome di WhatsApp
+         * («PTT-20240101-WA0001.opus», «AUD-20240101-WA0002.mp3») anche salvato altrove.
+         */
+        fun isWhatsAppAudio(folder: String, fileName: String?): Boolean =
+            folder.split('/').any { it.contains("whatsapp", ignoreCase = true) } ||
+                (fileName != null && WHATSAPP_NAME.containsMatchIn(fileName))
+
+        private val WHATSAPP_NAME = Regex("^(PTT|AUD)-\\d{8}-WA\\d+", RegexOption.IGNORE_CASE)
+
         /** "Music/Disney/CD1" → "Music/Disney"; null per i file sciolti e per la cartella di sistema Android. */
         fun collectionFolder(folder: String): String? {
             val parts = folder.split('/').filter { it.isNotEmpty() }

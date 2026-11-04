@@ -86,6 +86,17 @@ class CleanupTest {
     }
 
     @Test
+    fun `la raccolta di WhatsApp dei vecchi telefoni sparisce`() {
+        val music = FolderCollection("Music/A", "A", listOf(TrackRef("local/track/1", "X")))
+        val voice = FolderCollection("WhatsApp/Media", "Media", listOf(TrackRef("local/track/2", "PTT-20241103-WA0007")))
+        var next = 0
+        val before = UserLibrary().syncFolders(listOf(music, voice), setOf("local/track/1", "local/track/2"), 1) { "p${next++}" }
+        // Ora i vocali non si leggono più: la raccolta vuota non deve restare.
+        val after = before.syncFolders(listOf(music), setOf("local/track/1"), 2) { "q${next++}" }
+        assertEquals(listOf("Music/A"), after.playlists.map { it.folder })
+    }
+
+    @Test
     fun `senza sostituzioni la libreria resta la stessa`() {
         val lib = UserLibrary().syncFolders(listOf(FolderCollection("Music/A", "A", listOf(TrackRef("local/track/1", "X")))), setOf("local/track/1"), 1) { "a" }
         assertTrue(lib.mergeTracks(emptyMap()) === lib)

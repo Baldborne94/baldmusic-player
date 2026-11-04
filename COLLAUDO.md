@@ -37,6 +37,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | T-6 | Crea una cartella nuova in `Music` con dei file | Diventa una raccolta nuova |
 | T-6b | Rinomina una cartella-raccolta col gestore file (es. `Music/Disney` → `Music/Disney Italia`), riapri l'app | Nessuna raccolta vuota o doppia: la stessa raccolta ha il nome nuovo, lo stesso ordine e i cuori dei suoi brani; se l'avevi rinominata tu, tiene il tuo nome |
 | T-6c | Sposta una cartella-raccolta dentro un'altra (es. `Music/Film/Disney`), o copiala dal PC e cancella la vecchia | Come T-6b; i brani piaciuti e i più ascoltati restano (anche se Android dà ai file ID nuovi) |
+| T-6d | Ricevi un vocale e un audio su WhatsApp, riapri l'app | Non compaiono né in Brani né in raccolte, ricerca, «Continua ad ascoltare»; neanche un audio di WhatsApp salvato in Download |
 | T-7 | Libreria → Album | Solo dischi con almeno due brani; nessun «album» da un brano solo |
 | T-8 | Apri un artista | Album per tipo (Album, EP, Dal vivo…) dal più recente; «Singoli e brani sparsi»; «Compare in» se è ospite altrove |
 | T-9 | Un brano «A feat. B» | Sta sotto A; B lo ha in «Compare in» |
