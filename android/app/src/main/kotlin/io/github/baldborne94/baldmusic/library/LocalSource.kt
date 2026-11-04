@@ -199,8 +199,14 @@ class LocalSource(
         return list
     }
 
-    /** I file da misurare: tag già letti e senza ReplayGain (chi ce l'ha nei tag usa quello). */
-    private fun toMeasure(rows: List<Row>): List<FileStamp> = rows.map { it.stamp }.filter { st ->
+    /**
+     * I file da misurare: tutti quelli coi tag già letti. Il volume serve a chi non ha ReplayGain nei
+     * tag; dove cominciano e finiscono i silenzi, per la dissolvenza, serve a tutti.
+     */
+    private fun toMeasure(rows: List<Row>): List<FileStamp> = rows.map { it.stamp }.filter { st -> scanner.index.tags(st) != null }
+
+    /** Quelli senza ReplayGain nei tag: per le Impostazioni, il volume misurato dall'app. */
+    private fun withoutGain(rows: List<Row>): List<FileStamp> = rows.map { it.stamp }.filter { st ->
         val tags = scanner.index.tags(st)
         tags != null && tags.replayGain == null
     }
@@ -225,7 +231,7 @@ class LocalSource(
     /** Per le Impostazioni: quanti brani senza ReplayGain nei tag sono già misurati, e su quanti. */
     suspend fun loudnessStatus(): Pair<Int, Int> = withContext(Dispatchers.IO) {
         if (!hasPermission()) return@withContext 0 to 0
-        val files = toMeasure(rows(null, null))
+        val files = withoutGain(rows(null, null))
         (files.size - loudness.index.pending(files).size) to files.size
     }
 
@@ -338,7 +344,7 @@ class LocalSource(
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.DATE_MODIFIED,
             MediaStore.Audio.Media.SIZE,
-        ) + if (Build.VERSION.SDK_INT >= 30) arrayOf(ALBUM_ARTIST, GENRE) else emptyArray()
+        ) + if (Build.VERSION.SDK_INT >= 30) arrayOf(ALBUM_ARTIST, GENRE, MediaStore.Audio.Media.BITRATE) else emptyArray()
         val where = listOfNotNull(
             "${MediaStore.Audio.Media.IS_MUSIC} != 0",
             // I file nel cestino Android li esclude già; detto esplicitamente, un brano buttato non torna mai.
@@ -367,6 +373,9 @@ class LocalSource(
                     fileName = c.getString(10)?.substringAfterLast('/'),
                     albumArtist = if (c.columnCount > 13) c.getString(13)?.takeUnless { it == UNKNOWN || it.isBlank() } else null,
                     genre = if (c.columnCount > 14) c.getString(14)?.takeUnless { it == UNKNOWN || it.isBlank() } else null,
+                    // Per la Pulizia: quale copia di un doppione suona meglio.
+                    sizeBytes = c.getLong(12),
+                    bitrate = if (c.columnCount > 15) c.getInt(15) else 0,
                 )
                 out += Row(song, FileStamp(id, modified = c.getLong(11), size = c.getLong(12)))
             }

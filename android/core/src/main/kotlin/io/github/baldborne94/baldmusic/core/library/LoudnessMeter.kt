@@ -7,8 +7,17 @@ import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.tan
 
-/** Quanto è forte un brano: loudness integrata (LUFS) e picco dei campioni (0…1). */
-data class Measure(val lufs: Float, val peak: Float)
+/**
+ * Quanto è forte un brano: loudness integrata (LUFS) e picco dei campioni (0…1); e dove comincia
+ * e finisce il suono ([startMs], [endMs]: il primo e l'ultimo pezzo da 100 ms sopra [SILENCE]).
+ */
+data class Measure(val lufs: Float, val peak: Float, val startMs: Long = 0, val endMs: Long? = null) {
+    val trim get() = endMs?.let { Trim(startMs, it) }
+}
+
+/** Dove comincia e finisce davvero il suono di un file, in millisecondi dall'inizio. */
+@kotlinx.serialization.Serializable
+data class Trim(val startMs: Long, val endMs: Long)
 
 /**
  * Misura la loudness di un brano come ITU-R BS.1770 / EBU R128, lo stesso metodo che
@@ -55,6 +64,10 @@ class LoudnessMeter(val sampleRate: Int, val channels: Int) {
     private var inStep = 0
     private val subBlocks = ArrayList<Double>()
     private var peak = 0.0
+    // I pezzi da 100 ms con del suono: il primo e l'ultimo dicono dove sono i silenzi.
+    private var stepPeak = 0.0
+    private var firstLoud = -1
+    private var lastLoud = -1
 
     /** PCM a 16 bit, canali alternati. */
     fun addShorts(samples: ShortArray, frames: Int) {
@@ -74,6 +87,7 @@ class LoudnessMeter(val sampleRate: Int, val channels: Int) {
 
     private fun sample(c: Int, x: Double) {
         peak = max(peak, abs(x))
+        stepPeak = max(stepPeak, abs(x))
         val y = pre[0] * x + preZ1[c]
         preZ1[c] = pre[1] * x - pre[3] * y + preZ2[c]
         preZ2[c] = pre[2] * x - pre[4] * y
@@ -89,6 +103,11 @@ class LoudnessMeter(val sampleRate: Int, val channels: Int) {
         // altoparlanti: si misura come "doppio mono" (ReplayGain 2.0, EBU), cioè come lo stesso
         // suono in stereo, altrimenti risulterebbe 3 dB più piano e suonerebbe più forte degli altri.
         subBlocks += sums.sum() * (if (channels == 1) 2 else 1) / step
+        if (stepPeak > SILENCE) {
+            if (firstLoud < 0) firstLoud = subBlocks.size - 1
+            lastLoud = subBlocks.size - 1
+        }
+        stepPeak = 0.0
         sums.fill(0.0)
         inStep = 0
     }
@@ -102,12 +121,20 @@ class LoudnessMeter(val sampleRate: Int, val channels: Int) {
         if (absolute.isEmpty()) return null
         val relative = loud(absolute.average()) - 10.0
         val gated = absolute.filter { loud(it) > relative }
-        return Measure(loud(gated.average()).toFloat(), peak.toFloat())
+        val msPerStep = step * 1000L / sampleRate
+        return Measure(
+            loud(gated.average()).toFloat(), peak.toFloat(),
+            startMs = firstLoud.coerceAtLeast(0) * msPerStep,
+            endMs = (lastLoud + 1).takeIf { lastLoud >= 0 }?.let { it * msPerStep },
+        )
     }
 
     companion object {
         /** Il livello a cui ReplayGain 2.0 porta ogni brano. */
         const val REFERENCE_LUFS = -18f
+
+        /** Sotto −50 dBFS è silenzio (o il fruscio di fondo di un file scaricato). */
+        const val SILENCE = 0.0032
 
         /** Dalla misura al ReplayGain del brano, come lo scriverebbero rsgain o Picard. */
         fun replayGain(m: Measure) = ReplayGain(trackGain = REFERENCE_LUFS - m.lufs, trackPeak = m.peak, measured = true)

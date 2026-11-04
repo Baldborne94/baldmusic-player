@@ -46,7 +46,34 @@ export function previews(songs: Song[]): Song[] {
  * Quale copia tenere: quella coi tag più completi (riconosciuta da MusicBrainz, con
  * l'album, con un anno vero), poi quella arrivata per prima.
  */
+const LOSSLESS = new Set(["flac", "wav", "aiff", "aif", "ape", "wv", "alac", "dsf"]);
+
+/**
+ * Quanto suona bene una copia, come `LibraryCleanup.quality` sul telefono: formato senza perdita,
+ * poi i kbps che manda Navidrome. [rank] sono le fasce che si sentono (senza perdita, 320, 256,
+ * 192, 128 e sotto); dentro la stessa fascia decidono i tag.
+ */
+export function songQuality(s: Song): { label: string; rank: number } {
+  const format = (s.suffix ?? s.path?.split(".").pop() ?? "").toLowerCase() || undefined;
+  const lossless = !!format && LOSSLESS.has(format);
+  const kbps = s.bitRate ?? 0;
+  const rank = lossless ? 5 : kbps >= 300 ? 4 : kbps >= 224 ? 3 : kbps >= 160 ? 2 : kbps >= 112 ? 1 : 0;
+  const label = [format?.toUpperCase(), lossless ? "senza perdita" : kbps > 0 ? `${kbps} kbps` : undefined].filter(Boolean).join(" · ");
+  return { label, rank };
+}
+
+/** Scelta a mano nella Pulizia: resta la copia [id], le altre si possono buttare. */
+export function keeping(g: DuplicateGroup, id: string): DuplicateGroup {
+  const all = [g.keep, ...g.others];
+  const chosen = all.find((s) => s.id === id);
+  if (!chosen) return g;
+  return { keep: chosen, others: all.filter((s) => s.id !== id).sort((a, b) => collator.compare(folderName(a.path), folderName(b.path))) };
+}
+
+/** Prima la copia che suona meglio, poi quella coi tag più completi (prima contavano solo i tag). */
 function betterCopy(a: Song, b: Song): number {
+  const q = songQuality(b).rank - songQuality(a).rank;
+  if (q !== 0) return q;
   const score = (s: Song) => [s.musicBrainzId ? 1 : 0, s.album ? 1 : 0, s.year && s.year !== 1970 ? 1 : 0];
   const [sa, sb] = [score(a), score(b)];
   for (let i = 0; i < sa.length; i++) if (sa[i] !== sb[i]) return sb[i] - sa[i];

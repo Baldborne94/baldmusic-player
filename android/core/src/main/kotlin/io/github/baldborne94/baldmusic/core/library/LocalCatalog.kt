@@ -53,6 +53,12 @@ data class LocalTrack(
     val numberFromName: Boolean = false,
     /** Il genere scritto nel file (come lo legge Android), per la radio del brano ([MoodRadio]). */
     val genre: String? = null,
+    /** Byte del file, per stimare la qualità quando Android non dice il bitrate. 0 = non si sa. */
+    val sizeBytes: Long = 0,
+    /** Bit al secondo come li dice Android (da Android 11). 0 = non si sa. */
+    val bitrate: Int = 0,
+    /** Dove comincia e finisce davvero il suono (misurato dall'app, [LoudnessMeter]); null = non ancora misurato. */
+    val trim: Trim? = null,
 ) {
     /** L'anno da mostrare e su cui ordinare. */
     val shownYear get() = if (originalYear > 0) originalYear else year
@@ -371,6 +377,7 @@ class LocalCatalog(
         albumId = ix.albumKeyOf(t)?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = ix.primary(t)?.let { MediaId(KEY, ARTIST, it).toString() },
         replayGain = t.replayGain,
+        trim = t.trim,
         group = group,
     )
 

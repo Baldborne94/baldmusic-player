@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "../components/Icon";
 import { ErrorState, Loading } from "../components/States";
-import { duplicates, folderName, isWindowsPath, previews, TRASH_SCRIPT_NAME, trashScript, type DuplicateGroup } from "../lib/cleanup";
+import { duplicates, folderName, isWindowsPath, keeping, previews, songQuality, TRASH_SCRIPT_NAME, trashScript, type DuplicateGroup } from "../lib/cleanup";
 import { isRealPath } from "../lib/collections";
 import { formatDuration, plural } from "../lib/format";
 import { mergeDuplicates, rememberTrashed } from "../lib/library";
+import { player } from "../lib/player";
 import { href } from "../lib/router";
 import { getClient } from "../lib/session";
 import { useLoad } from "../lib/useLoad";
@@ -19,6 +20,8 @@ export function CleanupPage() {
   const { data, error, loading, reload } = useLoad(() => getClient()!.allSongs(), []);
   // Righe tolte dalla pulizia: ID del brano tenuto (doppioni) o dell'anteprima.
   const [skip, setSkip] = useState<Set<string>>(new Set());
+  // Le copie scelte a mano: per ogni gruppo (la copia proposta) quella che resta.
+  const [chosen, setChosen] = useState<Map<string, string>>(new Map());
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string[] | null>(null);
   // Ultima riga toccata, per Maiuscolo + clic su un intervallo.
@@ -29,7 +32,8 @@ export function CleanupPage() {
   if (error || !data || !report) return <ErrorState message={error ?? "Libreria non disponibile"} onRetry={reload} />;
   if (!data.some((s) => s.path && isRealPath(s.path))) return <div className="page"><h1>Pulizia della libreria</h1><CollectionsHint status={{ state: "noRealPath", missing: [] }} /></div>;
 
-  const groups = report.dup.filter((g) => !skip.has(g.keep.id));
+  const shown = report.dup.map((g) => ({ key: g.keep.id, group: chosen.has(g.keep.id) ? keeping(g, chosen.get(g.keep.id)!) : g }));
+  const groups = shown.filter((x) => !skip.has(x.key)).map((x) => x.group);
   const prev = report.prev.filter((s) => !skip.has(s.id));
   const files = [...groups.flatMap((g) => g.others), ...prev];
   const windows = files.every((s) => s.path && isWindowsPath(s.path));
@@ -124,18 +128,36 @@ export function CleanupPage() {
         <section className="panel-box">
           <h2>Doppioni</h2>
           <p className="muted">
-            {plural(report.dup.length, "brano è", "brani sono")} in più copie, in cartelle diverse. Si tiene la copia coi tag più completi: le
-            raccolte che avevano le altre continuano ad avere il brano.
+            {plural(report.dup.length, "brano è", "brani sono")} in più copie, in cartelle diverse. Si tiene la copia che suona meglio (formato e
+            kbps), poi quella coi tag più completi; puoi sceglierne un'altra e ascoltarla prima. Le raccolte che avevano le altre continuano ad
+            avere il brano.
           </p>
           <SelectAll ids={dupIds} skip={skip} onChange={(on) => setMany(dupIds, on)} />
-          {report.dup.map((g: DuplicateGroup, i) => (
-            <Row
-              key={g.keep.id}
-              checked={!skip.has(g.keep.id)}
-              onClick={(shift) => click("dup", dupIds, i, shift)}
-              title={g.keep.title}
-              lines={[`${g.keep.artist ?? ""} · ${formatDuration(g.keep.duration)}`, `Resta in: ${folderName(g.keep.path)}`, `Da buttare: ${g.others.map((o) => folderName(o.path)).join(", ")}`]}
-            />
+          {shown.map(({ key, group: g }: { key: string; group: DuplicateGroup }, i) => (
+            <div key={key} className="clean-dup">
+              <Row
+                checked={!skip.has(key)}
+                onClick={(shift) => click("dup", dupIds, i, shift)}
+                title={g.keep.title}
+                lines={[`${g.keep.artist ?? ""} · ${formatDuration(g.keep.duration)}`]}
+              />
+              <ul className="clean-copies">
+                {[g.keep, ...g.others].sort((a, b) => folderName(a.path).localeCompare(folderName(b.path))).map((c) => (
+                  <li key={c.id} className={c.id === g.keep.id ? "is-kept" : ""}>
+                    <label>
+                      <input type="radio" name={`tieni-${key}`} checked={c.id === g.keep.id} onChange={() => setChosen((m) => new Map(m).set(key, c.id))} />
+                      <span>
+                        {c.id === g.keep.id ? "Resta in" : "Da buttare"}: {folderName(c.path)}
+                        {songQuality(c).label && <span className="muted"> · {songQuality(c).label}</span>}
+                      </span>
+                    </label>
+                    <button className="icon-btn" title="Ascolta questa copia" onClick={() => player.play([c], 0, false, { label: "Pulizia", id: `cleanup/${c.id}` })}>
+                      <Icon name="play" size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </section>
       )}

@@ -104,12 +104,14 @@ internal class CrossfadeController(
             drop()
             return
         }
-        val start = duration - seconds * 1000L
+        // Dalla fine vera del suono, non dai secondi di silenzio che tanti file scaricati hanno in fondo.
+        val end = Crossfade.audibleEnd(duration, current!!.trim)
+        val start = end - seconds * 1000L
         val position = player.currentPosition
         val index = player.currentMediaItemIndex
         when {
-            position in (start - 3_000) until start && outgoingFor != index -> prepare(current!!, start, index)
-            position >= start && outgoingFor == index -> start(duration - position)
+            position in (start - 3_000) until start && outgoingFor != index -> prepare(current, start, index)
+            position >= start && outgoingFor == index -> start(end - position)
         }
     }
 
@@ -185,7 +187,10 @@ internal class CrossfadeController(
             }
             crossIn = 0f
             seeking = true
-            player.seekToNextMediaItem()
+            // Il brano che entra salta il suo silenzio iniziale, se ne ha uno.
+            val next = player.nextMediaItemIndex
+            if (next == C.INDEX_UNSET) player.seekToNextMediaItem()
+            else player.seekTo(next, Crossfade.audibleStart(player.getMediaItemAt(next).trim))
             applyVolume()
             val total = (lengthMs - (SystemClock.elapsedRealtime() - begun)).coerceAtLeast(500L).toFloat()
             val t0 = SystemClock.elapsedRealtime()

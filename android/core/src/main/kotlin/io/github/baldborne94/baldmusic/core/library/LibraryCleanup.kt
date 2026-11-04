@@ -3,7 +3,16 @@ package io.github.baldborne94.baldmusic.core.library
 import kotlin.math.abs
 
 /** Lo stesso brano in più file: [keep] resta, [others] si possono buttare. */
-data class DuplicateGroup(val keep: LocalTrack, val others: List<LocalTrack>)
+data class DuplicateGroup(val keep: LocalTrack, val others: List<LocalTrack>) {
+    /** Tutte le copie, quella che resta per prima. */
+    val copies get() = listOf(keep) + others
+
+    /** Scelta a mano nella Pulizia: resta la copia [id], le altre si possono buttare. */
+    fun keeping(id: Long): DuplicateGroup {
+        val chosen = copies.firstOrNull { it.id == id } ?: return this
+        return DuplicateGroup(chosen, copies.filter { it.id != id }.sortedBy { it.folder.lowercase() })
+    }
+}
 
 /**
  * Pulizia della musica sul telefono. Le cartelle sono playlist scaricate, quindi lo
@@ -119,7 +128,45 @@ object LibraryCleanup {
      * Quale copia tenere: quella coi tag più completi (riconosciuta da MusicBrainz,
      * con l'artista dell'album, con l'anno), poi quella arrivata per prima.
      */
+    /** Quanto suona bene una copia: formato senza perdita, e i kbps (da Android, o stimati dalla dimensione). */
+    data class Quality(val format: String?, val lossless: Boolean, val kbps: Int) {
+        /** «FLAC · senza perdita», «MP3 · 320 kbps», «M4A»: per scegliere quale copia tenere. */
+        val label get() = listOfNotNull(format?.uppercase(), if (lossless) "senza perdita" else kbps.takeIf { it > 0 }?.let { "$it kbps" }).joinToString(" · ")
+
+        /**
+         * Fasce che si sentono: senza perdita, 320, 256, 192, 128 kbps e sotto. Dentro la stessa fascia
+         * (320 e 317 kbps) decidono i tag, come prima.
+         */
+        val rank get() = when {
+            lossless -> 5
+            kbps >= 300 -> 4
+            kbps >= 224 -> 3
+            kbps >= 160 -> 2
+            kbps >= 112 -> 1
+            else -> 0
+        }
+    }
+
+    private val LOSSLESS = setOf("flac", "wav", "aiff", "aif", "ape", "wv", "alac", "dsf")
+
+    fun quality(t: LocalTrack): Quality {
+        val format = t.fileName?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotEmpty() && it.length <= 5 }
+        val kbps = when {
+            t.bitrate > 0 -> t.bitrate / 1000
+            // Byte × 8 / millisecondi = kbps (la copertina nel file conta poco).
+            t.sizeBytes > 0 && t.durationMs > 0 -> (t.sizeBytes * 8 / t.durationMs).toInt()
+            else -> 0
+        }
+        return Quality(format, format in LOSSLESS, kbps)
+    }
+
+    /**
+     * La copia da tenere: prima quella che suona meglio ([Quality.rank]), poi quella coi tag più
+     * completi. Prima contavano solo i tag, e si poteva buttare un file a 320 kbps per tenerne uno
+     * a 128 con un tag in più.
+     */
     private val betterCopy: Comparator<LocalTrack> = compareBy<LocalTrack>(
+        { quality(it).rank },
         { it.albumMbid != null || it.releaseGroupMbid != null },
         { it.albumArtist != null },
         { it.shownYear > 0 },

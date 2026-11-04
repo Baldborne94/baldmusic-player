@@ -1887,6 +1887,33 @@ input[type="range"]:hover::-moz-range-thumb,
   display: block;
 }
 
+/* Pulizia: le copie di un doppione, quale resta e come suona. */
+.clean-copies {
+  list-style: none;
+  margin: 0 0 10px 34px;
+  padding: 0;
+}
+
+.clean-copies li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.clean-copies li.is-kept {
+  color: var(--text);
+}
+
+.clean-copies label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  cursor: pointer;
+}
+
 /* Cartelle senza raccolta da decidere: in cima a Raccolte e in Home. */
 .missing-collections {
   background: var(--panel-2);

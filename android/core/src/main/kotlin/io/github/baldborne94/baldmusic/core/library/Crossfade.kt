@@ -39,6 +39,27 @@ object Crossfade {
     }
 
     /**
+     * Dove finisce davvero il suono di un brano lungo [durationMs] ([trim] misurato dall'app): lì
+     * comincia la dissolvenza, non nei secondi di silenzio che molti file scaricati hanno in fondo
+     * (prima tra due canzoni si sentiva un vuoto). Solo se il silenzio dura almeno [MIN_SILENCE_MS].
+     */
+    fun audibleEnd(durationMs: Long, trim: Trim?): Long {
+        val end = trim?.endMs ?: return durationMs
+        return if (end in 1..(durationMs - MIN_SILENCE_MS)) end else durationMs
+    }
+
+    /** Da dove far partire il brano che entra: dopo il silenzio iniziale, se è lungo almeno [MIN_SILENCE_MS] e non più di [MAX_LEAD_SILENCE_MS]. */
+    fun audibleStart(trim: Trim?): Long {
+        val start = trim?.startMs ?: return 0
+        return if (start in MIN_SILENCE_MS..MAX_LEAD_SILENCE_MS) start else 0
+    }
+
+    /** Un silenzio più corto non si salta: è il respiro normale tra due brani. */
+    const val MIN_SILENCE_MS = 1_000L
+    /** Più lungo non è un silenzio da saltare: forse un'introduzione molto piano. */
+    const val MAX_LEAD_SILENCE_MS = 15_000L
+
+    /**
      * Serve controllare, più volte al secondo, se è ora di sfumare? Solo mentre si suona (o si
      * sta per suonare) con la dissolvenza accesa: in pausa o spenta il controllo si ferma.
      */
