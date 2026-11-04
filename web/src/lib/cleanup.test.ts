@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duplicates, folderName, isWindowsPath, nameKey, previews, psQuote, replaceCopies, trashScript, songVersion } from "./cleanup";
+import { duplicates, folderName, isWindowsPath, nameKey, previews, psQuote, replaceCopies, trashScript, songVersion, songQuality, keeping } from "./cleanup";
 import type { Song } from "./subsonic";
 
 const song = (id: string, title: string, artist: string, duration: number, extra: Partial<Song> = {}): Song => ({
@@ -139,5 +139,31 @@ describe("versioni censurate ed esplicite", () => {
     expect(songVersion(["Break Stuff - Radio Edit.mp3"])).toBe("clean");
     expect(songVersion(["Break Stuff (Uncensored)"])).toBe("explicit");
     expect(songVersion(["Clean", "Mr. Clean.mp3"])).toBe("unknown");
+  });
+});
+
+describe("qualità delle copie", () => {
+  it("si tiene la copia che suona meglio, poi quella coi tag migliori, come sul telefono", () => {
+    const base = { title: "Break Stuff", artist: "Limp Bizkit", duration: 166 };
+    // Prima vinceva la copia con l'ID di MusicBrainz anche a 128 kbps.
+    const low = { ...base, id: "low", suffix: "mp3", bitRate: 128, musicBrainzId: "x", path: "E:\\M\\Metal\\a.mp3" };
+    const high = { ...base, id: "high", suffix: "mp3", bitRate: 320, path: "E:\\M\\Nu\\a.mp3" };
+    expect(duplicates([low, high])[0].keep.id).toBe("high");
+    const flac = { ...base, id: "flac", suffix: "flac", bitRate: 900, path: "E:\\M\\Flac\\a.flac" };
+    expect(duplicates([high, flac])[0].keep.id).toBe("flac");
+    // Stessa fascia: decidono i tag.
+    const tagged = { ...base, id: "tagged", suffix: "mp3", bitRate: 317, musicBrainzId: "y", path: "E:\\M\\P\\a.mp3" };
+    expect(duplicates([high, tagged])[0].keep.id).toBe("tagged");
+    expect(songQuality(high).label).toBe("MP3 · 320 kbps");
+    expect(songQuality(flac).label).toBe("FLAC · senza perdita");
+  });
+
+  it("si sceglie a mano quale copia tenere", () => {
+    const base = { title: "X", artist: "Y", duration: 200 };
+    const g = duplicates([{ ...base, id: "a", bitRate: 320, path: "E:\\M\\A\\x.mp3" }, { ...base, id: "b", bitRate: 128, path: "E:\\M\\B\\x.mp3" }])[0];
+    const chosen = keeping(g, "b");
+    expect(chosen.keep.id).toBe("b");
+    expect(chosen.others.map((s) => s.id)).toEqual(["a"]);
+    expect(keeping(g, "zzz")).toBe(g);
   });
 });

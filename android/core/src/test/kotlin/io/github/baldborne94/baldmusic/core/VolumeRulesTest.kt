@@ -223,9 +223,10 @@ class VolumeRulesTest {
         // Cambia la dimensione: si rimisura anche a parità di data.
         assertNull(index.measure(FileStamp(1, 1, 2)))
         assertTrue(index.toJson().contains("\"version\":${LoudnessIndex.VERSION}"))
-        // Le misure della versione 1 (mono 3 dB più piani) si rifanno.
-        assertEquals(2, LoudnessIndex.VERSION)
+        // Le misure delle versioni 1 (mono 3 dB più piani) e 2 (senza i silenzi) si rifanno.
+        assertEquals(3, LoudnessIndex.VERSION)
         assertEquals(1, LoudnessIndex.fromJson("""{"version":1,"entries":{"1":{"modified":1,"size":1,"lufs":-9}}}""").pending(listOf(FileStamp(1, 1, 1))).size)
+        assertEquals(1, LoudnessIndex.fromJson("""{"version":2,"entries":{"1":{"modified":1,"size":1,"lufs":-9}}}""").pending(listOf(FileStamp(1, 1, 1))).size)
         assertEquals(1, LoudnessIndex.fromJson("""{"entries":{"1":{"modified":1,"size":1,"lufs":-9}}}""").pending(listOf(FileStamp(1, 1, 1))).size)
         assertEquals(1, LoudnessIndex.fromJson("{rotto").pending(listOf(FileStamp(1, 1, 1))).size)
         // Un file che non si è potuto misurare non si riprova, ma non ha misura.

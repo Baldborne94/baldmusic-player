@@ -23,7 +23,7 @@ test("Pulizia: doppioni e anteprime, le raccolte passano alla copia tenuta, si s
 
   await expect(page.getByRole("heading", { name: "Doppioni" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Brani di 30 secondi" })).toBeVisible();
-  const dup = page.locator(".clean-row", { hasText: "Resta in: Rock" });
+  const dup = page.locator(".clean-dup", { hasText: "Resta in: Rock" });
   await expect(dup).toContainText("Da buttare: Disney Italia");
   await expect(page.locator(".clean-row", { hasText: "Hakuna Matata" })).toContainText("0:30");
 
@@ -49,6 +49,23 @@ test("Pulizia: doppioni e anteprime, le raccolte passano alla copia tenuta, si s
     [copy.path, "tenuto"],
     [preview.path, undefined],
   ]);
+});
+
+test("Pulizia: si sceglie a mano quale copia tenere, e quella resta fuori dallo script", async ({ page, navidrome, login }) => {
+  await navidrome({ songs: [copy, kept, other] });
+  acceptDialogs(page);
+  await login("#/cleanup");
+  // Il gruppo resta lo stesso anche dopo la scelta: lo si trova per titolo.
+  const dup = page.locator(".clean-dup", { hasText: copy.title });
+  await expect(dup).toContainText("Resta in: Rock");
+  await dup.getByText("Da buttare: Disney Italia").click();
+  await expect(dup).toContainText("Resta in: Disney Italia");
+  await expect(dup).toContainText("Da buttare: Rock");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Prepara la pulizia (1 file)" }).click();
+  const script = await readFile(await (await download).path(), "utf8");
+  expect(script).toContain(`'${kept.path}'`);
+  expect(script).not.toContain(`'${copy.path}'`);
 });
 
 test("Pulizia: deselezionare un'anteprima la toglie dallo script", async ({ page, navidrome, login }) => {

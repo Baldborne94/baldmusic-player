@@ -70,6 +70,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-1 | Album dal vivo o concept, ascolta il passaggio tra due brani | Nessuna pausa e nessuna dissolvenza (stesso album) |
 | A-2 | Impostazioni → Dissolvenza: prova Spenta, 3, 12 s | Spenta = passaggio netto; 12 s = sfumatura lunga; un disco ascoltato in ordine (traccia 3 → 4) resta attaccato |
 | A-2b | Una raccolta di file scaricati (anche senza tag dell'album), dissolvenza 6 s, lascia finire un brano da solo | Il brano che finisce si abbassa senza interrompersi nemmeno un attimo all'inizio della sfumatura, il successivo sale; lo stesso in casuale con brani dello stesso album |
+| A-2c | Dopo una notte in carica (o «Misura adesso»), un brano scaricato con qualche secondo di silenzio in fondo, dissolvenza 6 s | La dissolvenza comincia quando il suono finisce davvero, senza vuoto; il brano dopo parte senza il suo silenzio iniziale |
 | A-3 | Durante una dissolvenza premi pausa, poi «avanti», poi trascina la barra | La dissolvenza si interrompe subito, niente due brani insieme |
 | A-4 | Volume uguale: Album / Brano / Spento con brani vecchi e recenti | Con Album o Brano i brani vecchi e nuovi hanno volume simile; mai distorsione |
 | A-4b | Volume uguale su «Album», casuale su una raccolta di file scaricati (anche senza tag dell'album) | Le canzoni hanno tutte più o meno lo stesso volume; aprendo un disco vero e ascoltandolo in ordine restano le differenze del disco |
@@ -94,6 +95,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 |---|-----------|---------------------|
 | P-1 | Pulizia: un doppione tra due cartelle → «Butta le copie doppie»; una seconda volta ruota il telefono mentre è aperta la finestra di Android | Conferma dell'app e poi di Android; il file va nel cestino; le raccolte che lo avevano hanno ancora il brano (la copia tenuta), anche dopo la rotazione |
 | P-1b | Due copie della stessa canzone, una «(Clean)» o «Radio Edit» nel nome del file o nell'album e l'altra no (o «Explicit») | Pulizia → doppioni non le propone: restano tutte e due; Brani nel cestino ripristina quella buttata prima |
+| P-1c | Pulizia con un doppione a 128 kbps e uno a 320 (o FLAC) | Resta quello a 320/FLAC, ogni copia dice formato e kbps; ▶ la fa sentire; toccando l'altra copia si tiene quella e va nel cestino la prima |
 | P-2 | Pulizia: anteprime di 30 s | Elencate solo brani da 25–35 s |
 | P-3 | Brani nel cestino → ripristina un doppione | Il file torna nella sua cartella e nella sua raccolta, al posto della copia che lo aveva sostituito |
 | P-4 | Elimina una raccolta «con i brani dal telefono» | Doppia conferma; i file nel cestino di Android (recuperabili 30 giorni) |

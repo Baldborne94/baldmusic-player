@@ -26,6 +26,8 @@ private const val EXTRA_RG_TRACK = "io.github.baldborne94.baldmusic.RG_TRACK"
 private const val EXTRA_RG_ALBUM = "io.github.baldborne94.baldmusic.RG_ALBUM"
 private const val EXTRA_RG_TRACK_PEAK = "io.github.baldborne94.baldmusic.RG_TRACK_PEAK"
 private const val EXTRA_RG_ALBUM_PEAK = "io.github.baldborne94.baldmusic.RG_ALBUM_PEAK"
+private const val EXTRA_TRIM_START = "io.github.baldborne94.baldmusic.TRIM_START"
+private const val EXTRA_TRIM_END = "io.github.baldborne94.baldmusic.TRIM_END"
 
 /** Chiave nelle RequestMetadata: "riproduci in ordine casuale partendo da un brano a caso". */
 const val EXTRA_SHUFFLE = "io.github.baldborne94.baldmusic.SHUFFLE"
@@ -43,6 +45,11 @@ fun LibraryNode.toMediaItem(context: Context): MediaItem {
             rg.albumGain?.let { putFloat(EXTRA_RG_ALBUM, it) }
             rg.trackPeak?.let { putFloat(EXTRA_RG_TRACK_PEAK, it) }
             rg.albumPeak?.let { putFloat(EXTRA_RG_ALBUM_PEAK, it) }
+        }
+        // Dove cominciano e finiscono i silenzi: la dissolvenza parte dalla fine vera del suono.
+        trim?.let { t ->
+            putLong(EXTRA_TRIM_START, t.startMs)
+            putLong(EXTRA_TRIM_END, t.endMs)
         }
         // Come Android Auto deve disegnare i figli di questo nodo.
         putInt(MediaConstants.EXTRAS_KEY_CONTENT_STYLE_BROWSABLE, style)
@@ -80,6 +87,14 @@ fun LibraryNode.toMediaItem(context: Context): MediaItem {
 }
 
 /** Il ReplayGain messo negli extra da [toMediaItem]; null se il brano non ne ha. */
+/** Dove cominciano e finiscono i silenzi del brano, se l'app li ha misurati. */
+val MediaItem.trim: io.github.baldborne94.baldmusic.core.library.Trim?
+    get() {
+        val e = mediaMetadata.extras ?: return null
+        if (!e.containsKey(EXTRA_TRIM_END)) return null
+        return io.github.baldborne94.baldmusic.core.library.Trim(e.getLong(EXTRA_TRIM_START), e.getLong(EXTRA_TRIM_END))
+    }
+
 val MediaItem.replayGain: ReplayGain?
     get() {
         val e = mediaMetadata.extras ?: return null

@@ -1,6 +1,7 @@
 package io.github.baldborne94.baldmusic.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,11 +15,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.HealthAndSafety
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +43,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.DuplicateGroup
+import io.github.baldborne94.baldmusic.core.library.LibraryCleanup
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.LocalTrack
 
@@ -53,6 +57,8 @@ fun CleanupScreen(vm: PlayerViewModel) {
     val ui = LocalUi.current
     val context = LocalContext.current
     var report by remember { mutableStateOf<Pair<List<DuplicateGroup>, List<LocalTrack>>?>(null) }
+    // Le copie scelte a mano: per ogni gruppo (la copia proposta) quella che resta.
+    var chosen by remember { mutableStateOf(mapOf<Long, Long>()) }
     // Dopo ogni cestino la libreria si rilegge (libraryVersion) e la pagina si aggiorna.
     LaunchedEffect(vm.libraryVersion) { report = context.app.local.cleanup() }
     val trash = ui.trash
@@ -76,10 +82,11 @@ fun CleanupScreen(vm: PlayerViewModel) {
                 Text("  Salute della libreria: quali tag sistemare, cartella per cartella", color = Accent)
             }
         }
-        val (duplicates, previews) = report ?: run {
+        val (proposed, previews) = report ?: run {
             item { Loading() }
             return@LazyColumn
         }
+        val duplicates = proposed.map { g -> chosen[g.keep.id]?.let(g::keeping) ?: g }
         if (trash == null) {
             item { Message("Per buttare i file nel cestino serve Android 11 o successivo.") }
         }
@@ -93,8 +100,9 @@ fun CleanupScreen(vm: PlayerViewModel) {
             item {
                 Intro(
                     title = "Doppioni",
-                    text = "${count(duplicates.size, "brano", "brani")} in più copie, in cartelle diverse. Si tiene una copia sola " +
-                        "(quella coi tag più completi): le raccolte che avevano le altre continuano ad avere il brano.",
+                    text = "${count(duplicates.size, "brano", "brani")} in più copie, in cartelle diverse. Si tiene una copia sola: " +
+                        "quella che suona meglio (formato e kbps), poi quella coi tag più completi. Tocca una copia per tenere quella, " +
+                        "▶ per ascoltarla. Le raccolte che avevano le altre continuano ad avere il brano.",
                     action = if (trash != null) "Tieni una copia di tutti (${count(extra, "file", "file")} nel cestino)" else null,
                 ) {
                     trash?.invoke(duplicates.flatMap { g -> g.others.map(::asItem) }, "Buttare ${count(extra, "copia doppia", "copie doppie")}?", KEEP_NOTE) {
@@ -102,18 +110,40 @@ fun CleanupScreen(vm: PlayerViewModel) {
                     }
                 }
             }
-            items(duplicates, key = { "d" + it.keep.id }) { g ->
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(g.keep.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(listOfNotNull(g.keep.artist, duration(g.keep.durationMs)).joinToString(" · "), color = TextMuted, fontSize = 13.sp, maxLines = 1)
-                        Text("Resta in: ${folderName(g.keep)}", color = Accent, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Da buttare: ${g.others.joinToString { folderName(it) }}", color = TextMuted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            items(proposed.indices.toList(), key = { "d" + proposed[it].keep.id }) { i ->
+                val g = duplicates[i]
+                val groupKey = proposed[i].keep.id
+                Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(g.keep.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(listOfNotNull(g.keep.artist, duration(g.keep.durationMs)).joinToString(" · "), color = TextMuted, fontSize = 13.sp, maxLines = 1)
+                        }
+                        if (trash != null) {
+                            IconButton(onClick = {
+                                trash(g.others.map(::asItem), "Tenere una copia sola di “${g.keep.title}”?", KEEP_NOTE) { vm.mergeDuplicates(listOf(g)) }
+                            }) { Icon(Icons.Rounded.Delete, "Butta le copie doppie", tint = Danger) }
+                        }
                     }
-                    if (trash != null) {
-                        IconButton(onClick = {
-                            trash(g.others.map(::asItem), "Tenere una copia sola di “${g.keep.title}”?", KEEP_NOTE) { vm.mergeDuplicates(listOf(g)) }
-                        }) { Icon(Icons.Rounded.Delete, "Butta le copie doppie", tint = Danger) }
+                    // Ogni copia: dove sta e come suona. Si tocca per tenere quella, ▶ per sentirla.
+                    g.copies.sortedBy { it.folder.lowercase() }.forEach { c ->
+                        val keep = c.id == g.keep.id
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { chosen = chosen + (groupKey to c.id) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = keep, onClick = { chosen = chosen + (groupKey to c.id) })
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    (if (keep) "Resta in: " else "Da buttare: ") + folderName(c),
+                                    color = if (keep) Accent else TextMuted, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                )
+                                LibraryCleanup.quality(c).label.takeIf { it.isNotEmpty() }?.let {
+                                    Text(it, color = TextMuted, fontSize = 12.sp, maxLines = 1)
+                                }
+                            }
+                            IconButton(onClick = { vm.play(asItem(c), from = "Pulizia") }) { Icon(Icons.Rounded.PlayArrow, "Ascolta questa copia") }
+                        }
                     }
                 }
             }

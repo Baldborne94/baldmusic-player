@@ -13,7 +13,7 @@ import kotlin.math.pow
 class LoudnessIndex private constructor(private val entries: MutableMap<Long, Entry>) {
 
     @Serializable
-    data class Entry(val modified: Long, val size: Long, val lufs: Float? = null, val peak: Float? = null)
+    data class Entry(val modified: Long, val size: Long, val lufs: Float? = null, val peak: Float? = null, val startMs: Long = 0, val endMs: Long? = null)
 
     @Serializable
     private data class Stored(val version: Int, val entries: Map<Long, Entry> = emptyMap())
@@ -24,7 +24,7 @@ class LoudnessIndex private constructor(private val entries: MutableMap<Long, En
 
     /** La misura del file, se è già stata fatta e il file non è cambiato. */
     @Synchronized
-    fun measure(stamp: FileStamp): Measure? = entry(stamp)?.let { e -> e.lufs?.let { Measure(it, e.peak ?: 1f) } }
+    fun measure(stamp: FileStamp): Measure? = entry(stamp)?.let { e -> e.lufs?.let { Measure(it, e.peak ?: 1f, e.startMs, e.endMs) } }
 
     /** I file ancora da misurare tra [files]. */
     @Synchronized
@@ -32,7 +32,7 @@ class LoudnessIndex private constructor(private val entries: MutableMap<Long, En
 
     @Synchronized
     fun put(stamp: FileStamp, measure: Measure?) {
-        entries[stamp.id] = Entry(stamp.modified, stamp.size, measure?.lufs, measure?.peak)
+        entries[stamp.id] = Entry(stamp.modified, stamp.size, measure?.lufs, measure?.peak, measure?.startMs ?: 0, measure?.endMs)
     }
 
     /** Toglie i file che non ci sono più; true se ne ha tolto qualcuno. */
@@ -45,7 +45,8 @@ class LoudnessIndex private constructor(private val entries: MutableMap<Long, En
     companion object {
         /** Da aumentare quando cambia come si misura: le misure si rifanno da capo. */
         // 2: i file mono si misurano come doppio mono (prima risultavano 3 dB più piani).
-        const val VERSION = 2
+        // 3: anche dove cominciano e finiscono i silenzi, per la dissolvenza.
+        const val VERSION = 3
 
         private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
@@ -61,9 +62,18 @@ class LoudnessIndex private constructor(private val entries: MutableMap<Long, En
          * differenze volute.
          */
         fun applyTo(tracks: List<LocalTrack>, measure: (LocalTrack) -> Measure?): List<LocalTrack> {
+            // I silenzi valgono per tutti i brani misurati; il volume solo per chi non ha il ReplayGain nei tag.
+            val all = HashMap<Long, Measure>()
+            tracks.forEach { t -> measure(t)?.let { all[t.id] = it } }
+            if (all.isEmpty()) return tracks
+            val withTrim = tracks.map { t -> all[t.id]?.trim?.let { t.copy(trim = it) } ?: t }
             val measured = HashMap<Long, Measure>()
-            tracks.forEach { t -> if (t.replayGain == null) measure(t)?.let { measured[t.id] = it } }
-            if (measured.isEmpty()) return tracks
+            withTrim.forEach { t -> if (t.replayGain == null) all[t.id]?.let { measured[t.id] = it } }
+            if (measured.isEmpty()) return withTrim
+            return withGain(withTrim, measured)
+        }
+
+        private fun withGain(tracks: List<LocalTrack>, measured: Map<Long, Measure>): List<LocalTrack> {
             val albums = tracks.filter { it.id in measured && it.album != null }.groupBy { it.albumId }.filterValues { it.size > 1 }
             val albumGain = HashMap<Long, Pair<Float, Float>>()
             albums.values.forEach { list ->
