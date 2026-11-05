@@ -46,6 +46,14 @@ class CoverScreenTest {
     }
 
     @Test
+    fun `un tocco ferma o fa ripartire, due tocchi mettono mi piace`() {
+        assertEquals(CoverScreen.Touch.PLAY_PAUSE, CoverScreen.tap(1))
+        assertEquals(CoverScreen.Touch.LIKE, CoverScreen.tap(2))
+        assertNull(CoverScreen.tap(0))
+        assertNull(CoverScreen.tap(3))
+    }
+
+    @Test
     fun `scorrere di lato cambia brano, un tocco mosso no`() {
         assertEquals(1, CoverScreen.swipe(-300f, 1000f))
         assertEquals(-1, CoverScreen.swipe(300f, 1000f))

@@ -53,6 +53,19 @@ object CoverScreen {
     /** La luminosità all'ora [hour] (0–23, ora del telefono). */
     fun brightness(hour: Int): Float = if (hour >= NIGHT_FROM || hour < NIGHT_UNTIL) NIGHT_BRIGHTNESS else BRIGHTNESS
 
+    /** Cosa fa toccare lo schermo copertina. */
+    enum class Touch { PLAY_PAUSE, LIKE }
+
+    /**
+     * [count] tocchi di fila: uno ferma la musica o la fa ripartire (e mostra i comandi), due
+     * mettono o tolgono «mi piace» senza toccare la musica.
+     */
+    fun tap(count: Int): Touch? = when (count) {
+        1 -> Touch.PLAY_PAUSE
+        2 -> Touch.LIKE
+        else -> null
+    }
+
     /**
      * Uno scorrimento di lato di [dragPx] punti (negativo = verso sinistra), su uno schermo largo
      * [widthPx]: +1 il brano dopo (verso sinistra, come sfogliare), −1 quello prima, 0 niente
