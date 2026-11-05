@@ -63,6 +63,18 @@
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|keyboardHidden" />
 
+        <!-- Lo schermo copertina come salvaschermo di Android, col telefono in carica. -->
+        <service
+            android:name=".ui.CoverDream"
+            android:exported="true"
+            android:label="BaldMusic – copertina"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <!--
           Il cuore dell'app: riproduce la musica e espone la libreria. L'action
           MediaBrowserService è quella che Android Auto cerca per elencare le app
