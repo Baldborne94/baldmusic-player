@@ -27,6 +27,7 @@ import io.github.baldborne94.baldmusic.playback.toTrackRef
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.guava.await
+import io.github.baldborne94.baldmusic.core.library.CoverScreen
 import kotlinx.coroutines.launch
 
 /**
@@ -84,9 +85,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             app.settings.lyricsOnline = value
         }
 
+    /** Schermo copertina da solo: armato quando parte la musica ([CoverScreen.arms]), si apre una volta. */
+    var coverArmed = false
+    /** Il testo è aperto in «In riproduzione»: lo schermo copertina non si apre da solo. */
+    var reading = false
+    private var newQueue = false
+
     private val listener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) newQueue = true
+        }
+
         // La coda si rilegge solo quando cambia: play, pausa e buffering non la toccano.
         override fun onEvents(player: Player, events: Player.Events) = sync(player, queueChanged = events.contains(Player.EVENT_TIMELINE_CHANGED))
+    }
+
+    /** Lo schermo copertina aperto a mano: quello automatico non serve più per questa partenza. */
+    fun openCover(context: android.content.Context) {
+        coverArmed = false
+        CoverActivity.open(context)
     }
 
     init {
@@ -122,7 +139,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun sync(p: Player, queueChanged: Boolean = true) {
         current = p.currentMediaItem
+        val wasPlaying = isPlaying
         isPlaying = p.isPlaying
+        if (CoverScreen.arms(wasPlaying, isPlaying, newQueue)) coverArmed = true
+        if (isPlaying) newQueue = false
         buffering = p.playbackState == Player.STATE_BUFFERING
         shuffle = p.shuffleModeEnabled
         repeat = p.repeatMode

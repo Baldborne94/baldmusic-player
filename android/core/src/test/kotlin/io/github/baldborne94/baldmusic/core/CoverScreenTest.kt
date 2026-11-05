@@ -27,6 +27,27 @@ class CoverScreenTest {
     }
 
     @Test
+    fun `si arma quando parte la musica o una coda nuova`() {
+        assertTrue(CoverScreen.arms(wasPlaying = false, playing = true, newQueue = false))
+        assertTrue(CoverScreen.arms(wasPlaying = true, playing = true, newQueue = true))
+        // Suona gia (passa al brano dopo): non si riarma, cosi chiuso a mano non torna.
+        assertFalse(CoverScreen.arms(wasPlaying = true, playing = true, newQueue = false))
+        assertFalse(CoverScreen.arms(wasPlaying = true, playing = false, newQueue = true))
+    }
+
+    @Test
+    fun `si apre da solo dopo qualche secondo senza toccare il telefono`() {
+        val idle = CoverScreen.IDLE_MS
+        assertTrue(CoverScreen.autoOpen(enabled = true, armed = true, playing = true, reading = false, idleMs = idle))
+        assertFalse(CoverScreen.autoOpen(enabled = true, armed = true, playing = true, reading = false, idleMs = idle - 1))
+        assertFalse(CoverScreen.autoOpen(enabled = false, armed = true, playing = true, reading = false, idleMs = idle))
+        assertFalse(CoverScreen.autoOpen(enabled = true, armed = false, playing = true, reading = false, idleMs = idle))
+        assertFalse(CoverScreen.autoOpen(enabled = true, armed = true, playing = false, reading = false, idleMs = idle))
+        // Col testo aperto lo stai leggendo.
+        assertFalse(CoverScreen.autoOpen(enabled = true, armed = true, playing = true, reading = true, idleMs = idle * 10))
+    }
+
+    @Test
     fun `la copertina si sposta di poco e ogni volta altrove`() {
         val steps = (0L until 18L).map(CoverScreen::shift)
         steps.forEach { (x, y) ->

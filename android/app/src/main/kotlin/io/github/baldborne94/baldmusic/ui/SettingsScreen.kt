@@ -151,6 +151,22 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
             )
         }
+        var coverAuto by remember { mutableStateOf(context.app.settings.coverAuto) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Schermo copertina da solo", fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Quando parte la musica e non tocchi il telefono per 10 secondi, la copertina va a tutto schermo e lo schermo resta acceso finché suona (anche col telefono bloccato).",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            androidx.compose.material3.Switch(
+                checked = coverAuto,
+                onCheckedChange = { coverAuto = it; context.app.settings.coverAuto = it },
+                colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
+            )
+        }
         Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds
