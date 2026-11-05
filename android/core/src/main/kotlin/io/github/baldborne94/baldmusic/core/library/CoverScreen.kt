@@ -33,6 +33,23 @@ object CoverScreen {
     /** Da quando si è fermato: resta lo stesso finché non riparte. */
     fun stoppedAt(playing: Boolean, before: Long?, nowMs: Long): Long? = if (playing) null else before ?: nowMs
 
+    /** Senza toccare il telefono per così, con la musica appena partita, lo schermo copertina si apre da solo. */
+    const val IDLE_MS = 10_000L
+
+    /**
+     * Si arma quando parte la musica ([playing] dopo [wasPlaying] fermo) o quando parte una coda
+     * nuova ([newQueue]: hai scelto altro da ascoltare); resta armato finché non si apre.
+     */
+    fun arms(wasPlaying: Boolean, playing: Boolean, newQueue: Boolean): Boolean = playing && (!wasPlaying || newQueue)
+
+    /**
+     * Aprirlo da solo adesso: acceso nelle impostazioni, armato, la musica suona e non tocchi il
+     * telefono da [IDLE_MS]. Mai col testo aperto ([reading]): lo stai leggendo. Una volta sola
+     * per ogni partenza: chiuso a mano non torna finché la musica non riparte.
+     */
+    fun autoOpen(enabled: Boolean, armed: Boolean, playing: Boolean, reading: Boolean, idleMs: Long): Boolean =
+        enabled && armed && playing && !reading && idleMs >= IDLE_MS
+
     /** Lo spostamento (dx, dy in dp) al passo [step]: un giro attorno al centro, mai fermo nello stesso punto. */
     fun shift(step: Long): Pair<Int, Int> {
         val (x, y) = PATH[Math.floorMod(step, PATH.size.toLong()).toInt()]

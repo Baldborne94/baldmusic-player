@@ -50,8 +50,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -62,6 +66,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
+import coil3.compose.AsyncImage
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
@@ -73,7 +78,8 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 
 /**
- * «Schermo copertina» (da «In riproduzione»): fondo nero, la copertina grande e il titolo,
+ * «Schermo copertina» (da «In riproduzione», o da solo quando parte la musica: [CoverScreen.autoOpen]):
+ * la copertina a tutto schermo, da bordo a bordo su uno sfondo che è la stessa copertina sfocata, e il titolo,
  * anche col telefono bloccato, come il salvaschermo di un Kindle. Lo schermo resta acceso e
  * poco luminoso solo mentre suona ([CoverScreen.keepAwake]); poi si spegne da solo come sempre.
  * Sta sopra il blocco schermo senza sbloccarlo: chiudendolo col telefono bloccato si torna al
@@ -215,28 +221,49 @@ private fun CoverScreenContent(
                 touchedAt = System.currentTimeMillis()
             },
     ) {
-        BoxWithConstraints(Modifier.fillMaxSize().offset(x, y), contentAlignment = Alignment.Center) {
-            // Grande, ma con spazio per il titolo anche col telefono girato.
-            val side = min(min(maxWidth * 0.82f, maxHeight * 0.62f), 560.dp)
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.alpha(shown)) {
-                Artwork(item, Modifier.size(side), shape = RoundedCornerShape(8.dp))
+        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // A tutto schermo: dietro la stessa copertina ingrandita, sfocata e scurita fino ai
+            // bordi (la copertina è quadrata, lo schermo no: tagliata si perderebbero i lati).
+            item?.mediaMetadata?.artworkUri?.let { uri ->
+                AsyncImage(
+                    model = uri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Un po' più grande dello schermo: spostandosi non scopre i bordi.
+                            scaleX = 1.15f
+                            scaleY = 1.15f
+                            translationX = x.toPx()
+                            translationY = y.toPx()
+                        }
+                        // Android 12 e oltre; prima resta solo scurita.
+                        .blur(40.dp)
+                        .alpha(0.45f * shown),
+                )
+            }
+            // Da bordo a bordo, con lo spazio per il titolo anche col telefono girato.
+            val side = min(min(maxWidth, maxHeight * 0.7f), 720.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.offset(x, y).alpha(shown)) {
+                Artwork(item, Modifier.size(side), shape = RectangleShape)
                 Text(
                     item?.title().orEmpty(),
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 18.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 20.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(max = side).padding(top = 18.dp),
+                    modifier = Modifier.widthIn(max = side).padding(start = 24.dp, end = 24.dp, top = 20.dp),
                 )
                 Text(
                     item?.mediaMetadata?.artist?.toString().orEmpty(),
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.widthIn(max = side).padding(top = 4.dp),
+                    modifier = Modifier.widthIn(max = side).padding(start = 24.dp, end = 24.dp, top = 4.dp),
                 )
             }
         }

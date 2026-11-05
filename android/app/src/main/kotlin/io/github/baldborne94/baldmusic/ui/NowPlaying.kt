@@ -117,6 +117,11 @@ fun NowPlayingScreen(
     var showLyrics by rememberSaveable { mutableStateOf(false) }
     // Col testo aperto il tasto indietro lo riduce, invece di chiudere il lettore.
     androidx.activity.compose.BackHandler(enabled = showLyrics) { showLyrics = false }
+    // Mentre leggi il testo lo schermo copertina non si apre da solo.
+    androidx.compose.runtime.DisposableEffect(showLyrics) {
+        vm.reading = showLyrics
+        onDispose { vm.reading = false }
+    }
     var sleepSheet by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf(false) }
@@ -200,7 +205,7 @@ fun NowPlayingScreen(
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Schermo copertina") },
                             leadingIcon = { Icon(Icons.Rounded.Fullscreen, null) },
-                            onClick = { menu = false; CoverActivity.open(context) },
+                            onClick = { menu = false; vm.openCover(context) },
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Timer di spegnimento") },
@@ -294,7 +299,7 @@ fun NowPlayingScreen(
                 SleepButton(sleepEnd) { sleepSheet = true }
                 Spacer(Modifier.weight(1f))
                 // La copertina a tutto schermo, anche col telefono bloccato (come un Kindle).
-                IconButton(onClick = { CoverActivity.open(context) }) { Icon(Icons.Rounded.Fullscreen, "Schermo copertina") }
+                IconButton(onClick = { vm.openCover(context) }) { Icon(Icons.Rounded.Fullscreen, "Schermo copertina") }
                 IconButton(onClick = { showLyrics = !showLyrics }) {
                     Icon(Icons.Rounded.Mic, "Testo", tint = if (showLyrics) Accent else Color.White)
                 }
