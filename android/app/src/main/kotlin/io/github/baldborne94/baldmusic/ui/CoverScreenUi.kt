@@ -151,7 +151,7 @@ internal class CoverPlayer(private val context: Context, private val onGone: () 
 
 /**
  * La copertina a tutto schermo: da bordo a bordo, dietro la stessa copertina ingrandita,
- * sfocata e scurita. Un tocco mostra i comandi, il doppio tocco mette o toglie «mi piace»,
+ * sfocata e scurita. Un tocco ferma la musica o la fa ripartire (e mostra i comandi), il doppio tocco mette o toglie «mi piace»,
  * scorrere di lato cambia brano.
  */
 @Composable
@@ -201,13 +201,21 @@ internal fun CoverScreenContent(player: CoverPlayer, onClose: () -> Unit, onTouc
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { touchedAt = System.currentTimeMillis() },
-                    onDoubleTap = {
-                        player.current?.let { context.app.userData.toggleLike(it.toTrackRef()) }
-                        heartAt = System.currentTimeMillis()
-                    },
-                )
+                fun touched(count: Int) {
+                    when (CoverScreen.tap(count)) {
+                        // Ferma o fa ripartire, e mostra i comandi (✕ per chiudere).
+                        CoverScreen.Touch.PLAY_PAUSE -> {
+                            player.toggle()
+                            touchedAt = System.currentTimeMillis()
+                        }
+                        CoverScreen.Touch.LIKE -> {
+                            player.current?.let { context.app.userData.toggleLike(it.toTrackRef()) }
+                            heartAt = System.currentTimeMillis()
+                        }
+                        null -> Unit
+                    }
+                }
+                detectTapGestures(onTap = { touched(1) }, onDoubleTap = { touched(2) })
             }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
