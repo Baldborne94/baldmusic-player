@@ -19,6 +19,41 @@ class CoverScreenTest {
     }
 
     @Test
+    fun `fermato dal timer di spegnimento si spegne subito`() {
+        assertFalse(CoverScreen.keepAwake(playing = false, stoppedAtMs = 1_000, nowMs = 1_001, byTimer = true))
+        // Finche suona il timer non conta.
+        assertTrue(CoverScreen.keepAwake(playing = true, stoppedAtMs = null, nowMs = 1_001, byTimer = true))
+    }
+
+    @Test
+    fun `con poca batteria e senza caricatore non resta acceso`() {
+        val low = CoverScreen.LOW_BATTERY - 1
+        assertFalse(CoverScreen.keepAwake(playing = true, stoppedAtMs = null, nowMs = 0, batteryPercent = low, charging = false))
+        assertTrue(CoverScreen.keepAwake(playing = true, stoppedAtMs = null, nowMs = 0, batteryPercent = low, charging = true))
+        assertTrue(CoverScreen.keepAwake(playing = true, stoppedAtMs = null, nowMs = 0, batteryPercent = CoverScreen.LOW_BATTERY, charging = false))
+        // Batteria sconosciuta: come prima.
+        assertTrue(CoverScreen.keepAwake(playing = true, stoppedAtMs = null, nowMs = 0, batteryPercent = null))
+    }
+
+    @Test
+    fun `di notte la luminosita e piu bassa`() {
+        assertEquals(CoverScreen.NIGHT_BRIGHTNESS, CoverScreen.brightness(23))
+        assertEquals(CoverScreen.NIGHT_BRIGHTNESS, CoverScreen.brightness(0))
+        assertEquals(CoverScreen.NIGHT_BRIGHTNESS, CoverScreen.brightness(6))
+        assertEquals(CoverScreen.BRIGHTNESS, CoverScreen.brightness(7))
+        assertEquals(CoverScreen.BRIGHTNESS, CoverScreen.brightness(21))
+        assertTrue(CoverScreen.NIGHT_BRIGHTNESS < CoverScreen.BRIGHTNESS)
+    }
+
+    @Test
+    fun `scorrere di lato cambia brano, un tocco mosso no`() {
+        assertEquals(1, CoverScreen.swipe(-300f, 1000f))
+        assertEquals(-1, CoverScreen.swipe(300f, 1000f))
+        assertEquals(0, CoverScreen.swipe(-150f, 1000f))
+        assertEquals(0, CoverScreen.swipe(500f, 0f))
+    }
+
+    @Test
     fun `il momento in cui si e fermato non si sposta finche non riparte`() {
         val first = CoverScreen.stoppedAt(playing = false, before = null, nowMs = 100)
         assertEquals(100L, first)

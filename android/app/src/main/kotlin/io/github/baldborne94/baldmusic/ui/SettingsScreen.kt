@@ -167,6 +167,16 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
             )
         }
+        // Col telefono in carica la copertina anche quando la musica parte dalle cuffie, da Auto o con l'app chiusa.
+        Text(
+            "Col telefono in carica: scegli «BaldMusic – copertina» come salvaschermo e «In carica» come quando avviarlo.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedButton(onClick = {
+            runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_DREAM_SETTINGS)) }
+                .recoverCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)) }
+        }) { Text("Salvaschermo del telefono") }
         Spacer(Modifier.height(12.dp))
         Text("Server Navidrome", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         val current = creds
