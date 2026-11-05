@@ -10,6 +10,7 @@ import io.github.baldborne94.baldmusic.core.library.MediaId
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -297,6 +298,20 @@ class CatalogRulesTest {
         assertNull(LocalCatalog.collectionFolder("Music"))
         assertNull(LocalCatalog.collectionFolder(""))
         assertNull(LocalCatalog.collectionFolder("Android/media/com.whatsapp"))
+    }
+
+    @Test
+    fun `gli audio di WhatsApp non sono musica`() {
+        assertTrue(LocalCatalog.isWhatsAppAudio("Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Voice Notes/202544", "PTT-20241103-WA0007.opus"))
+        assertTrue(LocalCatalog.isWhatsAppAudio("Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio", "Canzone.mp3"))
+        assertTrue(LocalCatalog.isWhatsAppAudio("WhatsApp/Media/WhatsApp Audio", "x.mp3"))
+        assertTrue(LocalCatalog.isWhatsAppAudio("Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Audio", null))
+        // Salvato a mano in Download: si riconosce dal nome.
+        assertTrue(LocalCatalog.isWhatsAppAudio("Download", "AUD-20240101-WA0002.mp3"))
+        assertFalse(LocalCatalog.isWhatsAppAudio("Music/Disney Italia", "01 - Il cerchio della vita.mp3"))
+        assertFalse(LocalCatalog.isWhatsAppAudio("Download/Telegram", "Audio.mp3"))
+        assertFalse(LocalCatalog.isWhatsAppAudio("Music", "AUDIO-WA.mp3"))
+        assertFalse(LocalCatalog.isWhatsAppAudio("Music", null))
     }
 
     @Test

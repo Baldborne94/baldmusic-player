@@ -137,7 +137,10 @@ data class UserLibrary(
     private fun syncExisting(folders: List<FolderCollection>, present: Set<String>, now: Long, newId: () -> String): UserLibrary {
         var changed = false
         val byFolder = folders.associateBy { it.folder }
-        val updated = playlists.map { pl ->
+        // La raccolta che i vecchi telefoni facevano con "WhatsApp/Media": i suoi audio non sono più musica.
+        val mine = playlists.filterNot { pl -> pl.folder?.let { LocalCatalog.isWhatsAppAudio(it, null) } == true }
+        if (mine.size != playlists.size) changed = true
+        val updated = mine.map { pl ->
             val folder = pl.folder ?: return@map pl
             val source = byFolder[folder]
             val kept = pl.tracks.filter { t -> !t.id.startsWith(LOCAL_TRACK) || t.id in present }

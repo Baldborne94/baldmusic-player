@@ -37,6 +37,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | T-6 | Crea una cartella nuova in `Music` con dei file | Diventa una raccolta nuova |
 | T-6b | Rinomina una cartella-raccolta col gestore file (es. `Music/Disney` → `Music/Disney Italia`), riapri l'app | Nessuna raccolta vuota o doppia: la stessa raccolta ha il nome nuovo, lo stesso ordine e i cuori dei suoi brani; se l'avevi rinominata tu, tiene il tuo nome |
 | T-6c | Sposta una cartella-raccolta dentro un'altra (es. `Music/Film/Disney`), o copiala dal PC e cancella la vecchia | Come T-6b; i brani piaciuti e i più ascoltati restano (anche se Android dà ai file ID nuovi) |
+| T-6d | Ricevi un vocale e un audio su WhatsApp, riapri l'app | Non compaiono né in Brani né in raccolte, ricerca, «Continua ad ascoltare»; neanche un audio di WhatsApp salvato in Download |
 | T-7 | Libreria → Album | Solo dischi con almeno due brani; nessun «album» da un brano solo |
 | T-8 | Apri un artista | Album per tipo (Album, EP, Dal vivo…) dal più recente; «Singoli e brani sparsi»; «Compare in» se è ospite altrove |
 | T-9 | Un brano «A feat. B» | Sta sotto A; B lo ha in «Compare in» |
@@ -90,6 +91,9 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-17 | Mentre suona un brano (o una puntata), tocca la ✕ accanto a play nel mini player | La musica si ferma, il mini player e la notifica spariscono; una puntata riparte poi da dove eri; in macchina «riprendi» ritrova la coda di prima |
 | A-18 | Casuale su una raccolta: ascolta due brani, salta il terzo nei primi secondi, poi ⏮ nei primi 3 s del quarto (anche da notifica e in Auto) | Torna al terzo (saltato, rimesso in coda); ⏮ di nuovo → il secondo; poi ⏭ torna in avanti nello stesso ordine. Oltre 3 s ⏮ ricomincia il brano |
 | A-19 | In «In riproduzione» apri il testo, poi tocca il tasto in alto a destra (e prova il tasto indietro del telefono) | Il testo si riduce e torna la copertina, il lettore resta aperto |
+| A-20 | Mentre suona, «In riproduzione» → ⛶ (o ⋮ → Schermo copertina), appoggia il telefono e non toccarlo per più del tempo di spegnimento dello schermo | Fondo nero, copertina grande con titolo e artista, poco luminosa; lo schermo resta acceso, cambia da sola al brano dopo e ogni minuto la copertina si sposta appena |
+| A-21 | Nello schermo copertina tocca lo schermo; poi metti in pausa e aspetta | Compaiono ⏮ ⏯ ⏭ e ✕ con la luminosità normale, spariscono dopo 5 s; in pausa la copertina si scurisce e dopo una quindicina di secondi lo schermo si spegne come sempre |
+| A-22 | Schermo copertina aperto: premi il tasto di accensione e poi di nuovo, col telefono protetto da PIN o impronta | Torna lo schermo copertina sopra il blocco, senza sbloccare; la ✕ (o indietro) riporta al blocco schermo, non all'app; dal ✕ del mini player o a fine coda si chiude da solo |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 

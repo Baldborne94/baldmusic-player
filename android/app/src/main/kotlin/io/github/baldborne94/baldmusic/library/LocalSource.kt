@@ -145,6 +145,8 @@ class LocalSource(
         val out = ArrayList<TrashedFile>()
         context.contentResolver.query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, projection, args, null)?.use { c ->
             while (c.moveToNext()) {
+                val path = c.getString(3)
+                if (LocalCatalog.isWhatsAppAudio(folderOf(path), path?.substringAfterLast('/'))) continue
                 out += TrashedFile(
                     id = c.getLong(0),
                     title = c.getString(1) ?: "Senza titolo",
@@ -377,6 +379,8 @@ class LocalSource(
                     sizeBytes = c.getLong(12),
                     bitrate = if (c.columnCount > 15) c.getInt(15) else 0,
                 )
+                // Vocali e audio di WhatsApp: Android li segna come musica, ma non lo sono.
+                if (LocalCatalog.isWhatsAppAudio(song.folder, song.fileName)) continue
                 out += Row(song, FileStamp(id, modified = c.getLong(11), size = c.getLong(12)))
             }
         }
