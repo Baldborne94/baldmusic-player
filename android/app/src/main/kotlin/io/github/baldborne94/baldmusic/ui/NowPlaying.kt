@@ -43,6 +43,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.CloseFullscreen
+import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MoreVert
@@ -197,6 +198,11 @@ fun NowPlayingScreen(
                             onClick = { menu = false; shareTrack(context, item) },
                         )
                         androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Schermo copertina") },
+                            leadingIcon = { Icon(Icons.Rounded.Fullscreen, null) },
+                            onClick = { menu = false; CoverActivity.open(context) },
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Timer di spegnimento") },
                             leadingIcon = { Icon(Icons.Rounded.Timer, null) },
                             onClick = { menu = false; sleepSheet = true },
@@ -287,6 +293,8 @@ fun NowPlayingScreen(
             Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 SleepButton(sleepEnd) { sleepSheet = true }
                 Spacer(Modifier.weight(1f))
+                // La copertina a tutto schermo, anche col telefono bloccato (come un Kindle).
+                IconButton(onClick = { CoverActivity.open(context) }) { Icon(Icons.Rounded.Fullscreen, "Schermo copertina") }
                 IconButton(onClick = { showLyrics = !showLyrics }) {
                     Icon(Icons.Rounded.Mic, "Testo", tint = if (showLyrics) Accent else Color.White)
                 }

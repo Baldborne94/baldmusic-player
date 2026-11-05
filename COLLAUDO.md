@@ -91,6 +91,9 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-17 | Mentre suona un brano (o una puntata), tocca la ✕ accanto a play nel mini player | La musica si ferma, il mini player e la notifica spariscono; una puntata riparte poi da dove eri; in macchina «riprendi» ritrova la coda di prima |
 | A-18 | Casuale su una raccolta: ascolta due brani, salta il terzo nei primi secondi, poi ⏮ nei primi 3 s del quarto (anche da notifica e in Auto) | Torna al terzo (saltato, rimesso in coda); ⏮ di nuovo → il secondo; poi ⏭ torna in avanti nello stesso ordine. Oltre 3 s ⏮ ricomincia il brano |
 | A-19 | In «In riproduzione» apri il testo, poi tocca il tasto in alto a destra (e prova il tasto indietro del telefono) | Il testo si riduce e torna la copertina, il lettore resta aperto |
+| A-20 | Mentre suona, «In riproduzione» → ⛶ (o ⋮ → Schermo copertina), appoggia il telefono e non toccarlo per più del tempo di spegnimento dello schermo | Fondo nero, copertina grande con titolo e artista, poco luminosa; lo schermo resta acceso, cambia da sola al brano dopo e ogni minuto la copertina si sposta appena |
+| A-21 | Nello schermo copertina tocca lo schermo; poi metti in pausa e aspetta | Compaiono ⏮ ⏯ ⏭ e ✕ con la luminosità normale, spariscono dopo 5 s; in pausa la copertina si scurisce e dopo una quindicina di secondi lo schermo si spegne come sempre |
+| A-22 | Schermo copertina aperto: premi il tasto di accensione e poi di nuovo, col telefono protetto da PIN o impronta | Torna lo schermo copertina sopra il blocco, senza sbloccare; la ✕ (o indietro) riporta al blocco schermo, non all'app; dal ✕ del mini player o a fine coda si chiude da solo |
 
 ### Pulizia, cestino, salute (dopo modifiche a Pulizia, Cestino, Salute)
 

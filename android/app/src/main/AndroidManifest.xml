@@ -56,6 +56,13 @@
             </intent-filter>
         </activity>
 
+        <!-- «Schermo copertina»: la copertina a tutto schermo, anche sopra il blocco schermo. -->
+        <activity
+            android:name=".ui.CoverActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|keyboardHidden" />
+
         <!--
           Il cuore dell'app: riproduce la musica e espone la libreria. L'action
           MediaBrowserService è quella che Android Auto cerca per elencare le app
