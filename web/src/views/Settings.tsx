@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Icon } from "../components/Icon";
-import { syncCollections, useLibrary } from "../lib/library";
+import { syncCollections, updateLibrary, useLibrary } from "../lib/library";
 import { player, usePlayer } from "../lib/player";
 import { CROSSFADE_CHOICES } from "../lib/crossfade";
 import type { ReplayGainMode } from "../lib/replaygain";
 import { href } from "../lib/router";
-import { CollectionsHint } from "./Library";
+import { CollectionsHint, scanText } from "./Library";
 import { saveCredentials, useClient } from "../lib/session";
 
 const RG_MODES: [ReplayGainMode, string][] = [
@@ -104,6 +104,23 @@ export function Settings() {
               {on ? "Attivo" : "Spento"}
             </button>
           ))}
+        </div>
+      </div>
+      <div className="panel">
+        <h2>Aggiorna libreria</h2>
+        <p className="muted">
+          Hai copiato musica nuova nella cartella di Navidrome? Navidrome la rilegge da solo ogni ora; da qui lo fa subito, poi raccolte,
+          preferiti e playlist si allineano. «Scansione completa» rilegge anche i file già letti: serve dopo aver sistemato i tag con
+          Picard. Serve l'utente amministratore di Navidrome. Lo stesso dal tasto ⟳ accanto a «La tua libreria».
+        </p>
+        {scanText(lib.scan) && <p className={lib.scan.state === "error" ? "error" : "muted"}>{scanText(lib.scan)}</p>}
+        <div className="actions">
+          <button className="btn btn--primary" disabled={lib.scan.state === "scanning" || lib.scan.state === "syncing"} onClick={() => void updateLibrary(false)}>
+            <Icon name="refresh" size={18} /> Aggiorna libreria
+          </button>
+          <button className="btn" disabled={lib.scan.state === "scanning" || lib.scan.state === "syncing"} onClick={() => void updateLibrary(true)}>
+            Scansione completa
+          </button>
         </div>
       </div>
       <div className="panel">

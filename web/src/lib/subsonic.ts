@@ -218,6 +218,17 @@ export function parseResponse(body: unknown): Raw {
   return root;
 }
 
+/** A che punto è la scansione della musica di Navidrome: [count] i brani letti finora. */
+export interface ScanStatus {
+  scanning: boolean;
+  count: number;
+}
+
+function scanStatusOf(r: Raw): ScanStatus {
+  const s = (r.scanStatus ?? {}) as { scanning?: boolean; count?: number };
+  return { scanning: s.scanning === true, count: Number(s.count ?? 0) || 0 };
+}
+
 export class SubsonicClient {
   constructor(readonly creds: Credentials) {}
 
@@ -234,6 +245,15 @@ export class SubsonicClient {
 
   async ping(): Promise<void> {
     await this.call("ping");
+  }
+
+  /** Fa rileggere la cartella della musica a Navidrome ([full]: anche i file già letti, dopo Picard). Serve un amministratore. */
+  async startScan(full = false): Promise<ScanStatus> {
+    return scanStatusOf(await this.call("startScan", full ? { fullScan: true } : undefined));
+  }
+
+  async scanStatus(): Promise<ScanStatus> {
+    return scanStatusOf(await this.call("getScanStatus"));
   }
 
   async albumList(type: AlbumListType, size = 40, offset = 0): Promise<Album[]> {

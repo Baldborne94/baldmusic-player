@@ -31,6 +31,23 @@ test.describe("Libreria e raccolte", () => {
     expect(server.callsOf("createPlaylist")).toHaveLength(2);
   });
 
+  test("«Aggiorna libreria» (⟳ accanto a La tua libreria): Navidrome rilegge e la cartella nuova diventa una raccolta", async ({ page, navidrome, login }) => {
+    const disney = folderSongs("Disney Italia", 2, "d");
+    const movies = folderSongs("Movie Soundtracks", 1, "m");
+    const server = await navidrome({ songs: [...disney, ...movies] });
+    await login("#/library");
+    await expect(page.locator(".main .card")).toHaveCount(2);
+    // Sul PC arriva una cartella nuova: Navidrome non l'ha ancora letta.
+    server.onDisk = folderSongs("Rock", 3, "r");
+    server.scanRounds = 1;
+    await page.locator(".side").getByRole("button", { name: "Aggiorna libreria" }).click();
+    await expect(page.locator(".main .card", { hasText: "Rock" })).toContainText("Raccolta · 3 brani");
+    expect(server.callsOf("startScan")).toHaveLength(1);
+    // Nelle Impostazioni si vede com'è andata.
+    await page.goto("./#/settings");
+    await expect(page.locator(".main")).toContainText("Libreria aggiornata ✓ 6 brani");
+  });
+
   test("cartelle senza raccolta da decidere: in cima a Raccolte e in Home, «Crea tutte» le crea", async ({ page, navidrome, login }) => {
     const disney = folderSongs("Disney Italia", 2, "d");
     const rock = folderSongs("Rock", 2, "r");
