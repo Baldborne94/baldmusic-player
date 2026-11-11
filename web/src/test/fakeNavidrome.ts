@@ -37,6 +37,13 @@ export class FakeNavidrome {
   starred: Set<string>;
   user: string;
   calls: FakeCall[] = [];
+  /** L'utente è amministratore (può far partire la scansione). */
+  admin = true;
+  /** Brani che compaiono alla prossima scansione (file copiati nella cartella della musica). */
+  onDisk: Song[] = [];
+  /** Le richieste di stato prima che la scansione finisca. */
+  scanRounds = 0;
+  private scanning = false;
   /** Metodi che rispondono con un errore, per provare i casi storti. */
   failing = new Set<string>();
   private seq = 1;
@@ -138,6 +145,18 @@ export class FakeNavidrome {
         return ok({ similarSongs2: {} });
       case "scrobble":
         return ok();
+      case "startScan":
+        if (!this.admin) return fail(50, "User not authorized");
+        this.scanning = true;
+        return ok({ scanStatus: { scanning: true, count: 0 } });
+      case "getScanStatus": {
+        if (this.scanning && this.scanRounds-- <= 0) {
+          this.scanning = false;
+          this.songs = [...this.songs, ...this.onDisk];
+          this.onDisk = [];
+        }
+        return ok({ scanStatus: { scanning: this.scanning, count: this.songs.length } });
+      }
       default:
         return fail(0, `Metodo non previsto dal server finto: ${method}`);
     }

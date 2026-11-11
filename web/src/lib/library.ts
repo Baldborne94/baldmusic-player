@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { replaceCopies, type DuplicateGroup } from "./cleanup";
 import { collectionComment, collectionFolders, deletedInStore, deletedStoreComment, DELETED_STORE_NAME, folderOf, isRealPath, planFollow, planSync, type CollectionsState } from "./collections";
+import { scanAndWait } from "./scan";
 import { getClient } from "./session";
 import type { Playlist, Song, SubsonicClient } from "./subsonic";
 import { addRecords, putBack, reconcile, type TrashRecord } from "./trash";
@@ -20,7 +21,16 @@ export interface CollectionsStatus {
   error?: string;
 }
 
+/** «Aggiorna libreria»: Navidrome rilegge la musica ([count] brani letti), poi si riallineano le raccolte. */
+export type LibraryScan =
+  | { state: "idle" }
+  | { state: "scanning"; full: boolean; count: number }
+  | { state: "syncing" }
+  | { state: "done"; count: number }
+  | { state: "error"; error: string };
+
 interface LibraryState {
+  scan: LibraryScan;
   liked: Set<string>;
   likedSongs: Song[];
   playlists: Playlist[];
@@ -28,7 +38,7 @@ interface LibraryState {
   collections: CollectionsStatus;
 }
 
-let state: LibraryState = { liked: new Set(), likedSongs: [], playlists: [], loaded: false, collections: { state: "idle", missing: [] } };
+let state: LibraryState = { scan: { state: "idle" }, liked: new Set(), likedSongs: [], playlists: [], loaded: false, collections: { state: "idle", missing: [] } };
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<LibraryState>) {
@@ -62,6 +72,35 @@ export async function refreshLibrary(): Promise<void> {
     playlists: playlists ? playlists.filter((p) => deletedInStore(p) === null) : state.playlists,
     loaded: true,
   });
+}
+
+let scanning: Promise<void> | null = null;
+
+/**
+ * Aggiorna la libreria: Navidrome rilegge la cartella della musica ([full]: anche i file già
+ * letti, dopo Picard), si aspetta che finisca, poi raccolte, preferiti e playlist si allineano.
+ * Una sola per volta.
+ */
+export function updateLibrary(full = false, sleep?: (ms: number) => Promise<void>): Promise<void> {
+  scanning ??= doUpdate(full, sleep).finally(() => {
+    scanning = null;
+  });
+  return scanning;
+}
+
+async function doUpdate(full: boolean, sleep?: (ms: number) => Promise<void>): Promise<void> {
+  const c = getClient();
+  if (!c) return;
+  set({ scan: { state: "scanning", full, count: 0 } });
+  try {
+    const count = await scanAndWait(c, full, (n) => set({ scan: { state: "scanning", full, count: n } }), sleep);
+    set({ scan: { state: "syncing" } });
+    await syncCollections();
+    await refreshLibrary();
+    set({ scan: { state: "done", count } });
+  } catch (e) {
+    set({ scan: { state: "error", error: e instanceof Error ? e.message : String(e) } });
+  }
 }
 
 /** Mi piace / non mi piace più: aggiorna subito l'interfaccia, poi il server. */

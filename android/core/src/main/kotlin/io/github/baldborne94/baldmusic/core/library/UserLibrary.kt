@@ -187,6 +187,39 @@ data class UserLibrary(
     }
 
     /** I brani più ascoltati, a parità di conteggio il più recente prima. */
+    /**
+     * Le raccolte divise per come le usi, così in Android Auto (dove guidando si scorre poco)
+     * quelle che senti stanno in cima: le ultime [RECENT_COLLECTIONS] ascoltate, poi le
+     * [TOP_COLLECTIONS] con più ascolti (somma degli ascolti dei loro brani), poi tutte le altre
+     * dalla A alla Z. Ognuna una volta sola. Senza ascolti un gruppo solo, senza titolo.
+     */
+    fun collectionGroups(): List<Pair<String?, List<UserPlaylist>>> {
+        val all = collections
+        if (all.isEmpty()) return emptyList()
+        val byId = all.associateBy { it.id }
+        val recentOnes = recent.mapNotNull { c ->
+            val id = MediaId.parse(c.id)
+            if (id?.source == PersonalSource.KEY && id.kind == PersonalSource.PLAYLIST) byId[id.id] else null
+        }.distinctBy { it.id }.take(RECENT_COLLECTIONS)
+        val shown = recentOnes.mapTo(HashSet()) { it.id }
+        val topOnes = all.asSequence()
+            .filter { it.id !in shown }
+            .map { pl -> pl to pl.tracks.sumOf { plays[baseId(it.id)]?.count ?: 0 } }
+            .filter { it.second > 0 }
+            .sortedWith(compareByDescending<Pair<UserPlaylist, Int>> { it.second }.thenBy { it.first.name.lowercase() })
+            .take(TOP_COLLECTIONS)
+            .map { it.first }
+            .toList()
+        topOnes.mapTo(shown) { it.id }
+        val rest = all.filter { it.id !in shown }.sortedBy { it.name.lowercase() }
+        if (recentOnes.isEmpty() && topOnes.isEmpty()) return listOf(null to rest)
+        return listOfNotNull(
+            recentOnes.takeIf { it.isNotEmpty() }?.let { "Ascoltate di recente" to it },
+            topOnes.takeIf { it.isNotEmpty() }?.let { "Le più ascoltate" to it },
+            rest.takeIf { it.isNotEmpty() }?.let { "Tutte le altre" to it },
+        )
+    }
+
     fun topTracks(limit: Int = 50): List<TrackRef> =
         plays.values.sortedWith(compareByDescending<PlayCount> { it.count }.thenByDescending { it.lastPlayed })
             .take(limit).map { it.track }
@@ -333,6 +366,10 @@ data class UserLibrary(
         private const val SAME_FILE_MS = 2_000L
 
         /** L'ID di un brano senza il contenitore da cui è stato scelto. */
+        /** Raccolte in cima ad Android Auto: le ultime ascoltate e le più ascoltate. */
+        const val RECENT_COLLECTIONS = 6
+        const val TOP_COLLECTIONS = 6
+
         fun baseId(trackId: String): String = MediaId.parse(trackId)?.copy(parent = null)?.toString() ?: trackId
     }
 }

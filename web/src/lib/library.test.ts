@@ -478,3 +478,40 @@ describe("ricerche recenti", () => {
     expect(() => lib.clearSearches()).not.toThrow();
   });
 });
+
+describe("updateLibrary", () => {
+  const noWait = async () => {};
+
+  it("Navidrome rilegge la musica, poi la cartella nuova diventa una raccolta e i brani nuovi entrano", async () => {
+    const server = new FakeNavidrome({ songs: [fileSong("a", "Disney Italia", "01 - A"), rock()] });
+    const { lib } = await open(server);
+    await lib.syncCollections();
+    // Sul PC arrivano un brano in una cartella che c'era e una cartella nuova.
+    server.onDisk = [fileSong("b", "Disney Italia", "02 - B"), fileSong("c", "Movie Soundtracks", "01 - C")];
+    server.scanRounds = 2;
+    await lib.updateLibrary(false, noWait);
+
+    expect(server.callsOf("startScan")[0].params.get("fullScan")).toBeNull();
+    expect(lib.getLibraryState().scan).toEqual({ state: "done", count: 4 });
+    expect(server.playlistByName("Disney Italia")!.songIds).toEqual(["a", "b"]);
+    expect(server.playlistByName("Movie Soundtracks")!.songIds).toEqual(["c"]);
+  });
+
+  it("la scansione completa lo chiede a Navidrome", async () => {
+    const server = new FakeNavidrome({ songs: [fileSong("a", "Disney Italia", "01 - A"), rock()] });
+    const { lib } = await open(server);
+    await lib.updateLibrary(true, noWait);
+    expect(server.callsOf("startScan")[0].params.get("fullScan")).toBe("true");
+  });
+
+  it("senza essere amministratore lo dice e non tocca le raccolte", async () => {
+    const server = new FakeNavidrome({ songs: [fileSong("a", "Disney Italia", "01 - A"), rock()] });
+    server.admin = false;
+    const { lib } = await open(server);
+    await lib.updateLibrary(false, noWait);
+    const scan = lib.getLibraryState().scan;
+    expect(scan.state).toBe("error");
+    expect(scan.state === "error" && scan.error).toMatch(/amministratore/);
+    expect(server.callsOf("getScanStatus")).toEqual([]);
+  });
+});

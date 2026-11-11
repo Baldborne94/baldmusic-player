@@ -468,6 +468,15 @@ code {
   transform: scale(1.06);
 }
 
+/* «Aggiorna libreria» mentre lavora: l'icona gira. */
+.icon-btn.is-busy svg {
+  animation: spin 1.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn.is-busy svg {
+    animation: none;
+  }
+}
 .icon-btn:disabled {
   opacity: 0.3;
 }

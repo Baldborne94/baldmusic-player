@@ -58,7 +58,7 @@ Lo fa in automatico **[MusicBrainz Picard](https://picard.musicbrainz.org/)**, g
 3. In alto premi **Raggruppa** (Cluster), poi **Scansiona** (Scan): Picard ascolta i file e li abbina agli album giusti. Con molte canzoni ci vuole qualche minuto.
 4. Sulla destra compaiono gli album ricostruiti. Quelli **dorati** sono completi; apri a campione un paio di quelli con il punto rosso o arancione per controllare che l'abbinamento sia giusto (succede con i remix o le versioni live).
 5. Seleziona tutto e premi **Salva**. Picard riscrive i tag dentro ai file: la musica non si sposta e non si perde nulla.
-6. In Navidrome: in alto a destra, l'icona *Attività* (la linea a zig-zag) → **Scansione completa** (oppure aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
+6. In Navidrome: in alto a destra, l'icona *Attività* (la linea a zig-zag) → **Scansione completa** (oppure il tasto ⟳ accanto a «La tua libreria» nell'app web, o aspetta la scansione automatica). Gli album si ricompongono da soli, su tutti i dispositivi.
 
 Tre accorgimenti che evitano i casi più comuni:
 

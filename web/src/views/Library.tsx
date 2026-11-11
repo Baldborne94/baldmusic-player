@@ -5,7 +5,7 @@ import { ErrorState, Loading } from "../components/States";
 import { AlbumCards, ArtistCards, LikedArt, PlaylistCards } from "../components/Ui";
 import { isRealAlbum } from "../lib/albums";
 import { plural } from "../lib/format";
-import { addNewToPlaylist, createCollection, createMissingCollections, createPlaylist, dismissMissingCollections, isCollection, isMine, likeAll, useLibrary, type CollectionsStatus } from "../lib/library";
+import { addNewToPlaylist, createCollection, createMissingCollections, createPlaylist, dismissMissingCollections, isCollection, isMine, likeAll, updateLibrary, useLibrary, type CollectionsStatus, type LibraryScan } from "../lib/library";
 import { href, type Route } from "../lib/router";
 import { getClient } from "../lib/session";
 import { draggedSongs, isSongDrag } from "../lib/songDrag";
@@ -57,6 +57,7 @@ export function SidebarLibrary({ route }: { route: Route }) {
         <a href={href({ name: "library" })} className="side-lib__title">
           <Icon name="library" /> La tua libreria
         </a>
+        <UpdateLibraryButton />
         <button
           className="icon-btn"
           title="Crea playlist"
@@ -350,5 +351,38 @@ export function MissingCollections({ compact = false }: { compact?: boolean }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** A che punto è «Aggiorna libreria», in una riga; null quando non c'è niente da dire. */
+export function scanText(scan: LibraryScan): string | null {
+  switch (scan.state) {
+    case "scanning":
+      return scan.count > 0 ? `Navidrome sta leggendo la musica… ${plural(scan.count, "brano", "brani")}` : "Navidrome sta leggendo la musica…";
+    case "syncing":
+      return "Allineo raccolte, preferiti e playlist…";
+    case "done":
+      return `Libreria aggiornata ✓ ${plural(scan.count, "brano", "brani")}`;
+    case "error":
+      return scan.error;
+    default:
+      return null;
+  }
+}
+
+/** Il tasto ⟳ accanto a «La tua libreria»: Navidrome rilegge la musica e le raccolte si allineano. */
+function UpdateLibraryButton() {
+  const { scan } = useLibrary();
+  const busy = scan.state === "scanning" || scan.state === "syncing";
+  return (
+    <button
+      className={`icon-btn ${busy ? "is-busy" : ""}`}
+      title={busy ? (scanText(scan) ?? "") : `Aggiorna libreria${scan.state === "done" || scan.state === "error" ? ` — ${scanText(scan)}` : ""}`}
+      aria-label="Aggiorna libreria"
+      disabled={busy}
+      onClick={() => void updateLibrary()}
+    >
+      <Icon name="refresh" size={20} />
+    </button>
   );
 }

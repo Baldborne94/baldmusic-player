@@ -267,6 +267,7 @@ dell'unità principale sul telefono.
 |---|-----------|---------------------|
 | C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto; con brani del server in coda e il PC spento riparte in pochi secondi con i soli brani del telefono |
 | C-2 | Schede La tua musica / Telefono / Server | Si aprono; raccolte per prime; elenchi lunghi divisi per lettera |
+| C-2b | La tua musica → Raccolte, dopo aver ascoltato due raccolte | In cima «Ascoltate di recente» con l'ultima sentita per prima, poi «Le più ascoltate», poi «Tutte le altre» dalla A alla Z; nessuna compare due volte. Lo stesso nell'app (Libreria → Raccolte) |
 | C-3 | Cuore, casuale, ripeti nella barra | Funzionano e si vedono nell'app |
 | C-4 | «Ok Google, metti la raccolta Movie Soundtracks su BaldMusic» | Suona tutta la raccolta |
 | C-5 | «…metti Lucio Dalla su BaldMusic», «…metti l'album X» | Suona l'artista / l'album giusto |
@@ -290,6 +291,7 @@ dell'unità principale sul telefono.
 | W-1 | Accesso con `http://localhost:4533` sul PC di Navidrome | Entra; Home con raccolte |
 | W-2 | Navidrome senza «Report Real Path» | Il sito spiega dove attivarlo; attivato e ricaricato, compaiono le raccolte |
 | W-3 | Cartella nuova sul PC + Quick Scan, ricarica | Raccolta nuova; brani nuovi in fondo a quelle esistenti |
+| W-3b | Cartella nuova sul PC, poi nel sito il tasto ⟳ accanto a «La tua libreria» (o Impostazioni → «Aggiorna libreria»); dopo Picard «Scansione completa» | L'icona gira, in Impostazioni «Navidrome sta leggendo la musica… N brani», poi «Libreria aggiornata ✓»: la raccolta nuova c'è senza ricaricare; con un utente non amministratore il messaggio lo spiega |
 | W-4 | Raccolta con migliaia di brani | Si apre subito e scorre senza scatti mentre suona |
 | W-5 | Trascina un brano (e poi 3 selezionati) su una playlist della barra laterale | «✓ N brani aggiunti»; i brani già presenti non si doppiano |
 | W-6 | Seleziona con Maiuscolo + clic, riordina trascinando, ordina per titolo | Salvato su Navidrome (lo vedi anche dal telefono collegato al server) |
