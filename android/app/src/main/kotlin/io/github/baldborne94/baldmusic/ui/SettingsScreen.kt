@@ -61,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -190,6 +191,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 }) { Text("Scollega") }
             }
             Text("I brani arrivano dal server nella qualità originale, senza conversioni.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            ServerSyncSetting()
         } else {
             Text(
                 "Inserisci l'indirizzo del PC: a casa va bene http://192.168.x.x:4533, fuori casa serve l'indirizzo di Tailscale (es. http://100.x.x.x:4533 o https://pc.tail1234.ts.net).",
@@ -374,5 +376,46 @@ private fun SettingsLink(title: String, subtitle: String, onClick: () -> Unit) {
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = TextMuted)
+    }
+}
+
+/** «Mi piace» e playlist uguali sul telefono e sul PC: interruttore, com'è andata e «Allinea adesso». */
+@Composable
+private fun ServerSyncSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sync = context.app.serverSync
+    val status by sync.status.collectAsStateWithLifecycle()
+    var on by remember { mutableStateOf(context.app.settings.syncWithServer) }
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("«Mi piace» e playlist uguali sul PC", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Un cuore o una playlist fatti sul telefono (anche in macchina) compaiono su Navidrome e nell'app web, e viceversa; " +
+                    "lo stesso brano si riconosce anche se è un file diverso. Le raccolte restano di ogni dispositivo.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        androidx.compose.material3.Switch(
+            checked = on,
+            onCheckedChange = {
+                on = it
+                context.app.settings.syncWithServer = it
+                if (it) scope.launch { sync.syncNow() }
+            },
+            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = Accent),
+        )
+    }
+    if (on) {
+        status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        OutlinedButton(enabled = !busy, onClick = {
+            busy = true
+            scope.launch {
+                sync.syncNow()
+                busy = false
+            }
+        }) { Text(if (busy) "Allineo…" else "Allinea adesso") }
     }
 }

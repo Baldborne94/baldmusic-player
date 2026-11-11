@@ -80,14 +80,21 @@ data class Playlist(
     val songCount: Int? = null,
     val coverArt: String? = null,
     val comment: String? = null,
+    val owner: String? = null,
     val entry: List<Song> = emptyList(),
 ) {
+    /** Una raccolta del PC (cartella di Navidrome): l'app web la riconosce dal commento. Non va sul telefono. */
+    val isPcCollection: Boolean get() = comment?.startsWith(COLLECTION_MARK) == true
+
     /** La playlist vuota in cui l'app web tiene l'elenco delle raccolte eliminate: non è da ascoltare. */
     val isAppData: Boolean get() = comment?.startsWith(DELETED_COLLECTIONS_MARK) == true
 
     companion object {
         /** Lo stesso segno di `web/src/lib/collections.ts`. */
         const val DELETED_COLLECTIONS_MARK = "BaldMusic: raccolte eliminate "
+
+        /** Lo stesso inizio di `collectionComment` in `web/src/lib/collections.ts`. */
+        const val COLLECTION_MARK = "Raccolta della cartella «"
     }
 }
 

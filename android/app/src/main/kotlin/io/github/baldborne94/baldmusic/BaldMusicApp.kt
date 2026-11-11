@@ -50,6 +50,8 @@ class BaldMusicApp : Application() {
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
+    /** «Mi piace» e playlist uguali sul telefono e su Navidrome. */
+    val serverSync by lazy { io.github.baldborne94.baldmusic.data.ServerSyncer(this) }
     val backups: Backups by lazy { Backups(this, userData, local, podcasts) { settings } }
 
     /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */
@@ -102,6 +104,7 @@ class BaldMusicApp : Application() {
             decades = { local.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES)) },
         )
         backups.start()
+        serverSync.start()
         // Testi scaricati in anticipo, per quando non c'è rete.
         LyricsWorker.schedule(this)
         // Puntate nuove dei podcast che segui, anche ad app chiusa.

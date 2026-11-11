@@ -68,6 +68,8 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
+| A-0a | Server collegato: metti ♥ a un brano sul telefono (o in macchina) che c'è anche sul PC; aspetta mezzo minuto e apri l'app web | Il brano è tra «Brani che ti piacciono» anche nel sito (anche se sul PC è un file diverso); togli il ♥ dal sito e, entro mezz'ora (o «Allinea adesso» in Impostazioni → Server), sparisce dal telefono |
+| A-0b | Crea una playlist sul telefono con un brano che il PC non ha; crea una playlist nel sito; rinominane una e eliminane un'altra | La playlist del telefono compare nel sito coi brani che il PC ha (quello che manca resta solo sul telefono, al suo posto); quella del sito compare sul telefono; nome cambiato ed eliminazione arrivano dall'altra parte. Le raccolte non si toccano |
 | A-1 | Album dal vivo o concept, ascolta il passaggio tra due brani | Nessuna pausa e nessuna dissolvenza (stesso album) |
 | A-2 | Impostazioni → Dissolvenza: prova Spenta, 3, 12 s | Spenta = passaggio netto; 12 s = sfumatura lunga; un disco ascoltato in ordine (traccia 3 → 4) resta attaccato |
 | A-2b | Una raccolta di file scaricati (anche senza tag dell'album), dissolvenza 6 s, lascia finire un brano da solo | Il brano che finisce si abbassa senza interrompersi nemmeno un attimo all'inizio della sfumatura, il successivo sale; lo stesso in casuale con brani dello stesso album |

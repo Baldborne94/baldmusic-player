@@ -103,6 +103,16 @@ class UserData(context: Context) {
     /** Ripristino da un backup: tutta la tua musica cambia. */
     fun replaceAll(library: UserLibrary) = update { library }
 
+    /**
+     * Il risultato dell'allineamento col server, solo se nel frattempo la tua musica non è
+     * cambiata (un cuore messo proprio adesso): altrimenti false e si rifà al giro dopo.
+     */
+    fun replaceIf(expected: UserLibrary, next: UserLibrary): Boolean {
+        var applied = false
+        update { current -> if (current == expected) next.also { applied = true } else current.also { applied = false } }
+        return applied
+    }
+
     fun addSearch(query: String) = update { it.addSearch(query) }
     fun clearSearches() = update { it.clearSearches() }
 }
