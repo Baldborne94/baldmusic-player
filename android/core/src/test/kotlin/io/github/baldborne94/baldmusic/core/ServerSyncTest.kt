@@ -124,4 +124,46 @@ class ServerSyncTest {
         assertEquals(listOf("Corsa veloce"), p.library.playlists.map { it.name })
         assertEquals(listOf(PlaylistLink("p1", "x", "Corsa veloce", listOf("s1"))), p.state.playlists)
     }
+
+    private fun play(t: TrackRef, count: Int, at: Long = 100) = io.github.baldborne94.baldmusic.core.library.PlayCount(t, count, at)
+
+    @Test
+    fun `la prima volta si mandano gli ascolti dei file, non quelli gia sentiti dal server`() {
+        val remote = TrackRef("remote/track/s3", "Bohemian Rhapsody", "Queen", durationMs = 355_000)
+        val lib = UserLibrary(plays = mapOf(numb.id to play(numb, 2, at = 500), remote.id to play(remote, 4), onlyPhone.id to play(onlyPhone, 9)))
+        val songs = server.map { if (it.id == "s3") it.copy(playCount = 6) else it }
+        val p = ServerSync.planPlays(lib, songs, pushedBefore = null, match = match)
+        // Numb (file) 2 volte; Bohemian Rhapsody il server l'aveva già; il brano solo del telefono non c'è.
+        assertEquals(listOf("s1" to 500L, "s1" to 500L), p.scrobbles)
+        assertEquals(mapOf("s1" to 2, "s3" to 4), p.pushed)
+        // Sul server 6 ascolti di Bohemian Rhapsody, 4 erano del telefono: 2 fatti dal PC.
+        assertEquals(mapOf("remote/track/s3" to 2), p.others.mapValues { it.value.count })
+    }
+
+    @Test
+    fun `poi si manda solo quello che manca, e gli ascolti dal PC vanno sul file del telefono`() {
+        val lib = UserLibrary(plays = mapOf(numb.id to play(numb, 5)))
+        val songs = server.map { if (it.id == "s1") it.copy(playCount = 10, played = "2026-11-01T20:00:00Z") else it }
+        val p = ServerSync.planPlays(lib, songs, pushedBefore = mapOf("s1" to 3), match = match)
+        assertEquals(2, p.scrobbles.size)
+        assertEquals(5, p.pushed["s1"])
+        // 10 sul server, 3 erano del telefono: 7 dal PC, sul file del telefono.
+        val other = p.others.getValue("local/track/1")
+        assertEquals(7, other.count)
+        assertEquals(1_793_563_200_000L, other.lastPlayed)
+    }
+
+    @Test
+    fun `classifiche e mix contano anche gli ascolti fatti dal PC`() {
+        val lib = UserLibrary(
+            plays = mapOf(numb.id to play(numb, 2), end.id to play(end, 3)),
+            otherPlays = mapOf(numb.id to play(numb, 4, at = 900)),
+        )
+        assertEquals(listOf("local/track/1", "local/track/2"), lib.topTracks().map { it.id })
+        assertEquals(6, lib.allPlays.getValue(numb.id).count)
+        assertEquals(900L, lib.allPlays.getValue(numb.id).lastPlayed)
+        assertEquals(9, io.github.baldborne94.baldmusic.core.library.ListeningStats.from(lib).totalPlays)
+        // Gli ascolti del telefono restano i suoi (il backup e l'invio al server guardano solo quelli).
+        assertEquals(2, lib.plays.getValue(numb.id).count)
+    }
 }

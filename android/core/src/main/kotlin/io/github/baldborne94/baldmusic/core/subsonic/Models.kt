@@ -18,6 +18,9 @@ data class Song(
     val duration: Int? = null,
     val coverArt: String? = null,
     val starred: String? = null,
+    /** Quante volte e quando l'ultima (data ISO) lo ha ascoltato chiunque usi quell'utente: web, telefono. */
+    val playCount: Int? = null,
+    val played: String? = null,
     /** OpenSubsonic (Navidrome): il ReplayGain letto dai tag del file. */
     val replayGain: SongReplayGain? = null,
 )

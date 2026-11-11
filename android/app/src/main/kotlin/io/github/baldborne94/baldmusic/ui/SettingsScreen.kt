@@ -390,10 +390,11 @@ private fun ServerSyncSetting() {
     var busy by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("«Mi piace» e playlist uguali sul PC", fontWeight = FontWeight.SemiBold)
+            Text("«Mi piace», playlist e ascolti uguali sul PC", fontWeight = FontWeight.SemiBold)
             Text(
                 "Un cuore o una playlist fatti sul telefono (anche in macchina) compaiono su Navidrome e nell'app web, e viceversa; " +
-                    "lo stesso brano si riconosce anche se è un file diverso. Le raccolte restano di ogni dispositivo.",
+                    "lo stesso brano si riconosce anche se è un file diverso. Gli ascolti si sommano: più ascoltati, mix e statistiche contano " +
+                    "anche quello che senti dal PC, e il PC quello che senti sul telefono (anche in macchina senza rete). Le raccolte restano di ogni dispositivo.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )

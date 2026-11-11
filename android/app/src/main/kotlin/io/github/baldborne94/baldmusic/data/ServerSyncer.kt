@@ -77,22 +77,33 @@ class ServerSyncer(private val app: BaldMusicApp) {
             val now = System.currentTimeMillis()
             val known = songs?.takeIf { now - it.first < EVERY_MS }?.second
             val needed = starred + lists.flatMap { it.songs }
-            val all = if (known != null && known.map { it.id }.toSet().containsAll(needed)) known else client.allSongs().also { songs = now to it }
+            // Brani del server riletti adesso: anche gli ascolti (servono i playCount di adesso).
+            val fresh = known == null || !known.map { it.id }.toSet().containsAll(needed)
+            val all = if (!fresh) known!! else client.allSongs().also { songs = now to it }
             val phone = app.local.allTracks().map(LocalCatalog::ref)
             val file = stateFile(creds.url, creds.user)
             val state = runCatching { json.decodeFromString(SyncState.serializer(), file.readText()) }.getOrDefault(SyncState())
-            val plan = ServerSync.plan(before, starred, lists, state, ServerSync.Matcher(all, phone), { UUID.randomUUID().toString().take(8) }, now)
+            val match = ServerSync.Matcher(all, phone)
+            val plan = ServerSync.plan(before, starred, lists, state, match, { UUID.randomUUID().toString().take(8) }, now)
+            // Statistiche unite: gli ascolti del telefono al server, quelli fatti dal PC sul telefono.
+            val plays = if (fresh) ServerSync.planPlays(before, all, state.pushed, match) else null
+            if (plays != null) {
+                client.scrobbleAll(plays.scrobbles)
+                // Mandati: si ricorda subito, qualunque cosa succeda dopo (non vanno rimandati).
+                file.writeText(json.encodeToString(SyncState.serializer(), state.copy(pushed = plays.pushed)))
+            }
 
             client.star(plan.star, true)
             client.star(plan.unstar, false)
-            var saved = plan.state
+            var saved = plan.state.copy(pushed = plays?.pushed ?: state.pushed)
             for (w in plan.writes) when (w) {
                 is ServerSync.Write.Create -> saved = saved.created(w.phoneId, client.createPlaylist(w.name, w.songs).id, w.name, w.songs)
                 is ServerSync.Write.Replace -> client.replacePlaylist(w.serverId, w.name, w.songs)
                 is ServerSync.Write.Delete -> client.deletePlaylist(w.serverId)
             }
-            // Nel frattempo hai cambiato qualcosa: lo stato resta quello di prima e si rifà al giro dopo.
-            if (plan.library != before && !app.userData.replaceIf(before, plan.library)) return@runCatching
+            // Nel frattempo hai cambiato cuori o playlist: lo stato resta quello di prima e si rifà al giro dopo.
+            val next = plays?.let { plan.library.copy(otherPlays = it.others) } ?: plan.library
+            if (next != before && !app.userData.applySync(before, next)) return@runCatching
             file.writeText(json.encodeToString(SyncState.serializer(), saved))
             val changes = plan.star.size + plan.unstar.size + plan.writes.size + (if (plan.library != before) 1 else 0)
             _status.value = if (changes == 0) "Allineati ✓" else "Allineati ✓ (cambiati ${plan.star.size + plan.unstar.size} «mi piace» e ${plan.writes.size} playlist sul server)"

@@ -104,12 +104,17 @@ class UserData(context: Context) {
     fun replaceAll(library: UserLibrary) = update { library }
 
     /**
-     * Il risultato dell'allineamento col server, solo se nel frattempo la tua musica non è
-     * cambiata (un cuore messo proprio adesso): altrimenti false e si rifà al giro dopo.
+     * Il risultato dell'allineamento col server: «mi piace» e playlist solo se nel frattempo non
+     * li hai cambiati (un cuore messo proprio adesso; ascolti e recenti invece sì, restano quelli
+     * di adesso), altrimenti false e si rifà al giro dopo. Gli ascolti fatti altrove sempre.
      */
-    fun replaceIf(expected: UserLibrary, next: UserLibrary): Boolean {
+    fun applySync(expected: UserLibrary, next: UserLibrary): Boolean {
         var applied = false
-        update { current -> if (current == expected) next.also { applied = true } else current.also { applied = false } }
+        update { current ->
+            applied = current.liked == expected.liked && current.playlists == expected.playlists
+            if (applied) current.copy(liked = next.liked, playlists = next.playlists, otherPlays = next.otherPlays)
+            else current.copy(otherPlays = next.otherPlays)
+        }
         return applied
     }
 

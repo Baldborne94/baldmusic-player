@@ -93,7 +93,7 @@ class BaldMusicApp : Application() {
                 phoneFolders.value = folders
                 userData.syncFolders(folders, songs.mapTo(HashSet()) { LocalCatalog.ref(it).id })
             },
-            plays = { userData.value.plays.mapValues { it.value.count } },
+            plays = { userData.value.allPlays.mapValues { it.value.count } },
             http = http,
             acoustIdKey = { settings.acoustIdKey },
         )

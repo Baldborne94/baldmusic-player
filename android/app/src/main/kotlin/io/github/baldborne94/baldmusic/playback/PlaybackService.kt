@@ -385,7 +385,9 @@ class PlaybackService : MediaLibraryService() {
                 val duration = player.duration
                 if (player.currentMediaItem?.mediaId != item.mediaId) return@launch
                 if (duration > 0 && ListeningSession.countsAsPlay(player.currentPosition, duration)) {
-                    runCatching { client.scrobble(songId, submission = true) }
+                    // Con l'allineamento acceso gli ascolti li manda ServerSyncer (anche quelli dei
+                    // file e quelli fatti senza rete): qui si conterebbero due volte.
+                    if (!app.settings.syncWithServer) runCatching { client.scrobble(songId, submission = true) }
                     return@launch
                 }
             }

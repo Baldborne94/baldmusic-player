@@ -175,8 +175,61 @@ object ServerSync {
             unstar = starred.intersect(removed),
             library = library,
             writes = writes,
-            state = SyncState(liked = final, playlists = links),
+            state = state.copy(liked = final, playlists = links),
         )
+    }
+
+    /** Ascolti da mandare al server e ascolti fatti altrove da mettere sul telefono. */
+    data class PlaysPlan(
+        /** Brano del server e momento dell'ascolto, uno per ascolto fatto dal telefono e non ancora mandato. */
+        val scrobbles: List<Pair<String, Long>>,
+        /** Quanti ascolti del telefono ha già il server, per brano: da salvare in [SyncState.pushed]. */
+        val pushed: Map<String, Int>,
+        /** Gli ascolti fatti altrove (app web), per [UserLibrary.otherPlays]. */
+        val others: Map<String, PlayCount>,
+    )
+
+    /** Al massimo così tanti ascolti dello stesso brano mandati in un giro. */
+    const val MAX_SCROBBLES_PER_SONG = 50
+
+    /**
+     * Statistiche unite: gli ascolti del telefono vanno al server (così l'app web li conta, anche
+     * quelli fatti in macchina senza rete) e quelli del server che non vengono dal telefono
+     * diventano [UserLibrary.otherPlays]. [server] = i brani col loro `playCount` letto prima di
+     * mandare; [pushedBefore] null = la prima volta: gli ascolti di brani del server fatti dal
+     * telefono il server li ha già (li registrava mentre suonavano), quelli dei file no.
+     */
+    fun planPlays(lib: UserLibrary, server: List<Song>, pushedBefore: Map<String, Int>?, match: Matcher): PlaysPlan {
+        val phone = HashMap<String, Int>()
+        val last = HashMap<String, Long>()
+        val viaServer = HashMap<String, Int>()
+        for (p in lib.plays.values) {
+            val sid = match.toServer(p.track) ?: continue
+            phone[sid] = (phone[sid] ?: 0) + p.count
+            last[sid] = maxOf(last[sid] ?: 0L, p.lastPlayed)
+            if (MediaId.parse(p.track.id)?.source == RemoteSource.KEY) viaServer[sid] = (viaServer[sid] ?: 0) + p.count
+        }
+        val base = pushedBefore ?: viaServer
+        val scrobbles = ArrayList<Pair<String, Long>>()
+        val pushed = HashMap(base)
+        for ((sid, count) in phone) {
+            val missing = count - (base[sid] ?: 0)
+            if (missing <= 0) continue
+            repeat(missing.coerceAtMost(MAX_SCROBBLES_PER_SONG)) { scrobbles += sid to (last[sid] ?: 0L) }
+            pushed[sid] = count
+        }
+        val others = HashMap<String, PlayCount>()
+        for (s in server) {
+            val elsewhere = (s.playCount ?: 0) - (base[s.id] ?: 0)
+            if (elsewhere <= 0) continue
+            val ref = match.toPhone(s.id) ?: continue
+            val id = UserLibrary.baseId(ref.id)
+            val previous = others[id]
+            val played = s.played?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() } ?: 0L
+            others[id] = if (previous == null) PlayCount(ref.copy(id = id), elsewhere, played)
+            else previous.copy(count = previous.count + elsewhere, lastPlayed = maxOf(previous.lastPlayed, played))
+        }
+        return PlaysPlan(scrobbles, pushed, others)
     }
 
     /**
@@ -202,6 +255,8 @@ data class SyncState(
     /** null = mai allineati: la prima volta si unisce soltanto. */
     val liked: Set<String>? = null,
     val playlists: List<PlaylistLink> = emptyList(),
+    /** Quanti ascolti del telefono ha già il server, per brano del server (null = mai mandati). */
+    val pushed: Map<String, Int>? = null,
 ) {
     /** Una playlist del telefono appena creata sul server ([ServerSync.Write.Create]). */
     fun created(phoneId: String, serverId: String, name: String, songs: List<String>) =

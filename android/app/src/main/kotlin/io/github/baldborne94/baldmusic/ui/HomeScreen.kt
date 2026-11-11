@@ -93,14 +93,14 @@ fun HomeScreen(vm: PlayerViewModel) {
 
     // Anche quando una raccolta cambia nome (cartella rinominata): i riquadri in alto prendono quello nuovo.
     val (recent) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.RECENT}", lib.recent to lib.playlists)
-    val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.plays.size)
+    val (top) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.TOP}", lib.allPlays.size)
     val (liked) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.LIKED}", lib.liked.size)
     val (collections) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.COLLECTIONS}", lib.playlists)
     val (localSections) = rememberChildren(vm, LocalCatalog.KEY)
     val (recentAdded) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.RECENT}")
     val newAlbums = recentAdded?.filter { it.kind != Kind.TRACK }
     val (allAlbums) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ALBUMS}")
-    val (mixItems) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.MIXES}", lib.plays.size to lib.liked.size)
+    val (mixItems) = rememberChildren(vm, "${PersonalSource.KEY}/${PersonalSource.MIXES}", lib.allPlays.size to lib.liked.size)
     val (artists) = rememberChildren(vm, "${LocalCatalog.KEY}/${LocalCatalog.ARTISTS}")
     val (roots) = rememberChildren(vm, "root")
     val hasServer = roots?.any { it.mediaId == RemoteSource.KEY } == true

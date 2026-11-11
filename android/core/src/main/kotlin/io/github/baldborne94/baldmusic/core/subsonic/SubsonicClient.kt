@@ -162,6 +162,13 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
         call("deletePlaylist", "id" to id)
     }
 
+    /** Ascolti fatti senza il server (telefono, in macchina), ognuno col suo momento: a gruppi di 50. */
+    suspend fun scrobbleAll(plays: List<Pair<String, Long>>) {
+        plays.chunked(50).forEach { chunk ->
+            call("scrobble", *(chunk.map { "id" to it.first } + chunk.map { "time" to it.second } + listOf("submission" to true)).toTypedArray())
+        }
+    }
+
     suspend fun scrobble(id: String, submission: Boolean) {
         call("scrobble", "id" to id, "submission" to submission, "time" to System.currentTimeMillis())
     }

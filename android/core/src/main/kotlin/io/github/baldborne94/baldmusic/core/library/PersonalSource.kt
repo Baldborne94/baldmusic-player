@@ -66,9 +66,9 @@ class PersonalSource(
         ours(DRIVE, "Per la macchina", "I tuoi preferiti di sempre, mescolati")
         add(mixNode(MediaId(LocalCatalog.KEY, LocalCatalog.SHUFFLE).toString(), "Mix casuale", "Tutta la tua musica, mescolata", null))
         if (lib.liked.isNotEmpty()) add(mixNode(MediaId(KEY, LIKED).toString(), "Preferiti in shuffle", "I brani che ti piacciono", mosaic(lib.liked)))
-        if (lib.plays.isNotEmpty()) add(mixNode(MediaId(KEY, TOP).toString(), "In loop", "Quelli che ascolti di più", mosaic(lib.topTracks())))
+        if (lib.allPlays.isNotEmpty()) add(mixNode(MediaId(KEY, TOP).toString(), "In loop", "Quelli che ascolti di più", mosaic(lib.topTracks())))
         // Un mix per ognuno dei tuoi artisti più ascoltati, tra i brani del telefono.
-        lib.plays.values.filter { it.track.id.startsWith("${LocalCatalog.KEY}/") && !it.track.artist.isNullOrBlank() }
+        lib.allPlays.values.filter { it.track.id.startsWith("${LocalCatalog.KEY}/") && !it.track.artist.isNullOrBlank() }
             .groupBy { ArtistNames.key(it.track.artist!!) }
             .values.sortedByDescending { list -> list.sumOf { it.count } }
             .take(TOP_ARTIST_MIXES)
@@ -86,12 +86,12 @@ class PersonalSource(
         return when (kind) {
             REDISCOVER -> {
                 val old = today - REDISCOVER_AFTER_MS
-                val played = lib.plays.values.filter { it.count >= 2 && it.lastPlayed < old }.map { it.track }
-                val likedForgotten = lib.liked.filter { t -> lib.plays[t.id]?.let { it.lastPlayed < old } ?: true }
+                val played = lib.allPlays.values.filter { it.count >= 2 && it.lastPlayed < old }.map { it.track }
+                val likedForgotten = lib.liked.filter { t -> lib.allPlays[t.id]?.let { it.lastPlayed < old } ?: true }
                 (played + likedForgotten).distinctBy { it.id }.shuffled(random).take(MIX_SIZE)
             }
             DRIVE -> {
-                val favourite = lib.plays.values.filter { it.count >= 3 }.sortedByDescending { it.count }.take(MIX_SIZE).map { it.track }
+                val favourite = lib.allPlays.values.filter { it.count >= 3 }.sortedByDescending { it.count }.take(MIX_SIZE).map { it.track }
                 (favourite + lib.liked.take(MIX_SIZE / 2)).distinctBy { it.id }.shuffled(random).take(MIX_SIZE)
             }
             else -> emptyList()
@@ -216,7 +216,7 @@ class PersonalSource(
                 // Le sezioni, coi loro conteggi.
                 null -> listOf(lib.collections.size, lib.liked.size, lib.playlists.count { !it.isCollection })
                 LIKED -> lib.liked
-                TOP -> lib.plays
+                TOP -> lib.plays to lib.otherPlays
                 // Anche le playlist: il nome di una raccolta può cambiare senza un ascolto nuovo.
                 RECENT -> lib.recent to lib.playlists
                 PLAYLISTS -> lib.playlists
@@ -224,7 +224,7 @@ class PersonalSource(
                 COLLECTIONS -> lib.playlists to lib.collectionGroups().map { (group, list) -> group to list.map { it.id } }
                 PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }
                 // I mix vengono da preferiti e ascolti.
-                MIXES, MIX -> lib.liked to lib.plays
+                MIXES, MIX -> Triple(lib.liked, lib.plays, lib.otherPlays)
                 else -> lib
             }
         }

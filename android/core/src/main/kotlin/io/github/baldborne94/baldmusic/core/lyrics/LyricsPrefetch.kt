@@ -22,7 +22,7 @@ object LyricsPrefetch {
             val id = UserLibrary.baseId(t.id)
             if (id !in out) out[id] = if (id == t.id) t else t.copy(id = id)
         }
-        lib.plays.values.sortedWith(compareByDescending<PlayCount> { it.count }.thenByDescending { it.lastPlayed })
+        lib.allPlays.values.sortedWith(compareByDescending<PlayCount> { it.count }.thenByDescending { it.lastPlayed })
             .forEach { add(it.track) }
         lib.liked.forEach(::add)
         // Prima le raccolte (le cartelle sono il modo in cui ascolti), poi le playlist.
