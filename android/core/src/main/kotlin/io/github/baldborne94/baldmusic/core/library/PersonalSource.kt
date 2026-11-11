@@ -38,7 +38,8 @@ class PersonalSource(
             LIKED -> lib.liked.mapNotNull { trackNode(it, MediaId(KEY, LIKED)) }
             TOP -> lib.topTracks().mapNotNull { trackNode(it, MediaId(KEY, TOP)) }
             RECENT -> lib.recent.mapNotNull { recentNode(lib, it) }
-            COLLECTIONS -> lib.collections.sortedBy { it.name.lowercase() }.map(::playlistNode)
+            // Prima quelle che ascolti (in auto si scorre poco), poi le altre dalla A alla Z.
+            COLLECTIONS -> lib.collectionGroups().flatMap { (group, list) -> list.map { playlistNode(it).copy(group = group) } }
             PLAYLISTS -> lib.playlists.filterNot { it.isCollection }.map(::playlistNode)
             PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }?.let { pl ->
                 pl.tracks.mapNotNull { trackNode(it, MediaId(KEY, PLAYLIST, pl.id)) }
@@ -218,7 +219,9 @@ class PersonalSource(
                 TOP -> lib.plays
                 // Anche le playlist: il nome di una raccolta può cambiare senza un ascolto nuovo.
                 RECENT -> lib.recent to lib.playlists
-                PLAYLISTS, COLLECTIONS -> lib.playlists
+                PLAYLISTS -> lib.playlists
+                // Le raccolte cambiano ordine coi recenti e gli ascolti, ma un ascolto che non lo cambia non le ricarica.
+                COLLECTIONS -> lib.playlists to lib.collectionGroups().map { (group, list) -> group to list.map { it.id } }
                 PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }
                 // I mix vengono da preferiti e ascolti.
                 MIXES, MIX -> lib.liked to lib.plays

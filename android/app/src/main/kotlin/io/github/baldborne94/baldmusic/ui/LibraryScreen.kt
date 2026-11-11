@@ -91,6 +91,8 @@ fun LibraryScreen(vm: PlayerViewModel) {
 
     // Artisti e album per lettera, come in Android Auto (solo nell'ordine della libreria, che è già alfabetico).
     val lettered = !alphabetical && (filter == Filter.ARTIST || filter == Filter.ALBUM)
+    // Le raccolte: «Ascoltate di recente», «Le più ascoltate», «Tutte le altre» (come in Android Auto).
+    val headed = lettered || (!alphabetical && filter == Filter.COLLECTION)
     val listState = rememberLazyListState()
     // Sopra l'elenco: titolo, filtri e ordine.
     val letters = remember(items, lettered) { if (lettered) LetterIndex.entries(items.map { it.group }, before = 3) else emptyList() }
@@ -145,7 +147,7 @@ fun LibraryScreen(vm: PlayerViewModel) {
             }
             items.forEachIndexed { i, item ->
                 val group = item.group
-                if (lettered && group != null && (i == 0 || items[i - 1].group != group)) {
+                if (headed && group != null && (i == 0 || items[i - 1].group != group)) {
                     item(key = "lettera-$i-$group") { SectionHeader(group) }
                 }
                 item(key = item.mediaId) { ContainerRow(item) { ui.open(item.mediaId, item.title()) } }

@@ -267,6 +267,7 @@ dell'unità principale sul telefono.
 |---|-----------|---------------------|
 | C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto; con brani del server in coda e il PC spento riparte in pochi secondi con i soli brani del telefono |
 | C-2 | Schede La tua musica / Telefono / Server | Si aprono; raccolte per prime; elenchi lunghi divisi per lettera |
+| C-2b | La tua musica → Raccolte, dopo aver ascoltato due raccolte | In cima «Ascoltate di recente» con l'ultima sentita per prima, poi «Le più ascoltate», poi «Tutte le altre» dalla A alla Z; nessuna compare due volte. Lo stesso nell'app (Libreria → Raccolte) |
 | C-3 | Cuore, casuale, ripeti nella barra | Funzionano e si vedono nell'app |
 | C-4 | «Ok Google, metti la raccolta Movie Soundtracks su BaldMusic» | Suona tutta la raccolta |
 | C-5 | «…metti Lucio Dalla su BaldMusic», «…metti l'album X» | Suona l'artista / l'album giusto |
