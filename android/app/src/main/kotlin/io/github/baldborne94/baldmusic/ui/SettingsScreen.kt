@@ -192,6 +192,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
             }
             Text("I brani arrivano dal server nella qualità originale, senza conversioni.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             ServerSyncSetting()
+            ServerDownloadsSetting()
         } else {
             Text(
                 "Inserisci l'indirizzo del PC: a casa va bene http://192.168.x.x:4533, fuori casa serve l'indirizzo di Tailscale (es. http://100.x.x.x:4533 o https://pc.tail1234.ts.net).",
@@ -418,5 +419,30 @@ private fun ServerSyncSetting() {
                 busy = false
             }
         }) { Text(if (busy) "Allineo…" else "Allinea adesso") }
+    }
+}
+
+/** Album e playlist del PC salvati sul telefono: quanti, quanto spazio, «Togli tutti». */
+@Composable
+private fun ServerDownloadsSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val store = context.app.serverDownloads
+    val downloads by store.state.collectAsStateWithLifecycle()
+    val present by store.present.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val megabytes = remember(present) { store.bytes() / (1024 * 1024) }
+    Text("Scaricati dal PC", fontWeight = FontWeight.SemiBold)
+    Text(
+        if (downloads.sets.isEmpty()) {
+            "Da un album o una playlist del server: ⋮ → «Scarica sul telefono». Si ascoltano anche senza rete (Server → «Scaricati sul telefono», anche in macchina), nella qualità originale."
+        } else {
+            val songs = downloads.songIds.size
+            "${downloads.sets.size} tra album e playlist · ${present.count { it in downloads.songIds }} di $songs brani sul telefono · $megabytes MB"
+        },
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (downloads.sets.isNotEmpty()) {
+        OutlinedButton(onClick = { scope.launch { downloads.sets.forEach { store.remove(it.container) } } }) { Text("Togli tutti dal telefono") }
     }
 }
