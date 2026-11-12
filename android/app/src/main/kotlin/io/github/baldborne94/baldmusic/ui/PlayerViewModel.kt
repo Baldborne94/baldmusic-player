@@ -129,6 +129,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     val updater get() = app.updater
 
+    /** Album e playlist del PC salvati sul telefono. */
+    val serverDownloads get() = app.serverDownloads
+
+    fun download(container: String) {
+        viewModelScope.launch { runCatching { app.serverDownloads.add(container) } }
+    }
+
+    fun removeDownload(container: String) {
+        viewModelScope.launch { runCatching { app.serverDownloads.remove(container) } }
+    }
+
     fun checkUpdates(force: Boolean = false) {
         app.updater.scope.launch { app.updater.check(force) }
     }

@@ -50,6 +50,11 @@ class BaldMusicApp : Application() {
     val lyrics: LyricsRepository by lazy { LyricsRepository(this, http) }
 
     /** Backup della tua musica, a mano e in automatico in Download/BaldMusic. */
+    /** Album e playlist del PC salvati sul telefono. */
+    val serverDownloads by lazy { io.github.baldborne94.baldmusic.data.ServerDownloadsStore(this) }
+
+    /** «Mi piace» e playlist uguali sul telefono e su Navidrome. */
+    val serverSync by lazy { io.github.baldborne94.baldmusic.data.ServerSyncer(this) }
     val backups: Backups by lazy { Backups(this, userData, local, podcasts) { settings } }
 
     /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */
@@ -91,7 +96,7 @@ class BaldMusicApp : Application() {
                 phoneFolders.value = folders
                 userData.syncFolders(folders, songs.mapTo(HashSet()) { LocalCatalog.ref(it).id })
             },
-            plays = { userData.value.plays.mapValues { it.value.count } },
+            plays = { userData.value.allPlays.mapValues { it.value.count } },
             http = http,
             acoustIdKey = { settings.acoustIdKey },
         )
@@ -102,6 +107,7 @@ class BaldMusicApp : Application() {
             decades = { local.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES)) },
         )
         backups.start()
+        serverSync.start()
         // Testi scaricati in anticipo, per quando non c'è rete.
         LyricsWorker.schedule(this)
         // Puntate nuove dei podcast che segui, anche ad app chiusa.
@@ -116,7 +122,7 @@ class BaldMusicApp : Application() {
         val creds = settings.credentials
         if (creds != remoteCreds) {
             remoteCreds = creds
-            remote = creds?.let { RemoteSource(SubsonicClient(it, http)) }
+            remote = creds?.let { RemoteSource(SubsonicClient(it, http), offline = { serverDownloads.state.value }, fileOf = serverDownloads::fileOf) }
         }
         return remote
     }

@@ -130,6 +130,45 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
         call("search3", "query" to query, "artistCount" to 10, "albumCount" to 20, "songCount" to 50).searchResult3
             ?: SearchResult()
 
+    /** Tutti i brani del server, a pagine di [pageSize] (search3 con la ricerca `""`, come fa l'app web). */
+    suspend fun allSongs(pageSize: Int = 500): List<Song> {
+        val out = ArrayList<Song>()
+        while (true) {
+            val page = call("search3", "query" to "\"\"", "artistCount" to 0, "albumCount" to 0, "songCount" to pageSize, "songOffset" to out.size)
+                .searchResult3?.song.orEmpty()
+            out += page
+            if (page.size < pageSize) return out
+        }
+    }
+
+    /** «Mi piace» (stella di Navidrome) su più brani insieme. */
+    suspend fun star(ids: Collection<String>, starred: Boolean) {
+        if (ids.isEmpty()) return
+        ids.chunked(100).forEach { chunk -> call(if (starred) "star" else "unstar", *chunk.map { "id" to it }.toTypedArray()) }
+    }
+
+    /** Una playlist nuova coi brani [songIds] in quest'ordine. */
+    suspend fun createPlaylist(name: String, songIds: List<String>): Playlist =
+        call("createPlaylist", "name" to name, *songIds.map { "songId" to it }.toTypedArray()).playlist
+            ?: playlists().last { it.name == name }
+
+    /** Riscrive i brani di una playlist nello stesso ordine (Subsonic non sa spostarli) e, se serve, il nome. */
+    suspend fun replacePlaylist(id: String, name: String?, songIds: List<String>) {
+        call("createPlaylist", "playlistId" to id, *songIds.map { "songId" to it }.toTypedArray())
+        if (name != null) call("updatePlaylist", "playlistId" to id, "name" to name)
+    }
+
+    suspend fun deletePlaylist(id: String) {
+        call("deletePlaylist", "id" to id)
+    }
+
+    /** Ascolti fatti senza il server (telefono, in macchina), ognuno col suo momento: a gruppi di 50. */
+    suspend fun scrobbleAll(plays: List<Pair<String, Long>>) {
+        plays.chunked(50).forEach { chunk ->
+            call("scrobble", *(chunk.map { "id" to it.first } + chunk.map { "time" to it.second } + listOf("submission" to true)).toTypedArray())
+        }
+    }
+
     suspend fun scrobble(id: String, submission: Boolean) {
         call("scrobble", "id" to id, "submission" to submission, "time" to System.currentTimeMillis())
     }

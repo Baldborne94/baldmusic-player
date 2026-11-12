@@ -59,7 +59,7 @@ fun PageHeader(title: String) {
 @Composable
 fun StatsScreen(vm: PlayerViewModel) {
     val lib by vm.library.collectAsStateWithLifecycle()
-    val stats = remember(lib.plays) { ListeningStats.from(lib) }
+    val stats = remember(lib.plays, lib.otherPlays) { ListeningStats.from(lib) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
     LazyColumn(

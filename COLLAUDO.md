@@ -68,6 +68,10 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
+| A-0a | Server collegato: metti ♥ a un brano sul telefono (o in macchina) che c'è anche sul PC; aspetta mezzo minuto e apri l'app web | Il brano è tra «Brani che ti piacciono» anche nel sito (anche se sul PC è un file diverso); togli il ♥ dal sito e, entro mezz'ora (o «Allinea adesso» in Impostazioni → Server), sparisce dal telefono |
+| A-0b | Crea una playlist sul telefono con un brano che il PC non ha; crea una playlist nel sito; rinominane una e eliminane un'altra | La playlist del telefono compare nel sito coi brani che il PC ha (quello che manca resta solo sul telefono, al suo posto); quella del sito compare sul telefono; nome cambiato ed eliminazione arrivano dall'altra parte. Le raccolte non si toccano |
+| A-0c | Server collegato: ascolta per intero 3 brani dal sito sul PC e 3 brani del telefono (anche senza rete, in macchina); poi «Allinea adesso» | Le statistiche e i «più ascoltati» del telefono contano anche i 3 del PC; nel sito («I più ascoltati», statistiche) compaiono anche quelli del telefono; nessun ascolto contato due volte |
+| A-0d | Da un album del server (e da una playlist): ⋮ → «Scarica sul telefono»; aspetta, poi modalità aereo e apri Server (anche in macchina) | In cima «Scaricati sul telefono» con l'album e la playlist: si aprono e suonano senza rete, con le copertine; nel ⋮ «Togli dal telefono (scaricati N di M)» mentre scarica. «Togli dal telefono» li toglie e libera spazio (Impostazioni → Server dice quanti MB) |
 | A-1 | Album dal vivo o concept, ascolta il passaggio tra due brani | Nessuna pausa e nessuna dissolvenza (stesso album) |
 | A-2 | Impostazioni → Dissolvenza: prova Spenta, 3, 12 s | Spenta = passaggio netto; 12 s = sfumatura lunga; un disco ascoltato in ordine (traccia 3 → 4) resta attaccato |
 | A-2b | Una raccolta di file scaricati (anche senza tag dell'album), dissolvenza 6 s, lascia finire un brano da solo | Il brano che finisce si abbassa senza interrompersi nemmeno un attimo all'inizio della sfumatura, il successivo sale; lo stesso in casuale con brani dello stesso album |
@@ -268,6 +272,7 @@ dell'unità principale sul telefono.
 | C-1 | Avvio a freddo (app chiusa da ore) e accensione dell'auto | Riprende la coda di prima dal punto giusto; con brani del server in coda e il PC spento riparte in pochi secondi con i soli brani del telefono |
 | C-2 | Schede La tua musica / Telefono / Server | Si aprono; raccolte per prime; elenchi lunghi divisi per lettera |
 | C-2b | La tua musica → Raccolte, dopo aver ascoltato due raccolte | In cima «Ascoltate di recente» con l'ultima sentita per prima, poi «Le più ascoltate», poi «Tutte le altre» dalla A alla Z; nessuna compare due volte. Lo stesso nell'app (Libreria → Raccolte) |
+| C-2c | In auto apri una raccolta (e una playlist del server); poi torna a «La tua musica» | Prima voce «Riproduci in casuale · N brani»: un tocco e parte mescolata, col casuale acceso. In cima a «La tua musica» «Per la macchina» e «Riscopri» (se hai abbastanza ascolti): un tocco e parte il mix. Nell'app niente di tutto questo (ha i suoi tasti) |
 | C-3 | Cuore, casuale, ripeti nella barra | Funzionano e si vedono nell'app |
 | C-4 | «Ok Google, metti la raccolta Movie Soundtracks su BaldMusic» | Suona tutta la raccolta |
 | C-5 | «…metti Lucio Dalla su BaldMusic», «…metti l'album X» | Suona l'artista / l'album giusto |

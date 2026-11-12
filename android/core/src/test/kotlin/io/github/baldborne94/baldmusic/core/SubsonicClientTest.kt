@@ -102,6 +102,40 @@ class SubsonicClientTest {
     }
 
     @Test
+    fun `mi piace su piu brani insieme, playlist riscritta nello stesso ordine`() = runTest {
+        repeat(3) { reply("""{"subsonic-response":{"status":"ok"}}""") }
+        client().star(listOf("s1", "s2"), starred = true)
+        client().replacePlaylist("p9", "Corsa", listOf("s2", "s1"))
+        val star = server.takeRequest().url
+        assertEquals("/rest/star", star.encodedPath)
+        assertEquals(listOf("s1", "s2"), star.queryParameterValues("id"))
+        val rewrite = server.takeRequest().url
+        assertEquals("/rest/createPlaylist", rewrite.encodedPath)
+        assertEquals("p9", rewrite.queryParameter("playlistId"))
+        assertEquals(listOf("s2", "s1"), rewrite.queryParameterValues("songId"))
+        val rename = server.takeRequest().url
+        assertEquals("/rest/updatePlaylist", rename.encodedPath)
+        assertEquals("Corsa", rename.queryParameter("name"))
+    }
+
+    @Test
+    fun `tutti i brani a pagine finche ce ne sono`() = runTest {
+        reply("""{"subsonic-response":{"status":"ok","searchResult3":{"song":[{"id":"a"},{"id":"b"}]}}}""")
+        reply("""{"subsonic-response":{"status":"ok","searchResult3":{"song":[{"id":"c"}]}}}""")
+        assertEquals(listOf("a", "b", "c"), client().allSongs(pageSize = 2).map { it.id })
+        assertEquals("0", server.takeRequest().url.queryParameter("songOffset"))
+        assertEquals("2", server.takeRequest().url.queryParameter("songOffset"))
+    }
+
+    @Test
+    fun `le raccolte del PC si riconoscono dal commento`() = runTest {
+        reply("""{"subsonic-response":{"status":"ok","playlists":{"playlist":[{"id":"1","name":"Rock","comment":"Raccolta della cartella «Rock» · BaldMusic","owner":"ale"},{"id":"2","name":"Corsa","owner":"ale"}]}}}""")
+        val lists = client().playlists()
+        assertEquals(listOf(true, false), lists.map { it.isPcCollection })
+        assertEquals("ale", lists[1].owner)
+    }
+
+    @Test
     fun `lo stream chiede sempre il file originale`() {
         val url = client().streamUrl("s1").toHttpUrl()
         assertEquals("raw", url.queryParameter("format"))

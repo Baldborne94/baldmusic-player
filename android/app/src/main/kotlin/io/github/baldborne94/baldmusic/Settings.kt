@@ -74,6 +74,14 @@ class Settings(context: Context) {
             edited()
         }
 
+    /** «Mi piace» e playlist uguali sul telefono e su Navidrome ([io.github.baldborne94.baldmusic.data.ServerSyncer]). */
+    var syncWithServer: Boolean
+        get() = prefs.getBoolean(KEY_SYNC_SERVER, true)
+        set(value) {
+            prefs.edit { putBoolean(KEY_SYNC_SERVER, value) }
+            edited()
+        }
+
     /** La chiave dell'applicazione su AcoustID (acoustid.org/new-application) per riconoscere i brani dal suono. */
     var acoustIdKey: String?
         get() = prefs.getString(KEY_ACOUSTID, null)?.takeIf { it.isNotBlank() }
@@ -161,6 +169,7 @@ class Settings(context: Context) {
         const val KEY_CROSSFADE = "crossfade"
         const val KEY_CONTINUE = "continue_listening"
         const val KEY_COVER_AUTO = "cover_auto"
+        const val KEY_SYNC_SERVER = "sync_server"
         const val KEY_ACOUSTID = "acoustid_key"
         const val KEY_RECOGNITION_PROBLEM = "recognition_problem"
     }

@@ -61,7 +61,23 @@ data class UserLibrary(
     val searches: List<String> = emptyList(),
     /** Cartelle la cui raccolta è stata eliminata: non si ricrea. */
     val ignoredFolders: Set<String> = emptySet(),
+    /**
+     * Ascolti fatti altrove (app web, Navidrome) e non dal telefono, per brano (il file del
+     * telefono se c'è): si rileggono a ogni allineamento col server ([ServerSync.planPlays]).
+     */
+    val otherPlays: Map<String, PlayCount> = emptyMap(),
 ) {
+    /** Tutti gli ascolti, del telefono e degli altri dispositivi, sommati per brano: per classifiche, mix e statistiche. */
+    val allPlays: Map<String, PlayCount> by lazy {
+        if (otherPlays.isEmpty()) plays
+        else HashMap(plays).also { all ->
+            for ((id, p) in otherPlays) {
+                val mine = all[id]
+                all[id] = if (mine == null) p else mine.copy(count = mine.count + p.count, lastPlayed = maxOf(mine.lastPlayed, p.lastPlayed))
+            }
+        }
+    }
+
     val collections get() = playlists.filter { it.isCollection }
 
     /**
@@ -204,7 +220,7 @@ data class UserLibrary(
         val shown = recentOnes.mapTo(HashSet()) { it.id }
         val topOnes = all.asSequence()
             .filter { it.id !in shown }
-            .map { pl -> pl to pl.tracks.sumOf { plays[baseId(it.id)]?.count ?: 0 } }
+            .map { pl -> pl to pl.tracks.sumOf { allPlays[baseId(it.id)]?.count ?: 0 } }
             .filter { it.second > 0 }
             .sortedWith(compareByDescending<Pair<UserPlaylist, Int>> { it.second }.thenBy { it.first.name.lowercase() })
             .take(TOP_COLLECTIONS)
@@ -221,7 +237,7 @@ data class UserLibrary(
     }
 
     fun topTracks(limit: Int = 50): List<TrackRef> =
-        plays.values.sortedWith(compareByDescending<PlayCount> { it.count }.thenByDescending { it.lastPlayed })
+        allPlays.values.sortedWith(compareByDescending<PlayCount> { it.count }.thenByDescending { it.lastPlayed })
             .take(limit).map { it.track }
 
     fun createPlaylist(id: String, name: String, now: Long, first: List<TrackRef> = emptyList()) =
@@ -289,6 +305,7 @@ data class UserLibrary(
             liked = liked.filterNot { it.id in gone },
             playlists = playlists.map { pl -> if (pl.tracks.none { it.id in gone }) pl else pl.copy(tracks = pl.tracks.filterNot { it.id in gone }) },
             plays = plays.filterKeys { it !in gone },
+            otherPlays = otherPlays.filterKeys { it !in gone },
         )
     }
 

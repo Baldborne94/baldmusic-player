@@ -3,7 +3,7 @@ package io.github.baldborne94.baldmusic.core.library
 /** Una voce di classifica: nome, ascolti e (per brani e album) una copertina. */
 data class Ranked(val name: String, val plays: Int, val artwork: String? = null, val subtitle: String? = null)
 
-/** Le tue statistiche, calcolate dagli ascolti salvati sul telefono. */
+/** Le tue statistiche: gli ascolti del telefono più quelli fatti dal PC ([UserLibrary.allPlays]). */
 data class ListeningStats(
     val totalPlays: Int,
     val minutes: Long,
@@ -17,7 +17,7 @@ data class ListeningStats(
 ) {
     companion object {
         fun from(lib: UserLibrary, limit: Int = 5): ListeningStats {
-            val plays = lib.plays.values
+            val plays = lib.allPlays.values
             fun <K> rank(key: (PlayCount) -> K?, name: (K, List<PlayCount>) -> Ranked) =
                 plays.filter { key(it) != null }.groupBy { key(it)!! }
                     .map { (k, v) -> name(k, v) }

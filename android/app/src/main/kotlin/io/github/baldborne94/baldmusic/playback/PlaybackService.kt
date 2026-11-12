@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.Autoplay
+import io.github.baldborne94.baldmusic.core.library.CarShortcuts
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
 import io.github.baldborne94.baldmusic.core.library.GoBack
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -384,7 +385,9 @@ class PlaybackService : MediaLibraryService() {
                 val duration = player.duration
                 if (player.currentMediaItem?.mediaId != item.mediaId) return@launch
                 if (duration > 0 && ListeningSession.countsAsPlay(player.currentPosition, duration)) {
-                    runCatching { client.scrobble(songId, submission = true) }
+                    // Con l'allineamento acceso gli ascolti li manda ServerSyncer (anche quelli dei
+                    // file e quelli fatti senza rete): qui si conterebbero due volte.
+                    if (!app.settings.syncWithServer) runCatching { client.scrobble(songId, submission = true) }
                     return@launch
                 }
             }
@@ -605,6 +608,14 @@ class PlaybackService : MediaLibraryService() {
         return listOfNotNull(tree.resolve(item.mediaId)?.toMediaItem(this))
     }
 
+    /** Una scorciatoia dell'auto ([CarShortcuts]) diventa la richiesta di suonare tutto il contenitore, mescolato o no. */
+    private fun fromShortcut(item: MediaItem): MediaItem {
+        val (container, shuffled) = CarShortcuts.parse(item.mediaId) ?: return item
+        player.shuffleModeEnabled = shuffled
+        val request = item.requestMetadata.buildUpon().setExtras(Bundle().apply { putBoolean(EXTRA_SHUFFLE, shuffled) }).build()
+        return item.buildUpon().setMediaId(container).setRequestMetadata(request).build()
+    }
+
     private suspend fun searched(query: String): List<LibraryNode> =
         searches.getOrPut(query) { scope.async { runCatching { tree.search(query) }.getOrDefault(emptyList()) } }.await()
 
@@ -682,7 +693,13 @@ class PlaybackService : MediaLibraryService() {
                 } else {
                     tree.children(parentId)
                 }
-                LibraryResult.ofItemList(nodes.page(page, pageSize).toItems(), params)
+                // In auto (non nell'app, che ha i suoi tasti): «Riproduci in casuale» in cima alle
+                // raccolte e playlist, «Per la macchina» e «Riscopri» in cima alla prima scheda.
+                val shown = if (browser.packageName == packageName) nodes else {
+                    val mixes = if (parentId == PersonalSource.KEY) runCatching { tree.children(MediaId(PersonalSource.KEY, PersonalSource.MIXES).toString()) }.getOrDefault(emptyList()) else emptyList()
+                    CarShortcuts.forCar(parentId, nodes, mixes)
+                }
+                LibraryResult.ofItemList(shown.page(page, pageSize).toItems(), params)
             } catch (e: Exception) {
                 LibraryResult.ofError(SessionError.ERROR_IO)
             }
@@ -736,7 +753,7 @@ class PlaybackService : MediaLibraryService() {
             startIndex: Int,
             startPositionMs: Long,
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
-            val single = mediaItems.singleOrNull()
+            val single = mediaItems.singleOrNull()?.let(::fromShortcut)
             if (single == null) {
                 // Una lista intera (es. la coda ripristinata): ogni brano col suo indirizzo.
                 val resolved = mediaItems.flatMap { resolve(it) }

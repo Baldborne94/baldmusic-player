@@ -209,6 +209,8 @@ class ArtworkProvider : ContentProvider() {
     }
 
     private fun fetchRemote(ctx: Context, coverId: String, out: File): Boolean {
+        // Di un album o una playlist scaricati: dal telefono, anche senza rete.
+        ctx.app.serverDownloads.coverFile(coverId)?.let { saved -> return writeAtomically(out) { o -> saved.inputStream().use { it.copyTo(o) }; true } }
         val client = ctx.app.subsonic() ?: return false
         val request = Request.Builder().url(client.coverUrl(coverId, SIZE)).build()
         ctx.app.http.newCall(request).execute().use { res ->

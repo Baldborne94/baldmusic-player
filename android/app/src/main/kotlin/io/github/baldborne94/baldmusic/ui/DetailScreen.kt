@@ -68,6 +68,7 @@ import io.github.baldborne94.baldmusic.core.library.LetterIndex
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
+import io.github.baldborne94.baldmusic.core.library.ServerDownloads
 import io.github.baldborne94.baldmusic.playback.group
 import io.github.baldborne94.baldmusic.playback.kind
 
@@ -84,6 +85,9 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     LaunchedEffect(vm.browser, mediaId, if (personal) lib.playlists else null) { node = vm.item(mediaId) }
 
     val likedPage = isLikedSongs(mediaId)
+    // Album e playlist del PC: si possono salvare sul telefono, per la macchina e senza rete.
+    val downloads by vm.serverDownloads.state.collectAsStateWithLifecycle()
+    val downloaded by vm.serverDownloads.present.collectAsStateWithLifecycle()
     val playlistId = personalPlaylistId(mediaId)
     // Una raccolta è una playlist nata da una cartella del telefono: si modifica allo stesso modo.
     val isCollection = playlistId?.let { pid -> lib.playlists.firstOrNull { it.id == pid }?.isCollection } == true
@@ -165,6 +169,15 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                         onAddAll = { ui.addToPlaylist(tracks) },
                         menuItems = buildList {
                             if (tracks.isNotEmpty()) add("Seleziona brani" to { reordering = false; selecting = true })
+                            if (ServerDownloads.downloadable(mediaId)) {
+                                val set = downloads.sets.firstOrNull { it.container == mediaId }
+                                if (set == null) add("Scarica sul telefono" to { vm.download(mediaId) })
+                                else {
+                                    val done = set.songs.count { it.id in downloaded }
+                                    val label = if (done < set.songs.size) "Togli dal telefono (scaricati $done di ${set.songs.size})" else "Togli dal telefono"
+                                    add(label to { vm.removeDownload(mediaId) })
+                                }
+                            }
                             if (playlistId != null && tracks.size > 1) {
                                 add("Riordina brani" to { selecting = false; selected.clear(); reordering = true })
                                 add("Ordina per titolo" to { vm.sortPlaylist(playlistId, byArtist = false) })

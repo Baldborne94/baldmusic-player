@@ -10,8 +10,15 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
-/** La libreria sul server Navidrome. */
-class RemoteSource(private val client: SubsonicClient) : MusicSource {
+/**
+ * La libreria sul server Navidrome. [offline]: album e playlist scaricati sul telefono, che si
+ * sfogliano e suonano anche senza rete; [fileOf]: il file sul telefono di un brano, se c'è.
+ */
+class RemoteSource(
+    private val client: SubsonicClient,
+    private val offline: () -> ServerDownloads = { ServerDownloads() },
+    private val fileOf: (songId: String) -> String? = { null },
+) : MusicSource {
 
     override val key = KEY
     override val title = "Server"
@@ -19,7 +26,9 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
     /** Il mix casuale cambia a ogni richiesta: si tiene l'ultimo per ricostruire la coda. */
     @Volatile private var lastRandom: List<Song> = emptyList()
 
-    override suspend fun sections() = listOf(
+    override suspend fun sections() = listOfNotNull(
+        // Per prima: in macchina senza rete è l'unica che si apre.
+        section(DOWNLOADED, "Scaricati sul telefono", grid = true).takeIf { offline().sets.isNotEmpty() },
         section(RECENT, "Aggiunti di recente", grid = true),
         section(ALBUMS, "Album", grid = true),
         section(ARTISTS, "Artisti"),
@@ -82,12 +91,27 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         ARTIST_SINGLES -> looseSongs(client.artist(requireNotNull(id.id)).album.filterNot { it.isReal })
             .map { songNode(it, id.copy(parent = null)) }
         PLAYLIST -> client.playlist(requireNotNull(id.id)).entry.map { songNode(it, id.copy(parent = null)) }
+        // Senza rete: dall'elenco sul telefono.
+        DOWNLOADED -> offline().sets.map(::downloadedNode)
+        DOWNLOADED_SET -> offline().set(requireNotNull(id.id))?.songs.orEmpty().map { songNode(it, id.copy(parent = null)) }
         else -> emptyList()
     }
 
+    override suspend fun node(id: MediaId): LibraryNode? =
+        if (id.kind == DOWNLOADED_SET) id.id?.let { offline().set(it) }?.let(::downloadedNode) else null
+
+    private fun downloadedNode(set: DownloadedSet) = LibraryNode(
+        mediaId = MediaId(KEY, DOWNLOADED_SET, set.key).toString(),
+        title = set.title,
+        kind = Kind.PLAYLIST,
+        subtitle = listOfNotNull(set.subtitle, count(set.songs.size)).joinToString(" · "),
+        artwork = set.coverArt?.let { "$KEY/$it" },
+    )
+
     override suspend fun track(id: MediaId): LibraryNode? {
         val songId = id.id ?: return null
-        val song = lastRandom.firstOrNull { it.id == songId } ?: runCatching { client.song(songId) }.getOrNull() ?: return null
+        // Scaricato: si suona senza chiedere niente al server (anche senza rete).
+        val song = offline().song(songId) ?: lastRandom.firstOrNull { it.id == songId } ?: runCatching { client.song(songId) }.getOrNull() ?: return null
         return songNode(song, id.parent)
     }
 
@@ -152,7 +176,7 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         trackNumber = s.track,
         discNumber = s.discNumber,
         year = s.year,
-        streamUri = client.streamUrl(s.id),
+        streamUri = fileOf(s.id) ?: client.streamUrl(s.id),
         albumId = s.albumId?.let { MediaId(KEY, ALBUM, it).toString() },
         artistId = s.artistId?.let { MediaId(KEY, ARTIST, it).toString() },
         replayGain = s.replayGain?.let { ReplayGain(it.trackGain, it.albumGain, it.trackPeak, it.albumPeak) },
@@ -170,5 +194,7 @@ class RemoteSource(private val client: SubsonicClient) : MusicSource {
         const val ARTIST = "artist"
         const val ARTIST_SINGLES = "artistsingles"
         const val PLAYLIST = "playlist"
+        const val DOWNLOADED = "downloaded"
+        const val DOWNLOADED_SET = "downloadedset"
     }
 }
