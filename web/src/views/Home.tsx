@@ -11,14 +11,8 @@ import { getClient } from "../lib/session";
 import type { Artist } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
 import { quickTiles } from "../lib/recent";
+import { greeting } from "../lib/greeting";
 import { MissingCollections } from "./Library";
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 13) return "Buongiorno";
-  if (h >= 13 && h < 18) return "Buon pomeriggio";
-  return "Buonasera";
-}
 
 export interface Mix {
   id: string;
@@ -86,7 +80,7 @@ export function Home() {
   return (
     <div className="page page--home">
       <div className="home-head">
-        <h1>{greeting()}</h1>
+        <h1>{greeting(new Date().getHours(), c.creds.user)}</h1>
       </div>
       {quick.length > 0 && (
         <div className="quick">

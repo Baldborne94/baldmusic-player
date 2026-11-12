@@ -57,6 +57,7 @@ import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.library.LocalSource
 import io.github.baldborne94.baldmusic.playback.group
 import io.github.baldborne94.baldmusic.playback.kind
+import io.github.baldborne94.baldmusic.core.library.Greeting
 import java.util.Calendar
 
 /** Carica i figli di un nodo e li ricarica quando cambia la libreria o la tua musica. */
@@ -71,11 +72,8 @@ fun rememberChildren(vm: PlayerViewModel, mediaId: String, key: Any? = null): Pa
     return items to error
 }
 
-private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
-    in 5..12 -> "Buongiorno"
-    in 13..17 -> "Buon pomeriggio"
-    else -> "Buonasera"
-}
+/** «Buonasera, Alessandro»: l'utente del server collegato (o dell'ultimo collegamento), se c'è. */
+private fun greeting(user: String?): String = Greeting.of(Calendar.getInstance().get(Calendar.HOUR_OF_DAY), user)
 
 private val upNextId = "${PodcastSource.KEY}/${PodcastSource.UPNEXT}"
 
@@ -118,7 +116,7 @@ fun HomeScreen(vm: PlayerViewModel) {
     val rediscover = remember(allAlbums) { allAlbums?.shuffled()?.take(12) }
     val topArtists = remember(artists) { artists?.shuffled()?.take(10) }
 
-    val header = remember { greeting() }
+    val header = remember { greeting(context.app.settings.savedServer?.second) }
     LazyColumn(
         Modifier
             .fillMaxSize()
