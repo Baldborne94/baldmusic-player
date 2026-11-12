@@ -128,7 +128,7 @@ l'app deve solo leggerli tutti, non inventare euristiche.
 
 Con una libreria sola ha senso unire quello che oggi è separato per dispositivo.
 
-- [ ] **Guida per il NAS** in `server/README.md`: Navidrome sul NAS (Docker), Tailscale, spostare la musica.
+- [x] **Guida per il NAS** in `server/README.md`: Navidrome sul NAS (Docker), Tailscale, spostare la musica.
 - [x] **Preferiti e playlist uguali ovunque**: quelli del telefono finiscono anche su Navidrome; i brani presenti sia sul telefono sia sul server sono riconosciuti come uno (ID MusicBrainz del brano, o artista + titolo + durata).
 - [x] **Scaricare per l'offline**: album e playlist del NAS salvati sul telefono, per la macchina e i posti senza rete. Si scarica il file originale.
 - [x] **Statistiche unite** con gli ascolti dal web (scrobble di Navidrome).

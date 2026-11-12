@@ -2,9 +2,11 @@ package io.github.baldborne94.baldmusic.data
 
 import android.util.Log
 import io.github.baldborne94.baldmusic.BaldMusicApp
+import io.github.baldborne94.baldmusic.core.library.ArtistNames
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.ServerSync
 import io.github.baldborne94.baldmusic.core.library.SyncState
+import io.github.baldborne94.baldmusic.core.library.moved
 import io.github.baldborne94.baldmusic.core.subsonic.Song
 import io.github.baldborne94.baldmusic.core.subsonic.md5Hex
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +40,7 @@ class ServerSyncer(private val app: BaldMusicApp) {
     private val mutex = Mutex()
 
     /** Tutti i brani del server, letti al massimo ogni mezz'ora (per riconoscere i brani). */
-    private var songs: Pair<Long, List<Song>>? = null
+    private var songs: Triple<String, Long, List<Song>>? = null
 
     private val _status = MutableStateFlow<String?>(null)
     /** Com'è andato l'ultimo allineamento, per le Impostazioni. */
@@ -69,24 +71,38 @@ class ServerSyncer(private val app: BaldMusicApp) {
         val creds = app.settings.credentials ?: return
         val client = app.subsonic() ?: return
         runCatching {
-            val before = app.userData.value
+            var before = app.userData.value
             val starred = client.starred().song.map { it.id }.toSet()
             val lists = client.playlists()
                 .filter { (it.owner == null || it.owner == creds.user) && !it.isAppData && !it.isPcCollection }
                 .map { pl -> ServerSync.ServerList(pl.id, pl.name, client.playlist(pl.id).entry.map { it.id }) }
             val now = System.currentTimeMillis()
-            val known = songs?.takeIf { now - it.first < EVERY_MS }?.second
+            val server = "${creds.url}|${creds.user}"
+            val known = songs?.takeIf { it.first == server && now - it.second < EVERY_MS }?.third
             val needed = starred + lists.flatMap { it.songs }
             // Brani del server riletti adesso: anche gli ascolti (servono i playCount di adesso).
             val fresh = known == null || !known.map { it.id }.toSet().containsAll(needed)
-            val all = if (!fresh) known!! else client.allSongs().also { songs = now to it }
+            val all = if (!fresh) known!! else client.allSongs().also { songs = Triple(server, now, it) }
             val phone = app.local.allTracks().map(LocalCatalog::ref)
             val file = stateFile(creds.url, creds.user)
             val state = runCatching { json.decodeFromString(SyncState.serializer(), file.readText()) }.getOrDefault(SyncState())
             val match = ServerSync.Matcher(all, phone)
+            // Cambio di server (dal PC al NAS): i brani del server di prima passano allo stesso
+            // brano sul nuovo, anche quelli scaricati (i file si rinominano, non si riscaricano).
+            var moved = false
+            if (fresh) {
+                val moves = match.moved(before)
+                if (moves.isNotEmpty()) {
+                    app.userData.mergeTracks(moves)
+                    before = app.userData.value
+                    moved = true
+                }
+                app.serverDownloads.moveTo(match, lists.associate { ArtistNames.key(it.name) to it.id })
+            }
             val plan = ServerSync.plan(before, starred, lists, state, match, { UUID.randomUUID().toString().take(8) }, now)
             // Statistiche unite: gli ascolti del telefono al server, quelli fatti dal PC sul telefono.
-            val plays = if (fresh) ServerSync.planPlays(before, all, state.pushed, match) else null
+            // Su un server nuovo gli ascolti fatti col server di prima non ci sono: si mandano tutti.
+            val plays = if (fresh) ServerSync.planPlays(before, all, state.pushed ?: emptyMap<String, Int>().takeIf { moved }, match) else null
             if (plays != null) {
                 client.scrobbleAll(plays.scrobbles)
                 // Mandati: si ricorda subito, qualunque cosa succeda dopo (non vanno rimandati).

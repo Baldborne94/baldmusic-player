@@ -23,12 +23,23 @@ object ServerSync {
         private val serverByKey = server.groupBy { key(it.artist, it.title) }
         private val phoneByKey = phone.filter { MediaId.parse(it.id)?.source == LocalCatalog.KEY }.groupBy { key(it.artist, it.title) }
 
-        /** L'ID del server per un brano del telefono (o del server), null se il server non lo ha. */
+        /** Il server ha questo brano (per ID); senza l'elenco dei brani si crede all'ID. */
+        fun has(serverId: String) = byId.isEmpty() || serverId in byId
+
+        /**
+         * L'ID del server per un brano del telefono (o del server), null se il server non lo ha.
+         * Un brano di un altro server (il PC prima del NAS) ha un ID che qui non c'è: si ritrova
+         * come i file, per artista, titolo e durata.
+         */
         fun toServer(t: TrackRef): String? {
             val id = MediaId.parse(t.id)
-            if (id?.source == RemoteSource.KEY) return id.id
-            return closest(serverByKey[key(t.artist, t.title)], t.durationMs) { s -> s.duration?.let { it * 1000L } }?.id
+            if (id?.source == RemoteSource.KEY && id.id != null && has(id.id)) return id.id
+            return sameSong(t.artist, t.title, t.durationMs)?.id
         }
+
+        /** Lo stesso brano su questo server: artista principale e titolo, durata entro [SAME_SONG_MS]. */
+        fun sameSong(artist: String?, title: String, durationMs: Long?): Song? =
+            closest(serverByKey[key(artist, title)], durationMs) { s -> s.duration?.let { it * 1000L } }
 
         /** Il brano del server sul telefono: il file uguale se c'è (si ascolta senza rete), se no dal server. */
         fun toPhone(serverId: String): TrackRef? {
@@ -265,3 +276,16 @@ data class SyncState(
 
 @Serializable
 data class PlaylistLink(val phoneId: String, val serverId: String, val name: String, val songs: List<String>)
+
+/**
+ * Cambio di server (dal PC al NAS): i brani del server di prima salvati sul telefono (preferiti,
+ * playlist, ascolti) hanno ID che il server nuovo non ha. Qui, per ognuno, lo stesso brano sul
+ * server nuovo (o il file del telefono, se c'è): da passare a [UserLibrary.mergeTracks], che
+ * sposta anche gli ascolti. Quelli che il server nuovo non ha restano come sono.
+ */
+fun ServerSync.Matcher.moved(lib: UserLibrary): Map<String, TrackRef> =
+    (lib.liked + lib.playlists.flatMap { it.tracks } + lib.plays.values.map { it.track })
+        .filter { t -> MediaId.parse(t.id)?.let { it.source == RemoteSource.KEY && it.id != null && !has(it.id) } == true }
+        .distinctBy { it.id }
+        .mapNotNull { t -> toServer(t)?.let(::toPhone)?.let { t.id to it } }
+        .toMap()

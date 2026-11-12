@@ -1,0 +1,48 @@
+# Navidrome e Tailscale sul NAS UGREEN (UGOS Pro): Docker → Progetto → Crea, incolla questo.
+# Guida passo passo in server/README.md, «Sul NAS UGREEN».
+#
+# Prima di creare il progetto cambia:
+#   - /volume1/Musica  → la cartella condivisa con la musica (File → tasto destro → Proprietà)
+#   - /volume1/docker  → la cartella dove Navidrome e Tailscale salvano i loro dati
+#   - TS_AUTHKEY       → la chiave creata nella console di Tailscale. Resta solo sul NAS:
+#                        non scriverla in questo file del repository né mandarla a nessuno.
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    environment:
+      ND_SCANSCHEDULE: "1h"
+      ND_LOGLEVEL: info
+      ND_ENABLESHARING: "false"
+      # Edizioni dello stesso disco in una scheda sola (vedi «Sistemare i tag»).
+      ND_SCANNER_GROUPALBUMRELEASES: "true"
+    volumes:
+      - /volume1/docker/navidrome:/data
+      # Sola lettura: Navidrome non tocca mai i file.
+      - /volume1/Musica:/music:ro
+
+  # L'indirizzo https://nas.<la-tua-rete>.ts.net, raggiungibile da ovunque coi tuoi dispositivi.
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    restart: unless-stopped
+    hostname: nas
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_AUTHKEY: "metti-qui-la-chiave-di-tailscale"
+      TS_HOSTNAME: nas
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      # Come «tailscale serve --bg 4533» sul PC: https verso Navidrome.
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - /volume1/docker/tailscale/state:/var/lib/tailscale
+      - /volume1/docker/tailscale/config:/config
