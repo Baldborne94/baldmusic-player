@@ -5,11 +5,12 @@ import { AlbumCards, ArtistCards, PlayButton, PlaylistCards, Shelf, LikedArt } f
 import { isRealAlbum } from "../lib/albums";
 import { tileGradient } from "../lib/colors";
 import { isCollection, useLibrary } from "../lib/library";
-import { player } from "../lib/player";
+import { recentItems, player } from "../lib/player";
 import { href } from "../lib/router";
 import { getClient } from "../lib/session";
-import type { Album, Artist } from "../lib/subsonic";
+import type { Artist } from "../lib/subsonic";
 import { useLoad } from "../lib/useLoad";
+import { quickTiles } from "../lib/recent";
 import { MissingCollections } from "./Library";
 
 function greeting(): string {
@@ -71,7 +72,8 @@ export function Home() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
   const d = data!;
-  const quick: (Album | "liked")[] = [...(lib.likedSongs.length ? ["liked" as const] : []), ...d.recent].slice(0, 8);
+  // Quello che hai fatto partire tu (raccolte, playlist, album…), non l'album di ogni brano sentito.
+  const quick = quickTiles(recentItems(), lib.playlists, lib.likedSongs.length, d.recent);
 
   const c = getClient()!;
   const mixes: Mix[] = [
@@ -89,7 +91,7 @@ export function Home() {
       {quick.length > 0 && (
         <div className="quick">
           {quick.map((q) =>
-            q === "liked" ? (
+            q.liked ? (
               <a key="liked" className="quick__tile" href={href({ name: "liked" })}>
                 <span className="quick__art">
                   <LikedArt />
@@ -100,21 +102,24 @@ export function Home() {
                 </span>
               </a>
             ) : (
-              <a key={q.id} className="quick__tile" href={href({ name: "album", id: q.id })}>
+              <a key={q.key} className="quick__tile" href={href(q.route)}>
                 <span className="quick__art">
-                  <Cover id={q.coverArt} size={120} />
+                  <Cover id={q.cover} size={120} />
                 </span>
-                <span className="quick__title">{q.name}</span>
-                <span className="quick__play" onClick={(e) => e.preventDefault()}>
-                  <PlayButton
-                    id={`album/${q.id}`}
-                    size={40}
-                    onPlay={async () => {
-                      const full = await c.album(q.id);
-                      player.play(full.song ?? [], 0, false, { label: q.name, id: `album/${q.id}` });
-                    }}
-                  />
-                </span>
+                <span className="quick__title">{q.title}</span>
+                {q.play && (
+                  <span className="quick__play" onClick={(e) => e.preventDefault()}>
+                    <PlayButton
+                      id={q.key}
+                      size={40}
+                      onPlay={async () => {
+                        const p = q.play!;
+                        const songs = p.kind === "album" ? ((await c.album(p.id)).song ?? []) : ((await c.playlist(p.id)).entry ?? []);
+                        player.play(songs, 0, false, { label: q.title, id: q.key });
+                      }}
+                    />
+                  </span>
+                )}
               </a>
             ),
           )}

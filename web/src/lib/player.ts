@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { withRecent, type RecentItem } from "./recent";
 import * as Q from "./queue";
 import { autoplayNeeded, autoplayPick, storeAutoplay, storedAutoplay } from "./autoplay";
 import { crossfadeApplies, crossfadeGains, inSequence, storeCrossfade, storedCrossfade } from "./crossfade";
@@ -46,6 +47,28 @@ function storedVolume(): number {
 
 // La coda di prima (Ripresa), per questo server e utente: un altro server non ha quei brani.
 const queueKey = (c: SubsonicClient) => `baldmusic.coda.${c.creds.url}|${c.creds.user}`;
+const recentKey = (c: SubsonicClient) => `baldmusic.recenti.${c.creds.url}|${c.creds.user}`;
+
+/** Quello che hai fatto partire di recente da questo browser, per i riquadri della Home ([quickTiles]). */
+export function recentItems(): RecentItem[] {
+  const c = getClient();
+  if (!c) return [];
+  try {
+    return JSON.parse(localStorage.getItem(recentKey(c)) ?? "[]") as RecentItem[];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRecent(item: RecentItem): void {
+  const c = getClient();
+  if (!c) return;
+  try {
+    localStorage.setItem(recentKey(c), JSON.stringify(withRecent(recentItems(), item)));
+  } catch {
+    // Archiviazione bloccata (navigazione privata): i riquadri restano quelli di Navidrome.
+  }
+}
 
 function savedQueue(): ReturnType<typeof restore> {
   const c = getClient();
@@ -412,6 +435,7 @@ export const player = {
    */
   play(songs: Song[], start = 0, shuffle = false, from?: { label: string; id: string }, picked = false): void {
     const container = from?.id ?? null;
+    if (from) rememberRecent({ id: from.id, title: from.label, cover: songs[start]?.coverArt });
     listening = L.startingOn(listening, container, Date.now());
     const kept = L.keepFor(listening, songs.map((s) => s.id), start, picked, shuffle);
     const list = kept.kept.length === songs.length ? songs : kept.kept.map((i) => songs[i]);
