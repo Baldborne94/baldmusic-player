@@ -37,6 +37,32 @@ data class ServerDownloads(val sets: List<DownloadedSet> = emptyList()) {
         return wanted.filter { it !in present } to present.filterTo(LinkedHashSet()) { it !in wanted }
     }
 
+    /**
+     * Cambio di server (dal PC al NAS): i brani scaricati prendono l'ID dello stesso brano sul
+     * server nuovo ([ServerSync.Matcher.sameSong]); l'album diventa quello nuovo, la playlist
+     * quella col nome uguale ([playlists], ID per nome). Restituisce anche gli ID dei file da
+     * rinominare (vecchio → nuovo): sono lo stesso brano, non si riscarica niente. Quelli che il
+     * server nuovo non ha restano come sono e si ascoltano dal file.
+     */
+    fun movedTo(match: ServerSync.Matcher, playlists: Map<String, String>): Pair<ServerDownloads, Map<String, String>> {
+        val renames = LinkedHashMap<String, String>()
+        val moved = sets.map { set ->
+            val songs = set.songs.map { s ->
+                if (match.has(s.id)) s
+                else match.sameSong(s.artist, s.title, s.duration?.let { it * 1000L })?.also { renames[s.id] = it.id } ?: s
+            }
+            if (songs == set.songs) return@map set
+            val id = MediaId.parse(set.container)
+            val container = when (id?.kind) {
+                RemoteSource.ALBUM -> songs.firstNotNullOfOrNull { s -> s.albumId?.takeIf { s.id in renames.values } }?.let { MediaId(RemoteSource.KEY, RemoteSource.ALBUM, it).toString() }
+                RemoteSource.PLAYLIST -> playlists[ArtistNames.key(set.title)]?.let { MediaId(RemoteSource.KEY, RemoteSource.PLAYLIST, it).toString() }
+                else -> null
+            } ?: set.container
+            set.copy(container = container, coverArt = songs.firstOrNull { it.id in renames.values }?.coverArt ?: set.coverArt, songs = songs)
+        }
+        return ServerDownloads(moved) to renames
+    }
+
     companion object {
         /** Gli album e le playlist del server che si possono scaricare. */
         fun downloadable(container: String): Boolean {

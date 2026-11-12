@@ -86,6 +86,21 @@ class ServerDownloadsStore(private val app: BaldMusicApp) {
         app.settings.touch()
     }
 
+    /**
+     * Cambio di server (dal PC al NAS): album e playlist scaricati passano allo stesso brano sul
+     * server nuovo ([ServerDownloads.movedTo]); i file si rinominano, non si riscaricano.
+     */
+    suspend fun moveTo(match: io.github.baldborne94.baldmusic.core.library.ServerSync.Matcher, playlists: Map<String, String>) = mutex.withLock {
+        val (moved, renames) = _state.value.movedTo(match, playlists)
+        if (renames.isEmpty()) return@withLock
+        for ((from, to) in renames) {
+            val target = audioFile(to)
+            if (!target.exists()) audioFile(from).renameTo(target)
+        }
+        _present.value = scan()
+        change { moved }
+    }
+
     /** Scarica quello che manca e cancella quello che non serve più; true se resta qualcosa da scaricare. */
     suspend fun sync(downloadNew: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         mutex.withLock {
