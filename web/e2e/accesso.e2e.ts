@@ -11,7 +11,7 @@ test("accesso dal modulo: entra, salva solo sale e token, apre la Home", async (
   await page.getByLabel("Password").fill("password-segreta");
   await page.getByRole("button", { name: "Entra" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: /^(Buongiorno|Buon pomeriggio|Buonasera)$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^(Buongiorno|Buon pomeriggio|Buonasera), B$/ })).toBeVisible();
   const saved = await page.evaluate(() => localStorage.getItem("baldmusic.credentials"));
   expect(Object.keys(JSON.parse(saved!)).sort()).toEqual(["salt", "token", "url", "user"]);
   expect(saved).not.toContain("password-segreta");
