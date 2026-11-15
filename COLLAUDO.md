@@ -299,6 +299,7 @@ dell'unità principale sul telefono.
 
 | # | Cosa fare | Cosa deve succedere |
 |---|-----------|---------------------|
+| W-0 | Doppio clic su `server/controlla-brani.cmd`, Invio (o un'altra cartella); con e senza ffmpeg installato | Chiede la cartella, propone di installare ffmpeg se manca, mostra l'avanzamento; alla fine si apre `baldmusic-controllo.txt` dal Desktop coi tre gruppi (da riscaricare, qualità bassa, da controllare). Un mp3 rovinato apposta (pezzi sovrascritti), uno tagliato a metà e una pagina web rinominata `.mp3` finiscono in «Da riscaricare». Nessun file cambiato |
 | W-1 | Accesso con `http://localhost:4533` sul PC di Navidrome | Entra; Home con raccolte |
 | W-2 | Navidrome senza «Report Real Path» | Il sito spiega dove attivarlo; attivato e ricaricato, compaiono le raccolte |
 | W-3 | Cartella nuova sul PC + Quick Scan, ricarica | Raccolta nuova; brani nuovi in fondo a quelle esistenti |
