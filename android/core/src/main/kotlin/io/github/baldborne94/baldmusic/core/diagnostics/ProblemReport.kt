@@ -25,6 +25,22 @@ object ProblemReport {
     /** Quante righe di annotazioni si tengono. */
     const val KEEP_NOTES = 60
 
+    /** Quanto del registro di Android entra al massimo nel resoconto (la fine, la più recente). */
+    const val MAX_LOG_CHARS = 30_000
+
+    /**
+     * Le righe che il sistema scrive di continuo mentre si disegna o si tocca lo schermo (su
+     * Samsung migliaia al minuto: «setRequestedFrameRate», «ViewPostIme pointer»…): non dicono
+     * niente su BaldMusic e prima riempivano tutto il registro del resoconto. Solo informazioni e
+     * debug: avvisi ed errori di quei componenti restano.
+     */
+    private val noise = Regex(
+        """^\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} [VDI]/(View|VRI\[[^\]]*\]@[0-9a-f]+|ViewRootImpl[^\s(]*|InsetsController|InsetsSourceConsumer|ImeTracker|InputMethodManager[^\s(]*|BLASTBufferQueue[^\s(]*|SurfaceView[^\s(]*|SurfaceComposerClient|HWUI|Choreographer|InputTransport|NativeCustomFrequencyManager)\s*\(""",
+    )
+
+    /** Il registro di Android senza le righe che non servono ([noise]). */
+    fun quiet(log: String): String = log.lineSequence().filterNot { noise.containsMatchIn(it) }.joinToString("\n")
+
     /** Quante righe tiene il registro del lettore ([addTrace]). */
     const val KEEP_TRACE = 150
 
@@ -108,7 +124,7 @@ object ProblemReport {
         val room = MAX_CHARS - start.length
         if (log.isNullOrBlank() || room <= 200) return start.take(MAX_CHARS)
         // Del registro conta la fine: le righe più recenti.
-        val tail = redact(log.trimEnd()).takeLast(room - 100)
+        val tail = redact(quiet(log).trimEnd()).takeLast(minOf(room - 100, MAX_LOG_CHARS))
         return start + "\n--- Registro di adesso ---\n" + tail
     }
 }

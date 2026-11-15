@@ -215,6 +215,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | P-2 | Un brano del server col PC spento, poi «Segnala un problema» | Nel resoconto, tra gli «Ultimi problemi annotati», l'errore di riproduzione col titolo del brano; negli indirizzi niente `t=`, `s=`, `u=` con valori (si vede `t=…`) |
 | P-3 | Dopo una chiusura improvvisa dell'app, riaprila | In Home «BaldMusic si è chiusa da sola» con «Manda il resoconto» e «Non ora»; dopo uno dei due non ricompare fino alla prossima chiusura |
 | P-4 | In macchina premi «avanti» dal volante e dallo schermo di Android Auto, poi «indietro»; a casa Impostazioni → «Segnala un problema» | In fondo «Lettore: comandi e cambi di brano»: per ogni tasto chi l'ha mandato (Android Auto, notifica, app, Bluetooth…), dove eri (brano N di M, punto, casuale, ripeti) e cosa è successo dopo («comando: «A» a 1:05 → «B» a 0:00», «saltato: esce dalla coda»). Se un tasto non fa quello che deve, il resoconto lo mostra |
+| P-5 | Usa l'app qualche minuto toccando lo schermo, poi «Segnala un problema» | Nel «Registro di adesso» nessuna riga `setRequestedFrameRate` o `ViewPostIme`; il resoconto si incolla in un messaggio solo |
 
 Il resoconto mandalo a chi sviluppa l'app (o incollalo nella conversazione con Claude): dice cosa correggere.
 
@@ -291,6 +292,7 @@ dell'unità principale sul telefono.
 | C-16 | Tasto del timer nella barra (accanto a cuore, casuale, ripeti): toccalo più volte | Spento → «Si ferma tra 15 min» → 30 → 60 → «Si ferma a fine brano» → spento; il nome scende coi minuti; a tempo scaduto sfuma e si ferma; nell'app si vede lo stesso timer |
 | C-17 | Finisce una raccolta mentre guidi | La musica continua con brani simili (Continua ad ascoltare) |
 | C-18 | Telefono collegato all'auto: «Ok Google, metti Vasco Rossi su BaldMusic», poi «Ok Google, metti musica su BaldMusic»; lo stesso col telefono in mano fuori dall'auto | L'Assistente riconosce BaldMusic e suona l'artista; senza nome parte un mix. Dal telefono si apre BaldMusic e parte la musica chiesta |
+| C-18b | Col PC di casa spento (o il telefono fuori da Tailscale): «Ok Google, metti <un artista del telefono> su BaldMusic» | Parte entro pochi secondi con la musica del telefono; nel resoconto «richiesta da Assistente…: ricerca «…»» e «coda nuova … N brani» (o «niente da suonare» se non c'è) |
 
 ## PC (sito nel browser)
 

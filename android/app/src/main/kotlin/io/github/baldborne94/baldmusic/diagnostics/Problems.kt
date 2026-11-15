@@ -118,7 +118,8 @@ class Problems(private val context: Context) {
 
     private companion object {
         const val CRASH_LOG_LINES = 200
-        const val REPORT_LOG_LINES = 600
+        // Tante: le righe che non servono (ProblemReport.quiet) si tolgono dopo, e il resoconto ne tiene al massimo 30.000 caratteri.
+        const val REPORT_LOG_LINES = 3_000
         const val LOG_TIMEOUT_MS = 2_000L
     }
 }

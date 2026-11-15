@@ -57,4 +57,7 @@ interface MusicSource {
      * cronologia): leggerle costa niente e una cache le mostrerebbe vecchie.
      */
     val cacheable: Boolean get() = true
+
+    /** true se cercare chiede alla rete (il server): una ricerca non la aspetta più di tanto ([LibraryTree.search]). */
+    val network: Boolean get() = false
 }

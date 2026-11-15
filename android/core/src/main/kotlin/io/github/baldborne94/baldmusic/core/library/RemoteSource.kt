@@ -115,6 +115,8 @@ class RemoteSource(
         return songNode(song, id.parent)
     }
 
+    override val network get() = true
+
     override suspend fun search(query: String): List<LibraryNode> {
         val r = client.search(query)
         return r.artist.map(::artistNode) + r.album.map(::albumNode) + r.song.map { songNode(it, null) }
