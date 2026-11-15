@@ -1,5 +1,11 @@
 package io.github.baldborne94.baldmusic.core.library
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
+
 /**
  * L'albero unico che vedono sia l'app sia Android Auto. Smista gli ID verso la
  * sorgente giusta e ricostruisce le code a partire da un brano scelto.
@@ -89,10 +95,32 @@ class LibraryTree(
         return if (id.isTrack) source(id.source)?.track(id) else null
     }
 
-    suspend fun search(query: String): List<LibraryNode> =
-        sources().flatMap { src -> runCatching { src.search(query) }.getOrDefault(emptyList()) }
+    /**
+     * Cerca in tutte le sorgenti insieme. Quelle che passano dalla rete ([MusicSource.network],
+     * il server) si aspettano al massimo [waitMs]: quello che non hanno trovato in tempo resta
+     * fuori. In macchina il PC di casa spento o fuori rete faceva aspettare ogni ricerca fino al
+     * timeout della connessione (10 s e più), e la richiesta a voce («Ok Google, metti … su
+     * BaldMusic») non suonava niente. Le sorgenti del telefono si aspettano sempre (la prima
+     * lettura di una libreria grande può essere lenta). La ricerca lenta finisce per conto suo.
+     */
+    suspend fun search(query: String, waitMs: Long = SEARCH_WAIT_MS): List<LibraryNode> {
+        val all = sources()
+        val pending = all.map { src -> searches.async { runCatching { src.search(query) }.getOrDefault(emptyList()) } }
+        val deadline = System.nanoTime() + waitMs * 1_000_000
+        return all.indices.flatMap { i ->
+            if (!all[i].network) return@flatMap pending[i].await()
+            val left = (deadline - System.nanoTime()) / 1_000_000
+            withTimeoutOrNull(left.coerceAtLeast(1)) { pending[i].await() }.orEmpty()
+        }
+    }
+
+    /** Le ricerche girano qui, non nella chiamata: una sorgente lenta non tiene ferma la risposta. */
+    private val searches = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     companion object {
+        /** Quanto aspettare le sorgenti in una ricerca ([search]). */
+        const val SEARCH_WAIT_MS = 5_000L
+
         const val CACHE_MS = 2 * 60 * 1000L
     }
 }

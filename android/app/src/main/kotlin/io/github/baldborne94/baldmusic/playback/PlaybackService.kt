@@ -796,6 +796,7 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<LibraryResult<Void>> {
             scope.launch {
                 val results = searched(query)
+                trace("ricerca da ${caller(browser)}: «$query» → ${results.size} risultati")
                 session.notifySearchResultChanged(browser, query, results.size, params)
             }
             return Futures.immediateFuture(LibraryResult.ofVoid())
@@ -829,8 +830,18 @@ class PlaybackService : MediaLibraryService() {
             val asked = mediaItems.singleOrNull()?.let { item ->
                 item.requestMetadata.searchQuery?.let { "ricerca «$it»" } ?: item.mediaId.ifEmpty { "ricerca senza parole" }
             } ?: "${mediaItems.size} brani"
-            val result = itemsFor(mediaItems, startIndex, startPositionMs)
-            trace("coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}")
+            // Anche all'arrivo: una richiesta a voce che poi non suona niente si vede lo stesso.
+            trace("richiesta da ${caller(controller)}: $asked")
+            val result = try {
+                itemsFor(mediaItems, startIndex, startPositionMs)
+            } catch (e: Exception) {
+                trace("richiesta non riuscita: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
+                throw e
+            }
+            trace(
+                if (result.mediaItems.isEmpty()) "niente da suonare per $asked"
+                else "coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}",
+            )
             result
         }
 
@@ -885,6 +896,7 @@ class PlaybackService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>,
         ): ListenableFuture<MutableList<MediaItem>> = scope.future {
+            trace("aggiunti in coda da ${caller(controller)}: ${mediaItems.size}")
             mediaItems.flatMap { resolve(it) }.toMutableList()
         }
 
