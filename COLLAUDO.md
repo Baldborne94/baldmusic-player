@@ -293,6 +293,7 @@ dell'unità principale sul telefono.
 | C-17 | Finisce una raccolta mentre guidi | La musica continua con brani simili (Continua ad ascoltare) |
 | C-18 | Telefono collegato all'auto: «Ok Google, metti Vasco Rossi su BaldMusic», poi «Ok Google, metti musica su BaldMusic»; lo stesso col telefono in mano fuori dall'auto | L'Assistente riconosce BaldMusic e suona l'artista; senza nome parte un mix. Dal telefono si apre BaldMusic e parte la musica chiesta |
 | C-18b | Col PC di casa spento (o il telefono fuori da Tailscale): «Ok Google, metti <un artista del telefono> su BaldMusic» | Parte entro pochi secondi con la musica del telefono; nel resoconto «richiesta da Assistente…: ricerca «…»» e «coda nuova … N brani» (o «niente da suonare» se non c'è) |
+| C-18c | Mentre suona qualcosa, «Ok Google, metti Linkin Park su BaldMusic», poi «Ok Google, metti Metal mix su BaldMusic», poi un nome che non hai («metti Pippo Baudo su BaldMusic») | Parte Linkin Park anche se l'Assistente capisce «bald music»; «Metal mix» trova la raccolta Metal (se c'è); per il nome che non c'è l'auto dice «Non ho trovato «Pippo Baudo» su BaldMusic» e la musica di prima resta in coda |
 
 ## PC (sito nel browser)
 

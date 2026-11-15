@@ -21,7 +21,45 @@ object VoiceQuery {
      * l'Assistente non manda parole), null se è una richiesta normale (un ID da suonare).
      * Prima una richiesta senza parole (null) finiva cercata come ID vuoto e non suonava niente.
      */
-    fun searchOf(mediaId: String, query: String?): String? = if (mediaId.isEmpty()) query?.trim().orEmpty() else null
+    fun searchOf(mediaId: String, query: String?): String? = if (mediaId.isEmpty()) withoutAppName(query.orEmpty()) else null
+
+    /**
+     * Il nome dell'app che l'Assistente lascia nella richiesta quando non lo riconosce: in
+     * macchina «Ok Google, metti Linkin Park su BaldMusic» arrivava come «Linkin Park su bald
+     * music» (o «su Bud music») e la ricerca, con quelle parole in più, non trovava niente.
+     * Si toglie in fondo «su/con/in/da/on» + una parola corta + «music», attaccata o no; anche
+     * un «metti / riproduci / suona / fammi sentire» rimasto davanti.
+     */
+    private val appName = Regex(
+        """\s+(?:su|sull'app|sull’app|nell'app|nell’app|con|in|da|on)\s+(?:l'app\s+|l’app\s+)?\p{L}{2,7}\s*-?\s*music[ae]?\s*$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val verb = Regex("""^(?:metti|mettimi|riproduci|suona|fammi sentire|fai partire|ascolta)\s+""", RegexOption.IGNORE_CASE)
+
+    fun withoutAppName(query: String): String = query.trim().replace(appName, "").replace(verb, "").trim()
+
+    /** Le parole che non dicono cosa cercare («Metal mix», «musica di Vasco», «canzoni dei Queen»). */
+    private val filler = Regex(
+        """(?<!\p{L})(?:mix|musica|canzoni|brani|pezzi|qualcosa|un po['’])(?!\p{L})(?:\s+(?:di|dei|degli|delle|del|della|dello)(?!\p{L}))?""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** Cosa dire in macchina quando una richiesta non trova niente ([search] = le parole cercate, null se non era una ricerca). */
+    fun notFound(search: String?): String =
+        if (search.isNullOrBlank()) "Niente da suonare" else "Non ho trovato «${search.trim()}» su BaldMusic"
+
+    /** «Metti musica», «un po' di musica», niente: nessun nome, parte un mix. */
+    fun anyMusic(query: String): Boolean = filler.replace(query, " ").isBlank()
+
+    /**
+     * Le ricerche da provare una dopo l'altra finché una trova qualcosa: la richiesta com'è,
+     * poi senza le parole di contorno («Metal mix» → «Metal», così si trova la raccolta Metal).
+     */
+    fun attempts(query: String): List<String> {
+        val q = query.trim()
+        val simpler = filler.replace(q, " ").replace(Regex("\\s+"), " ").trim()
+        return listOf(q, simpler).filter { it.isNotEmpty() }.distinct()
+    }
 
     /** La richiesta senza le parole sul tipo, e il tipo chiesto se c'era. */
     fun parse(query: String): Pair<String, Kind?> {

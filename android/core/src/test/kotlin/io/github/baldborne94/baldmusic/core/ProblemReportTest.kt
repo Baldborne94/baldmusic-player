@@ -64,4 +64,27 @@ class ProblemReportTest {
         val report = ProblemReport.build(info, 0, emptyList(), emptyList(), log = null, zone = rome)
         assertTrue("Nessuna chiusura improvvisa salvata." in report)
     }
+
+    @Test
+    fun `nel resoconto non finiscono le righe che il sistema scrive di continuo`() {
+        // Su un Samsung il registro era tutto «setRequestedFrameRate» e statistiche del decoder:
+        // il resoconto diventava lunghissimo da incollare.
+        val noise = "11-15 13:51:37.841 I/View    (12314): setRequestedFrameRate frameRate=NaN, this=k2.x{c5d329e}\n" +
+            "11-15 13:51:37.953 I/VRI[MainActivity]@d263d3e(12314): ViewPostIme pointer 1\n" +
+            "11-15 16:41:19.869 D/BufferPoolAccessor2.0(29073): bufferpool2 0xb400007b876ad928 : 5(40960 size) total buffers\n" +
+            "11-15 16:48:14.574 I/ImeFocusController(29073): onPreWindowFocus: skipped hasWindowFocus=false\n"
+        val log = noise.repeat(2_000) +
+            "11-15 13:51:38.000 W/View    (12314): avviso vero\n" +
+            "11-15 13:51:39.000 E/ExoPlayerImplInternal(12314): Playback error\n" +
+            "11-15 13:51:40.000 I/AudioManager(12314): onAudioFocusChange(-2)"
+        val report = ProblemReport.build(info, 0, emptyList(), emptyList(), log = log, zone = rome)
+        assertFalse("setRequestedFrameRate" in report)
+        assertFalse("ViewPostIme" in report)
+        assertFalse("bufferpool2" in report)
+        assertFalse("onPreWindowFocus" in report)
+        assertTrue("avviso vero" in report && "Playback error" in report && "onAudioFocusChange" in report)
+        // Il registro non supera i suoi 30.000 caratteri anche quando e' tutto utile.
+        val long = ProblemReport.build(info, 0, emptyList(), emptyList(), log = "11-15 13:51:39.000 E/X(1): errore\n".repeat(10_000), zone = rome)
+        assertTrue(long.length < ProblemReport.MAX_LOG_CHARS + 1_000)
+    }
 }
