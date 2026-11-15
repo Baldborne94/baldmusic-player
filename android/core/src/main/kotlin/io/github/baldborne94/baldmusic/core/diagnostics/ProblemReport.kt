@@ -30,12 +30,13 @@ object ProblemReport {
 
     /**
      * Le righe che il sistema scrive di continuo mentre si disegna o si tocca lo schermo (su
-     * Samsung migliaia al minuto: «setRequestedFrameRate», «ViewPostIme pointer»…): non dicono
+     * Samsung migliaia al minuto: «setRequestedFrameRate», «ViewPostIme pointer»…) e le
+     * statistiche del decoder audio («BufferPoolAccessor2.0», ogni 5 s): non dicono
      * niente su BaldMusic e prima riempivano tutto il registro del resoconto. Solo informazioni e
      * debug: avvisi ed errori di quei componenti restano.
      */
     private val noise = Regex(
-        """^\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} [VDI]/(View|VRI\[[^\]]*\]@[0-9a-f]+|ViewRootImpl[^\s(]*|InsetsController|InsetsSourceConsumer|ImeTracker|InputMethodManager[^\s(]*|BLASTBufferQueue[^\s(]*|SurfaceView[^\s(]*|SurfaceComposerClient|HWUI|Choreographer|InputTransport|NativeCustomFrequencyManager)\s*\(""",
+        """^\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} [VDI]/(View|VRI\[[^\]]*\]@[0-9a-f]+|ViewRootImpl[^\s(]*|InsetsController|InsetsSourceConsumer|ImeTracker|InputMethodManager[^\s(]*|BLASTBufferQueue[^\s(]*|SurfaceView[^\s(]*|SurfaceComposerClient|HWUI|Choreographer|InputTransport|NativeCustomFrequencyManager|BufferPoolAccessor[^\s(]*|ImeFocusController)\s*\(""",
     )
 
     /** Il registro di Android senza le righe che non servono ([noise]). */

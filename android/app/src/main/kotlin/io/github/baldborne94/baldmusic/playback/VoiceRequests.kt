@@ -28,7 +28,7 @@ internal class VoiceRequests(private val context: Context) {
 
     suspend fun play(query: String): MediaItemsWithStartPosition {
         fun all(items: List<MediaItem>) = MediaItemsWithStartPosition(items, 0, C.TIME_UNSET)
-        if (query.isBlank()) {
+        if (VoiceQuery.anyMusic(query)) {
             // "Metti un po' di musica": mix casuale dalla prima sorgente disponibile.
             val first = tree.rootNodes().firstOrNull() ?: return all(emptyList())
             val mix = tree.children(first.mediaId).firstOrNull { it.title.startsWith("Mix") } ?: return all(emptyList())
@@ -39,9 +39,18 @@ internal class VoiceRequests(private val context: Context) {
             app.podcastSource.forVoice(ask.name, ask.latest)?.let { return episode(it) }
         }
         val (words, _) = VoiceQuery.parse(query)
-        val results = tree.search(words)
+        // Prima la richiesta com'è, poi senza le parole di contorno («Metal mix» → «Metal»).
+        var heard = query
+        var results = emptyList<LibraryNode>()
+        for (attempt in VoiceQuery.attempts(words)) {
+            results = tree.search(attempt)
+            if (results.isNotEmpty()) {
+                heard = if (attempt == words) query else attempt
+                break
+            }
+        }
         // Una raccolta, un artista o un album detti per nome si suonano per intero (un podcast: una puntata).
-        VoiceQuery.pick(query, results)?.let { picked ->
+        VoiceQuery.pick(heard, results)?.let { picked ->
             MediaId.parse(picked.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return episode(it) }
             return all(tree.playableIn(picked.mediaId).toItems())
         }

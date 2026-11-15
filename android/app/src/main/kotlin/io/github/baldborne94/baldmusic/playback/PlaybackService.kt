@@ -838,10 +838,15 @@ class PlaybackService : MediaLibraryService() {
                 trace("richiesta non riuscita: ${e.javaClass.simpleName} ${e.message.orEmpty()}")
                 throw e
             }
-            trace(
-                if (result.mediaItems.isEmpty()) "niente da suonare per $asked"
-                else "coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}",
-            )
+            if (result.mediaItems.isEmpty()) {
+                trace("niente da suonare per $asked")
+                // Niente trovato: la coda di prima resta com'era (prima si svuotava, e Android Auto
+                // restava fermo su una schermata vuota) e l'auto dice cosa non ha trovato.
+                val search = mediaItems.singleOrNull()?.let { VoiceQuery.searchOf(it.mediaId, it.requestMetadata.searchQuery) }
+                session.sendError(SessionError(SessionError.ERROR_BAD_VALUE, VoiceQuery.notFound(search)))
+                throw UnsupportedOperationException("Niente da suonare per $asked")
+            }
+            trace("coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}")
             result
         }
 
