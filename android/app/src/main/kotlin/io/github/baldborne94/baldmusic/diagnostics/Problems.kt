@@ -19,6 +19,7 @@ class Problems(private val context: Context) {
 
     private val dir = File(context.filesDir, "problemi").apply { mkdirs() }
     private val notesFile = File(dir, "annotazioni.txt")
+    private val traceFile = File(dir, "lettore.txt")
 
     /** Da chiamare per primo all'avvio: le chiusure improvvise si salvano prima di chiudere. */
     fun install() {
@@ -49,6 +50,25 @@ class Problems(private val context: Context) {
         }
     }
 
+    /** Il registro del lettore, in memoria dopo la prima lettura (si scrive a ogni riga). */
+    private var trace: List<String>? = null
+
+    /**
+     * Una riga del registro del lettore ([ProblemReport.addTrace]): un comando arrivato
+     * (dall'auto, dalle cuffie…) o un cambio di brano. Finisce nel resoconto.
+     */
+    fun trace(text: String) {
+        val line = ProblemReport.note(System.currentTimeMillis(), text)
+        writer.execute {
+            runCatching {
+                val lines = trace ?: (if (traceFile.exists()) traceFile.readLines().filter { it.isNotBlank() } else emptyList())
+                val next = ProblemReport.addTrace(lines, line)
+                trace = next
+                traceFile.writeText(next.joinToString("\n"))
+            }
+        }
+    }
+
     private fun crashFiles(): List<File> =
         dir.listFiles { f -> f.name.startsWith("crash-") }?.sortedByDescending { it.name }.orEmpty()
 
@@ -58,7 +78,8 @@ class Problems(private val context: Context) {
     /** Il resoconto da mandare: lento (legge il registro di Android), da chiamare fuori dal thread principale. */
     fun report(): String {
         val notes = runCatching { notesFile.readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
-        return ProblemReport.build(deviceInfo(), System.currentTimeMillis(), crashFiles().map { it.readText() }, notes, logcat(REPORT_LOG_LINES))
+        val trace = runCatching { traceFile.readLines().filter { it.isNotBlank() } }.getOrDefault(emptyList())
+        return ProblemReport.build(deviceInfo(), System.currentTimeMillis(), crashFiles().map { it.readText() }, notes, logcat(REPORT_LOG_LINES), trace = trace)
     }
 
     /** Apre la scelta di Android (mail, WhatsApp, Telegram, Drive…) col resoconto [text]. */

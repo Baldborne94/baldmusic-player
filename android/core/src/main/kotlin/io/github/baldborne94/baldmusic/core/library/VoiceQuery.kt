@@ -15,6 +15,14 @@ object VoiceQuery {
         Kind.ARTIST to Regex("^(l'|l’)?(artista)\\s+", RegexOption.IGNORE_CASE),
     )
 
+    /**
+     * Una richiesta a voce o dalla ricerca dell'Assistente arriva senza ID, con solo le parole
+     * da cercare: restituisce cosa cercare ("" = «metti un po' di musica», anche quando
+     * l'Assistente non manda parole), null se è una richiesta normale (un ID da suonare).
+     * Prima una richiesta senza parole (null) finiva cercata come ID vuoto e non suonava niente.
+     */
+    fun searchOf(mediaId: String, query: String?): String? = if (mediaId.isEmpty()) query?.trim().orEmpty() else null
+
     /** La richiesta senza le parole sul tipo, e il tipo chiesto se c'era. */
     fun parse(query: String): Pair<String, Kind?> {
         val q = query.trim()
