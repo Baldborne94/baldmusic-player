@@ -25,6 +25,9 @@ object ProblemReport {
     /** Quante righe di annotazioni si tengono. */
     const val KEEP_NOTES = 60
 
+    /** Quante righe tiene il registro del lettore ([addTrace]). */
+    const val KEEP_TRACE = 150
+
     private val secrets = Regex("""([?&;\s](?:t|s|p|u|token|salt|password|client|apiKey|api_key|auth|token-hash|token-time|signature|x-amz-signature|sig)=)[^&\s"']+""", RegexOption.IGNORE_CASE)
 
     /** Toglie dal testo i parametri che valgono come credenziali (negli indirizzi dei brani, per esempio). */
@@ -56,6 +59,13 @@ object ProblemReport {
     /** Le annotazioni dopo averne aggiunta una: le ultime [KEEP_NOTES]. */
     fun addNote(notes: List<String>, note: String): List<String> = (notes + note).takeLast(KEEP_NOTES)
 
+    /**
+     * Il registro del lettore: comandi arrivati (dall'auto, dalle cuffie, dall'app) e cambi di
+     * brano, gli ultimi [KEEP_TRACE], per capire cosa è successo quando un tasto non fa quello
+     * che dovrebbe.
+     */
+    fun addTrace(lines: List<String>, line: String): List<String> = (lines + line).takeLast(KEEP_TRACE)
+
     /** I file di chiusura da cancellare: tutti tranne i [KEEP_CRASHES] più recenti (i nomi sono l'ora). */
     fun crashesToDrop(names: List<String>): List<String> = names.sortedDescending().drop(KEEP_CRASHES)
 
@@ -63,7 +73,15 @@ object ProblemReport {
      * Il resoconto completo, al massimo [MAX_CHARS]: prima telefono e versione, poi le chiusure
      * dalla più recente, le annotazioni e infine il registro di adesso, che si accorcia per primo.
      */
-    fun build(info: DeviceInfo, at: Long, crashes: List<String>, notes: List<String>, log: String?, zone: ZoneId = ZoneId.systemDefault()): String {
+    fun build(
+        info: DeviceInfo,
+        at: Long,
+        crashes: List<String>,
+        notes: List<String>,
+        log: String?,
+        zone: ZoneId = ZoneId.systemDefault(),
+        trace: List<String> = emptyList(),
+    ): String {
         val head = buildString {
             appendLine("Resoconto di BaldMusic del ${time(at, zone)}")
             appendLine("App ${info.appVersion} (build ${info.build}) · ${info.device} · Android ${info.android}")
@@ -78,6 +96,12 @@ object ProblemReport {
                 appendLine()
                 appendLine("--- Ultimi problemi annotati ---")
                 notes.asReversed().forEach(::appendLine)
+            }
+            if (trace.isNotEmpty()) {
+                appendLine()
+                // In ordine di tempo: si legge come è andata.
+                appendLine("--- Lettore: comandi e cambi di brano ---")
+                trace.forEach(::appendLine)
             }
         }
         val start = redact(head + body)

@@ -32,7 +32,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // Solo alla prima apertura: ricreando l'activity (rotazione) la stessa risposta tornerebbe.
-        if (savedInstanceState == null) intent?.let { app.updater.onInstallStatus(this, it) }
+        if (savedInstanceState == null) intent?.let {
+            app.updater.onInstallStatus(this, it)
+            playFromSearch(it)
+        }
         // Schermo copertina da solo: con l'app davanti, parte la musica e non tocchi il telefono.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -61,5 +64,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         app.updater.onInstallStatus(this, intent)
+        playFromSearch(intent)
+    }
+
+    /** «Ok Google, metti … su BaldMusic» dall'Assistente del telefono: il servizio cerca e suona. */
+    private fun playFromSearch(intent: Intent) {
+        if (intent.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
+        vm.playFromSearch(intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty())
     }
 }

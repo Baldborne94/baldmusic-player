@@ -45,6 +45,8 @@ import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.SessionControls
 import io.github.baldborne94.baldmusic.core.library.SleepTimer
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
+import io.github.baldborne94.baldmusic.core.library.VoiceQuery
+import io.github.baldborne94.baldmusic.core.diagnostics.PlayerTrace
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.ui.MainActivity
 import io.github.baldborne94.baldmusic.widget.PlayerWidget
@@ -130,9 +132,44 @@ class PlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         // «Precedente» (dall'app, dalla notifica, da Auto, dalle cuffie) torna al brano sentito davvero prima ([GoBack]).
+        // Ogni comando che arriva da fuori (auto, cuffie, notifica, app) va nel registro del lettore.
         val sessionPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
-            override fun seekToPrevious() = goBack()
-            override fun seekToPreviousMediaItem() = goBack()
+            override fun seekToPrevious() {
+                trace("indietro da ${caller()}")
+                goBack()
+            }
+            override fun seekToPreviousMediaItem() {
+                trace("brano prima da ${caller()}")
+                goBack()
+            }
+            override fun seekToNext() {
+                trace("avanti da ${caller()}")
+                super.seekToNext()
+            }
+            override fun seekToNextMediaItem() {
+                trace("brano dopo da ${caller()}")
+                super.seekToNextMediaItem()
+            }
+            override fun seekTo(positionMs: Long) {
+                trace("vai a ${PlayerTrace.time(positionMs)} da ${caller()}")
+                super.seekTo(positionMs)
+            }
+            override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+                trace("vai al brano ${mediaItemIndex + 1} da ${caller()}")
+                super.seekTo(mediaItemIndex, positionMs)
+            }
+            override fun seekToDefaultPosition(mediaItemIndex: Int) {
+                trace("vai al brano ${mediaItemIndex + 1} da ${caller()}")
+                super.seekToDefaultPosition(mediaItemIndex)
+            }
+            override fun play() {
+                trace("play da ${caller()}")
+                super.play()
+            }
+            override fun pause() {
+                trace("pausa da ${caller()}")
+                super.pause()
+            }
         }
         session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
@@ -254,6 +291,9 @@ class PlaybackService : MediaLibraryService() {
 
     private inner class PlayerEvents : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                trace("${PlayerTrace.transition(reason)}: «${mediaItem.label()}»")
+            }
             // La cronologia per «precedente»: il brano lasciato, tranne quando ci si torna indietro.
             val left = lastItem
             lastItem = mediaItem
@@ -313,6 +353,10 @@ class PlaybackService : MediaLibraryService() {
         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
             // Si è spostato il punto del brano: il brano preparato per sfumare non vale più.
             if (reason == Player.DISCONTINUITY_REASON_SEEK && !crossfade.seeking) crossfade.drop()
+            trace(
+                "${PlayerTrace.discontinuity(reason)}: «${oldPosition.mediaItem.label()}» a ${PlayerTrace.time(oldPosition.positionMs)} → " +
+                    "«${newPosition.mediaItem.label()}» a ${PlayerTrace.time(newPosition.positionMs)}",
+            )
             noteLeft(oldPosition, newPosition, reason)
         }
 
@@ -323,6 +367,7 @@ class PlaybackService : MediaLibraryService() {
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             // Un brano che non parte non chiude l'app, ma va nel resoconto di "Segnala un problema".
             val item = player.currentMediaItem
+            trace("errore ${error.errorCodeName} su «${item.label()}»")
             app.problems.note(
                 "Riproduzione: ${error.errorCodeName} ${error.message.orEmpty()} ${error.cause?.let { "(${it.javaClass.simpleName}: ${it.message})" }.orEmpty()} " +
                     "su «${item?.mediaMetadata?.title ?: "?"}» [${item?.mediaId ?: "?"}]",
@@ -354,12 +399,14 @@ class PlaybackService : MediaLibraryService() {
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            trace("casuale ${if (shuffleModeEnabled) "acceso" else "spento"}")
             if (shuffleModeEnabled) shuffleStartingHere() else scope.launch { keepHeardBehind() }
             updateLikeButton()
             saveLast()
         }
 
         override fun onRepeatModeChanged(repeatMode: Int) {
+            trace("ripeti: ${PlayerTrace.repeat(repeatMode)}")
             updateLikeButton()
             saveLast()
             continueAfterQueue()
@@ -572,6 +619,20 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /** Una riga del registro del lettore («Segnala un problema»): cosa è successo e dove si era. */
+    private fun trace(what: String) {
+        val duration = player.duration.takeIf { it != C.TIME_UNSET }
+        app.problems.trace(
+            "$what · " + PlayerTrace.state(player.currentMediaItemIndex, player.mediaItemCount, player.currentPosition, duration, player.shuffleModeEnabled, player.repeatMode),
+        )
+    }
+
+    /** Chi ha mandato il comando che si sta eseguendo (Android Auto, la notifica, l'app…). */
+    private fun caller(controller: MediaSession.ControllerInfo? = null): String =
+        PlayerTrace.who((controller ?: if (::session.isInitialized) session.controllerForCurrentRequest else null)?.packageName, packageName)
+
+    private fun MediaItem?.label(): String = this?.mediaMetadata?.title?.toString()?.take(60) ?: "?"
+
     /** Indietro o avanti dentro il brano (le puntate): mai prima dell'inizio né oltre la fine. */
     private fun skipWithin(deltaMs: Long) {
         player.seekTo(SessionControls.skipTarget(player.currentPosition, player.duration.takeIf { it != C.TIME_UNSET }, deltaMs))
@@ -622,6 +683,7 @@ class PlaybackService : MediaLibraryService() {
     private inner class LibraryCallback : MediaLibrarySession.Callback {
 
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+            if (controller.packageName != packageName) trace("collegato: ${caller(controller)}")
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
                 .add(SessionCommand(CMD_TOGGLE_LIKE, Bundle.EMPTY))
                 .add(SessionCommand(CMD_SHUFFLE, Bundle.EMPTY))
@@ -635,12 +697,23 @@ class PlaybackService : MediaLibraryService() {
                 .build()
         }
 
+        override fun onMediaButtonEvent(session: MediaSession, controllerInfo: MediaSession.ControllerInfo, intent: Intent): Boolean {
+            // Solo per il registro: il tasto lo gestisce Media3 come sempre.
+            @Suppress("DEPRECATION")
+            val key = intent.getParcelableExtra<android.view.KeyEvent>(Intent.EXTRA_KEY_EVENT)
+            if (key != null && key.action == android.view.KeyEvent.ACTION_DOWN) {
+                trace("tasto ${PlayerTrace.key(key.keyCode)}${if (key.repeatCount > 0) " tenuto" else ""} da ${caller(controllerInfo)}")
+            }
+            return false
+        }
+
         override fun onCustomCommand(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
             customCommand: SessionCommand,
             args: Bundle,
         ): ListenableFuture<SessionResult> {
+            trace("${customCommand.customAction.substringAfterLast('.')} da ${caller(controller)}")
             if (customCommand.customAction == CMD_TOGGLE_LIKE) {
                 player.currentMediaItem?.let { app.userData.toggleLike(it.toTrackRef()) }
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -753,19 +826,33 @@ class PlaybackService : MediaLibraryService() {
             startIndex: Int,
             startPositionMs: Long,
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
+            val asked = mediaItems.singleOrNull()?.let { item ->
+                item.requestMetadata.searchQuery?.let { "ricerca «$it»" } ?: item.mediaId.ifEmpty { "ricerca senza parole" }
+            } ?: "${mediaItems.size} brani"
+            val result = itemsFor(mediaItems, startIndex, startPositionMs)
+            trace("coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}")
+            result
+        }
+
+        /**
+         * Cosa suonare quando si sceglie qualcosa (vedi sopra): la coda e da dove partire.
+         */
+        private suspend fun itemsFor(
+            mediaItems: MutableList<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long,
+        ): MediaItemsWithStartPosition {
             val single = mediaItems.singleOrNull()?.let(::fromShortcut)
             if (single == null) {
                 // Una lista intera (es. la coda ripristinata): ogni brano col suo indirizzo.
                 val resolved = mediaItems.flatMap { resolve(it) }
-                return@future MediaItemsWithStartPosition(resolved, startIndex.coerceIn(C.INDEX_UNSET, resolved.size - 1), startPositionMs)
+                return MediaItemsWithStartPosition(resolved, startIndex.coerceIn(C.INDEX_UNSET, resolved.size - 1), startPositionMs)
             }
 
-            val query = single.requestMetadata.searchQuery
-            if (single.mediaId.isEmpty() && query != null) {
-                return@future voice.play(query)
-            }
+            // «Ok Google, metti … su BaldMusic»: niente ID, solo cosa cercare (anche niente: un mix).
+            VoiceQuery.searchOf(single.mediaId, single.requestMetadata.searchQuery)?.let { return voice.play(it) }
             // Un podcast intero o «Da ascoltare»: una puntata sola, da dove eri (non tutto l'archivio).
-            MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return@future voice.episode(it) }
+            MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return voice.episode(it) }
 
             // Dall'elenco di tutti i brani: dopo quello scelto la sua radio (mood e stile), non l'alfabeto.
             val radio = QueueOrder.radioInstead(single.mediaId)?.let { r -> tree.playableIn(r).takeIf { it.isNotEmpty() }?.let { r to it } }
@@ -790,7 +877,7 @@ class PlaybackService : MediaLibraryService() {
             } else {
                 startPositionMs
             }
-            MediaItemsWithStartPosition(queue.toItems(), start, position)
+            return MediaItemsWithStartPosition(queue.toItems(), start, position)
         }
 
         override fun onAddMediaItems(
@@ -809,6 +896,7 @@ class PlaybackService : MediaLibraryService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
+            trace("ripresa chiesta da ${caller(controller)}")
             savedQueue()?.let { return@future it }
             val (mediaId, position) = app.settings.last() ?: throw UnsupportedOperationException("Niente da riprendere")
             shuffleFromCurrent = true
@@ -922,7 +1010,10 @@ class PlaybackService : MediaLibraryService() {
         // Fuori dalla coda, dopo che il player ha finito di passare al brano nuovo.
         scope.launch {
             val at = old.mediaItemIndex
-            if (at < player.mediaItemCount && at != player.currentMediaItemIndex && player.getMediaItemAt(at).mediaId == item.mediaId) player.removeMediaItem(at)
+            if (at < player.mediaItemCount && at != player.currentMediaItemIndex && player.getMediaItemAt(at).mediaId == item.mediaId) {
+                trace("«${item.label()}» saltato: esce dalla coda")
+                player.removeMediaItem(at)
+            }
         }
     }
 

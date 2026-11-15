@@ -54,6 +54,14 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!--
+              «Ok Google, metti … su BaldMusic»: senza questo l'Assistente (anche in Android
+              Auto) non conta BaldMusic tra le app che sanno suonare quello che chiedi.
+            -->
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- «Schermo copertina»: la copertina a tutto schermo, anche sopra il blocco schermo. -->
