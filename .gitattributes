@@ -1,0 +1,2 @@
+# Gli script per Windows restano con le righe di Windows (il prompt dei comandi ne ha bisogno).
+*.cmd text eol=crlf

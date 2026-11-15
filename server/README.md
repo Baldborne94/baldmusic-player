@@ -78,6 +78,16 @@ I file scaricati direttamente sul telefono hanno i tag del programma da cui veng
 
 Al riavvio BaldMusic rilegge solo i file cambiati e la libreria si riordina. Per vedere come l'app legge un brano: menu ⋮ → **Informazioni sul brano**. Per i doppioni tra cartelle e le anteprime di 30 secondi c'è **Pulizia della libreria** (Impostazioni o icona in Libreria): sul telefono i file vanno nel cestino di Android, sul PC nel Cestino di Windows, e in entrambi i casi si ripristinano da *Brani nel cestino*.
 
+### Controllare i brani: rovinati, tagliati, di qualità bassa
+
+[`controlla-brani.cmd`](controlla-brani.cmd) guarda ogni brano di una cartella (chiede quale; Invio = `E:\BalbMusic`) e scrive sul Desktop `baldmusic-controllo.txt`, diviso in tre gruppi:
+
+- **Da riscaricare**: file rovinati (errori di lettura: salti, scricchiolii), tagliati (si fermano prima della fine), vuoti, o che non sono musica (una pagina web salvata col nome del brano).
+- **Qualità bassa**: mp3 sotto 128 kbps, altri formati sotto 96 kbps, campionati sotto 32 kHz.
+- **Da controllare**: anteprime di 25–35 s, brani molto corti, pochi errori di lettura, estensione sbagliata.
+
+Si apre col doppio clic e **non cambia, sposta o cancella niente**. Per ascoltare ogni brano fino in fondo usa **ffmpeg** (lo cerca, e se manca propone di installarlo con `winget`); senza ffmpeg fa solo un controllo veloce con quello che sa Windows (durata e qualità). Con qualche migliaio di brani ci vuole una mezz'ora.
+
 ## 3. Raggiungilo da fuori casa con Tailscale
 
 A casa, sulla stessa Wi-Fi, il server risponde su `http://<IP-del-PC>:4533` (es. `http://192.168.1.20:4533`). Fuori casa usiamo **[Tailscale](https://tailscale.com)**: una rete privata gratuita tra i tuoi dispositivi. Non si aprono porte sul router e nessun altro può vedere il server.
