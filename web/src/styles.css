@@ -2469,3 +2469,386 @@ kbd {
   border-radius: 999px;
   padding: 6px 10px;
 }
+
+/* ---------- tema pop (come il logo e l'app Android) ----------
+   `data-theme="pop"` su <html> lo mette lib/theme.ts: di serie quando il computer è in tema chiaro.
+   Crema, bianco, giallo #FFD23F, contorni neri con ombra netta, rosso #E11D48, titoli in Archivo Black. */
+
+@font-face {
+  font-family: "Archivo Black";
+  src: url("./assets/fonts/archivo-black.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root[data-theme="pop"] {
+  --bg: #fff4d6;
+  --panel: #fffaf0;
+  --panel-2: #ffffff;
+  --hover: #ffe9a8;
+  --hover-2: #ffe08a;
+  --border: #111114;
+  --text: #111114;
+  --muted: #57534e;
+  --dim: #78716c;
+  --accent: #e11d48;
+  --accent-2: #e11d48;
+  --accent-grad: #e11d48;
+  --danger: #be123c;
+  --ink: #111114;
+  --yellow: #ffd23f;
+  --pop-line: 3px solid var(--ink);
+  --pop-shadow: 4px 4px 0 var(--ink);
+  color-scheme: light;
+}
+
+[data-theme="pop"] h1,
+[data-theme="pop"] h2,
+[data-theme="pop"] .hero__title,
+[data-theme="pop"] .liked-card__title,
+[data-theme="pop"] .mix__title,
+[data-theme="pop"] .now__title,
+[data-theme="pop"] .brand {
+  font-family: "Archivo Black", "Inter", system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Riquadri con contorno nero e ombra netta. */
+[data-theme="pop"] .side__box,
+[data-theme="pop"] .main,
+[data-theme="pop"] .panel {
+  border: var(--pop-line);
+}
+
+[data-theme="pop"] .side__box {
+  background: #fff;
+}
+
+[data-theme="pop"] .brand {
+  font-size: 1.25rem;
+}
+
+[data-theme="pop"] .page--home {
+  background: linear-gradient(180deg, var(--yellow) 0, var(--panel) 330px);
+}
+
+[data-theme="pop"] .page--stats {
+  background: linear-gradient(180deg, #22d3ee 0, var(--panel) 360px);
+}
+
+/* L'intestazione prende il colore della copertina, schiarito: il testo nero resta leggibile. */
+[data-theme="pop"] .page--detail {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--hero) 45%, #fff) 0,
+    color-mix(in srgb, var(--hero) 18%, var(--panel)) 340px,
+    var(--panel) 560px
+  );
+}
+
+[data-theme="pop"] .hero__meta {
+  color: var(--muted);
+}
+
+[data-theme="pop"] .hero__meta strong {
+  color: var(--text);
+}
+
+[data-theme="pop"] .action-bar {
+  background: none;
+}
+
+[data-theme="pop"] .round-btn {
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+[data-theme="pop"] .round-btn:hover {
+  background: var(--yellow);
+}
+
+[data-theme="pop"] .btn {
+  border: 2px solid var(--ink);
+  background: #fff;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+[data-theme="pop"] .btn--primary,
+[data-theme="pop"] .big-play,
+[data-theme="pop"] .play-btn {
+  background: var(--accent);
+  color: #fff;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="pop"] .btn--danger {
+  color: var(--danger);
+}
+
+[data-theme="pop"] .chip {
+  border: 2px solid var(--ink);
+  background: #fff;
+  font-weight: 600;
+}
+
+[data-theme="pop"] .chip:hover {
+  background: var(--hover);
+}
+
+[data-theme="pop"] .chip.is-on {
+  background: var(--accent);
+  color: #fff;
+}
+
+[data-theme="pop"] select,
+[data-theme="pop"] code {
+  border: 2px solid var(--ink);
+  background: #fff;
+}
+
+[data-theme="pop"] .cover--empty,
+[data-theme="pop"] .empty-art {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+[data-theme="pop"] .liked-art,
+[data-theme="pop"] .liked-card,
+[data-theme="pop"] .liked-card:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+[data-theme="pop"] .liked-card {
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .card__art .cover,
+[data-theme="pop"] .top-result__art,
+[data-theme="pop"] .hero__art,
+[data-theme="pop"] .now__cover,
+[data-theme="pop"] .stats-top__art,
+[data-theme="pop"] .mix__art {
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .card:hover,
+[data-theme="pop"] .mix:hover {
+  background: var(--hover);
+}
+
+[data-theme="pop"] .quick__tile {
+  background: #fff;
+  border: var(--pop-line);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="pop"] .quick__tile:hover {
+  background: var(--hover);
+}
+
+[data-theme="pop"] .quick__art {
+  box-shadow: none;
+  border-right: var(--pop-line);
+}
+
+[data-theme="pop"] .browse__tile,
+[data-theme="pop"] .stats-top {
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .trow:hover,
+[data-theme="pop"] .qrow:hover,
+[data-theme="pop"] .lib-row:hover {
+  background: var(--hover);
+}
+
+[data-theme="pop"] .ctx,
+[data-theme="pop"] .pop {
+  background: #fff;
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .ctx button {
+  color: var(--text);
+}
+
+[data-theme="pop"] .ctx button:hover,
+[data-theme="pop"] .pop button:hover {
+  background: var(--hover);
+}
+
+[data-theme="pop"] .ctx hr {
+  border-top-color: rgba(17, 17, 20, 0.2);
+}
+
+[data-theme="pop"] .picker__new input,
+[data-theme="pop"] .login input {
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+[data-theme="pop"] .now__lyrics,
+[data-theme="pop"] .now__next {
+  background: #fff;
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .now__lyrics .now__label {
+  color: var(--accent);
+}
+
+[data-theme="pop"] .lyrics p {
+  color: rgba(17, 17, 20, 0.4);
+}
+
+[data-theme="pop"] .lyrics p:hover {
+  color: rgba(17, 17, 20, 0.75);
+}
+
+[data-theme="pop"] .lyrics p.is-past {
+  color: rgba(17, 17, 20, 0.6);
+}
+
+[data-theme="pop"] .lyrics p.is-now,
+[data-theme="pop"] .lyrics__plain {
+  color: var(--ink) !important;
+}
+
+/* Barra in basso: bianca col contorno, barra di avanzamento rossa su bianco. */
+[data-theme="pop"] .bar {
+  background: #fff;
+  border-top: var(--pop-line);
+}
+
+[data-theme="pop"] input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border: 2px solid var(--ink);
+  background: linear-gradient(to right, var(--accent) var(--pct), #fff var(--pct));
+}
+
+[data-theme="pop"] input[type="range"]::-moz-range-track {
+  height: 8px;
+  border: 2px solid var(--ink);
+  background: linear-gradient(to right, var(--accent) var(--pct), #fff var(--pct));
+}
+
+[data-theme="pop"] input[type="range"]::-webkit-slider-thumb {
+  margin-top: -4px;
+  background: var(--ink);
+  border: 2px solid #fff;
+}
+
+[data-theme="pop"] input[type="range"]::-moz-range-thumb {
+  background: var(--ink);
+  border: 2px solid #fff;
+}
+
+/* «In riproduzione» a tutto schermo: gialla a puntini, testo nero. */
+[data-theme="pop"] .full {
+  color: var(--ink);
+  background-color: var(--yellow);
+  background-image: radial-gradient(rgba(17, 17, 20, 0.14) 1.6px, transparent 1.8px);
+  background-size: 12px 12px;
+}
+
+[data-theme="pop"] .full__art .cover {
+  border: 4px solid var(--ink);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+[data-theme="pop"] .full .cover--empty {
+  background: #fff;
+}
+
+[data-theme="pop"] .full__meta p {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+[data-theme="pop"] .full .icon-btn {
+  color: var(--ink);
+}
+
+[data-theme="pop"] .full .icon-btn.is-on {
+  color: var(--accent);
+}
+
+[data-theme="pop"] .full .seek__time {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+[data-theme="pop"] .full__lyrics .lyrics p {
+  color: rgba(17, 17, 20, 0.45);
+}
+
+[data-theme="pop"] .full__lyrics .lyrics p.is-now {
+  color: var(--ink);
+}
+
+[data-theme="pop"] .login {
+  background: var(--yellow);
+}
+
+[data-theme="pop"] .login__card {
+  background: #fff;
+  border: var(--pop-line);
+  box-shadow: 6px 6px 0 var(--ink);
+  border-radius: 14px;
+}
+
+[data-theme="pop"] .modal__box,
+[data-theme="pop"] .panel-box {
+  border: var(--pop-line);
+  box-shadow: var(--pop-shadow);
+}
+
+@media (max-width: 760px) {
+  [data-theme="pop"] .main {
+    border: 0;
+  }
+
+  /* Mini player nero con l'artista in giallo, schede gialle con la riga nera, come sul telefono. */
+  [data-theme="pop"] .bar {
+    background: var(--ink);
+    color: #fff;
+    border: 0;
+    border-radius: 12px;
+  }
+
+  [data-theme="pop"] .bar__mobile .bar__artist {
+    color: var(--yellow);
+  }
+
+  [data-theme="pop"] .bar__mobile-controls .icon-btn {
+    color: #fff;
+  }
+
+  [data-theme="pop"] .bar__progress {
+    background: var(--yellow);
+  }
+
+  [data-theme="pop"] .tabs {
+    background: var(--yellow);
+    border-top: var(--pop-line);
+  }
+
+  [data-theme="pop"] .tabs__link {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  [data-theme="pop"] .tabs__link.is-active {
+    font-weight: 800;
+    text-decoration: underline 3px var(--accent);
+    text-underline-offset: 3px;
+  }
+}

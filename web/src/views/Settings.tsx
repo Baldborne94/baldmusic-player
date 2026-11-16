@@ -7,6 +7,7 @@ import type { ReplayGainMode } from "../lib/replaygain";
 import { href } from "../lib/router";
 import { CollectionsHint, scanText } from "./Library";
 import { saveCredentials, useClient } from "../lib/session";
+import { setTheme, THEME_MODES, useTheme } from "../lib/theme";
 
 const RG_MODES: [ReplayGainMode, string][] = [
   ["album", "Album"],
@@ -18,6 +19,7 @@ export function Settings() {
   const client = useClient();
   const { replayGain: rg, crossfade, autoplay } = usePlayer();
   const lib = useLibrary();
+  const theme = useTheme();
   const [status, setStatus] = useState<string | null>(null);
   if (!client) return null;
   const { url, user } = client.creds;
@@ -60,6 +62,19 @@ export function Settings() {
           </button>
         </div>
         {status && <p className="muted">{status}</p>}
+      </div>
+      <div className="panel">
+        <h2>Tema</h2>
+        <p className="muted">
+          Automatico: pop (giallo, come il logo) quando il computer è in tema chiaro, scuro quando è in tema scuro. Pop o Scuro: sempre quello.
+        </p>
+        <div className="chips">
+          {THEME_MODES.map(([mode, label]) => (
+            <button key={mode} className={`chip ${theme === mode ? "is-on" : ""}`} onClick={() => setTheme(mode)}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="panel">
         <h2>Volume uguale tra i brani</h2>

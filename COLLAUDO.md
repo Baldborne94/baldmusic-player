@@ -321,6 +321,7 @@ dell'unità principale sul telefono.
 | W-14 | Apri una raccolta, tocca l'ultimo brano (casuale spento) | Dopo l'ultimo suonano tutti gli altri dall'inizio, poi arriva «Continua ad ascoltare» |
 | W-15 | In una raccolta salta un brano con ⏭ nei primi secondi, poi premi play sulla raccolta (o accendi «ripeti tutto») | Il brano saltato è uscito dalla coda e non torna; toccato apposta nell'elenco suona |
 | W-16 | Casuale acceso, ascolta due brani interi, spegni il casuale | I due brani sentiti restano prima di quello in corso, non dopo |
+| W-17 | Apri il sito col computer in tema chiaro, poi passa il computer al tema scuro; poi Impostazioni → Tema → Pop e Scuro, e ricarica | Di giorno giallo e crema coi contorni neri, titoli grossi, logo col teschio (anche nella scheda del browser); col tema scuro torna scuro senza ricaricare; scelto a mano resta dopo aver ricaricato; sul telefono mini player nero e schede gialle; «In riproduzione» a schermo intero gialla a puntini |
 | W-17 | Arriva all'ultimo brano di un album con «Continua ad ascoltare» attivo | In coda compaiono brani simili (stessa raccolta, stesso genere), mai quelli sentiti o saltati; spento nelle Impostazioni ci si ferma |
 | W-18 | Metti in pausa a metà brano e ricarica la pagina | Stessa coda e stesso brano; play riparte da quel punto |
 | W-19 | Salta un brano a metà, poi guarda «Più ascoltati» su Navidrome | Il brano saltato non conta un ascolto in più; uno sentito fino ai tre quarti sì |
