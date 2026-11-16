@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#0E0F13</color>
+    <!-- Lo sfondo mentre l'app si apre: crema del pop di giorno (values-night: scuro). -->
+    <color name="bg">#FFF4D6</color>
     <color name="accent">#FF7A59</color>
     <style name="Theme.BaldMusic" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/bg</item>

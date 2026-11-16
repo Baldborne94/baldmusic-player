@@ -363,7 +363,7 @@ private fun NavRail(tab: Tab, onSelect: (Tab) -> Unit) {
         Modifier
             .fillMaxHeight()
             .width(88.dp)
-            .background(Color.Black)
+            .background(if (isPop) LocalPalette.current.bar else Color.Black)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(top = 16.dp),
@@ -381,8 +381,8 @@ private fun RailItem(label: String, selectedIcon: ImageVector, icon: ImageVector
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) Color.White else TextMuted, modifier = Modifier.size(28.dp))
-        Text(label, fontSize = 12.sp, color = if (selected) Color.White else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) TextColor else TextMuted, modifier = Modifier.size(28.dp))
+        Text(label, fontSize = 12.sp, color = if (selected) TextColor else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }
 
@@ -391,7 +391,11 @@ private fun BottomBar(tab: Tab, onSelect: (Tab) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Background.copy(alpha = 0.92f), Color.Black)))
+            // Nel pop la barra è gialla con una riga nera sopra, come il logo.
+            .then(
+                if (isPop) Modifier.background(LocalPalette.current.bar).drawBehind { drawRect(Color(0xFF111114), size = size.copy(height = 3.dp.toPx())) }
+                else Modifier.background(Brush.verticalGradient(listOf(Background.copy(alpha = 0.92f), Color.Black))),
+            )
             .navigationBarsPadding()
             .height(64.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -408,8 +412,8 @@ private fun androidx.compose.foundation.layout.RowScope.NavItem(label: String, s
         Modifier.weight(1f).clickable(onClick = onClick).padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) Color.White else TextMuted, modifier = Modifier.size(26.dp))
-        Text(label, fontSize = 11.sp, color = if (selected) Color.White else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+        Icon(if (selected) selectedIcon else icon, null, tint = if (selected) TextColor else TextMuted, modifier = Modifier.size(26.dp))
+        Text(label, fontSize = 11.sp, color = if (selected) TextColor else TextMuted, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
     }
 }
 
@@ -425,6 +429,7 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
     Column(
         Modifier
             .padding(horizontal = 8.dp, vertical = 4.dp)
+            .popCard(RoundedCornerShape(8.dp))
             .clip(RoundedCornerShape(8.dp))
             .background(color)
             .clickable(onClick = onOpen)
@@ -441,7 +446,7 @@ fun MiniPlayer(vm: PlayerViewModel, liked: Boolean, onOpen: () -> Unit) {
             Artwork(item, Modifier.size(42.dp), shape = RoundedCornerShape(4.dp))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(item.title(), fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.title(), fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White)
                 Text(item.subtitle().orEmpty(), color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = { vm.toggleLike(item) }) {

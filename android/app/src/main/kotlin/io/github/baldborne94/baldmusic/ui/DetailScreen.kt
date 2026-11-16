@@ -397,7 +397,13 @@ private fun HeroHeader(
     val kind = node?.kind
     var menu by remember { mutableStateOf(false) }
     Column(
-        Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(color, color.copy(alpha = 0.35f), Background))).statusBarsPadding(),
+        // Nel pop il colore della copertina si schiarisce verso il crema: il titolo nero si legge.
+        Modifier.fillMaxWidth().background(
+            Brush.verticalGradient(
+                if (isPop) listOf(androidx.compose.ui.graphics.lerp(color, Background, 0.55f), Background)
+                else listOf(color, color.copy(alpha = 0.35f), Background),
+            ),
+        ).statusBarsPadding(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = ui.back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Indietro") }
@@ -425,7 +431,7 @@ private fun HeroHeader(
             else -> node?.subtitle()
         }
         if (!sub.isNullOrBlank()) {
-            Text(sub, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = Color.White.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(sub, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = TextColor.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         }
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (tracks.isNotEmpty()) {

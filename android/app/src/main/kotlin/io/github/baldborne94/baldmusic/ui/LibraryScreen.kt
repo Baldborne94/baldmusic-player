@@ -190,8 +190,8 @@ fun LibraryScreen(vm: PlayerViewModel) {
 @Composable
 fun Chip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(50)).background(if (selected) Accent else Surface2).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
+        Modifier.popCard(RoundedCornerShape(50), shadow = 2.dp, border = 2.dp).clip(RoundedCornerShape(50)).background(if (selected) Accent else Surface2).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Text(label, fontSize = 14.sp, color = if (selected) Color.Black else Color.White, fontWeight = FontWeight.SemiBold)
+        Text(label, fontSize = 14.sp, color = if (selected) (if (isPop) Color.White else Color.Black) else TextColor, fontWeight = FontWeight.SemiBold)
     }
 }

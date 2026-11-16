@@ -142,7 +142,11 @@ fun NowPlayingScreen(
         Modifier
             .fillMaxSize()
             .offset { IntOffset(0, dragY.coerceAtLeast(0f).roundToInt()) }
-            .background(Brush.verticalGradient(0f to color, 0.65f to androidx.compose.ui.graphics.lerp(color, Background, 0.75f), 1f to Background))
+            .then(
+                // Nel pop: giallo a puntini come i fumetti; nello scuro il colore della copertina.
+                if (isPop) Modifier.popDots()
+                else Modifier.background(Brush.verticalGradient(0f to color, 0.65f to androidx.compose.ui.graphics.lerp(color, Background, 0.75f), 1f to Background)),
+            )
             // Assorbe i tocchi: non devono arrivare alla schermata sotto.
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .pointerInput(Unit) {
@@ -165,7 +169,7 @@ fun NowPlayingScreen(
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Chiudi", Modifier.size(32.dp)) }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("IN RIPRODUZIONE DA", fontSize = 10.sp, letterSpacing = 1.sp, color = Color.White.copy(alpha = 0.75f))
+                    Text("IN RIPRODUZIONE DA", fontSize = 10.sp, letterSpacing = 1.sp, color = PlayerText.copy(alpha = 0.75f))
                     Text(vm.playingFrom ?: item.mediaMetadata.albumTitle?.toString().orEmpty(), fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Box {
@@ -249,7 +253,7 @@ fun NowPlayingScreen(
                     Text(
                         item.mediaMetadata.artist?.toString().orEmpty(),
                         fontSize = 16.sp,
-                        color = Color.White.copy(alpha = 0.75f),
+                        color = PlayerText.copy(alpha = 0.75f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.clickable(enabled = item.artistId != null) {
@@ -270,17 +274,17 @@ fun NowPlayingScreen(
                 // Una puntata: indietro di 15 s e avanti di 30 s al posto di casuale e ripeti.
                 if (episode) SkipButton(Icons.Rounded.Replay, "15", "Indietro di 15 secondi") { vm.skipBack() }
                 else IconButton(onClick = { vm.toggleShuffle() }) {
-                    Icon(Icons.Rounded.Shuffle, "Casuale", tint = if (vm.shuffle) Accent else Color.White)
+                    Icon(Icons.Rounded.Shuffle, "Casuale", tint = if (vm.shuffle) Accent else PlayerText)
                 }
                 IconButton(onClick = { vm.previous() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipPrevious, "Precedente", Modifier.size(42.dp)) }
                 Box(
-                    Modifier.size(72.dp).clip(CircleShape).background(Color.White).clickable { vm.toggle() },
+                    Modifier.size(72.dp).popCard(CircleShape, shadow = 4.dp, border = 3.dp).clip(CircleShape).background(PlayerText).clickable { vm.toggle() },
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
-                        vm.buffering -> CircularProgressIndicator(Modifier.size(30.dp), color = Color.Black, strokeWidth = 3.dp)
-                        vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = Color.Black, modifier = Modifier.size(40.dp))
-                        else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = Color.Black, modifier = Modifier.size(40.dp))
+                        vm.buffering -> CircularProgressIndicator(Modifier.size(30.dp), color = PlayerOnText, strokeWidth = 3.dp)
+                        vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = PlayerOnText, modifier = Modifier.size(40.dp))
+                        else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = PlayerOnText, modifier = Modifier.size(40.dp))
                     }
                 }
                 IconButton(onClick = { vm.next() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipNext, "Successivo", Modifier.size(42.dp)) }
@@ -289,7 +293,7 @@ fun NowPlayingScreen(
                     Icon(
                         if (vm.repeat == Player.REPEAT_MODE_ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
                         "Ripeti",
-                        tint = if (vm.repeat != Player.REPEAT_MODE_OFF) Accent else Color.White,
+                        tint = if (vm.repeat != Player.REPEAT_MODE_OFF) Accent else PlayerText,
                     )
                 }
             }
@@ -301,7 +305,7 @@ fun NowPlayingScreen(
                 // La copertina a tutto schermo, anche col telefono bloccato (come un Kindle).
                 IconButton(onClick = { vm.openCover(context) }) { Icon(Icons.Rounded.Fullscreen, "Schermo copertina") }
                 IconButton(onClick = { showLyrics = !showLyrics }) {
-                    Icon(Icons.Rounded.Mic, "Testo", tint = if (showLyrics) Accent else Color.White)
+                    Icon(Icons.Rounded.Mic, "Testo", tint = if (showLyrics) Accent else PlayerText)
                 }
                 IconButton(onClick = onQueue) { Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Coda") }
             }
@@ -362,7 +366,7 @@ private fun LikeButton(liked: Boolean, onClick: () -> Unit) {
         Icon(
             if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             if (liked) "Togli da Mi piace" else "Mi piace",
-            tint = if (liked) Accent else Color.White,
+            tint = if (liked) Accent else PlayerText,
             modifier = Modifier.size(30.dp).graphicsLayer { scaleX = scale; scaleY = scale },
         )
     }
@@ -382,17 +386,17 @@ private fun ProgressBar(vm: PlayerViewModel) {
             },
             valueRange = 0f..duration,
             colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color.White,
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f),
+                thumbColor = PlayerText,
+                activeTrackColor = PlayerText,
+                inactiveTrackColor = PlayerText.copy(alpha = 0.25f),
             ),
             modifier = Modifier.height(28.dp),
         )
         Row(Modifier.fillMaxWidth()) {
             val pos = (dragging?.toLong() ?: vm.position).coerceAtLeast(0)
-            Text(formatDuration(pos), fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
+            Text(formatDuration(pos), fontSize = 12.sp, color = PlayerText.copy(alpha = 0.7f))
             Spacer(Modifier.weight(1f))
-            Text("-" + formatDuration((vm.duration - pos).coerceAtLeast(0)), fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
+            Text("-" + formatDuration((vm.duration - pos).coerceAtLeast(0)), fontSize = 12.sp, color = PlayerText.copy(alpha = 0.7f))
         }
     }
 }
@@ -430,7 +434,7 @@ private fun LyricsPeek(vm: PlayerViewModel, lyrics: Lyrics, onOpen: () -> Unit) 
             overflow = TextOverflow.Ellipsis,
         )
         shown.next?.let {
-            Text(it, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(it, fontSize = 15.sp, color = PlayerText.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -488,7 +492,7 @@ private fun SleepButton(end: Long?, onClick: () -> Unit) {
         }
     }
     Row(Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onClick).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Rounded.Timer, "Timer di spegnimento", tint = if (end != null) Accent else Color.White)
+        Icon(Icons.Rounded.Timer, "Timer di spegnimento", tint = if (end != null) Accent else PlayerText)
         val label = when {
             end == null -> null
             end == BaldMusicApp.SLEEP_END_OF_TRACK -> "Fine brano"

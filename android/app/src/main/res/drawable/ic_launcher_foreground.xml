@@ -1,27 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Un disco: cerchio sfumato con il foro centrale (area sicura 66dp su 108dp). -->
+<!-- Il teschio pop con occhiali da sole e cuffie (area sicura 66dp su 108dp). Disegno su 200 unita', ridotto al centro. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M54,22a32,32 0,1 1,0 64a32,32 0,1 1,0 -64z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endColor="#C026D3"
-                android:endX="86"
-                android:endY="86"
-                android:startColor="#FF7A59"
-                android:startX="22"
-                android:startY="22"
-                android:type="linear" />
-        </aapt:attr>
-    </path>
-    <path
-        android:fillColor="#0E0F13"
-        android:pathData="M54,43.5a10.5,10.5 0,1 1,0 21a10.5,10.5 0,1 1,0 -21z" />
-    <path
-        android:fillColor="#FF7A59"
-        android:pathData="M54,50.5a3.5,3.5 0,1 1,0 7a3.5,3.5 0,1 1,0 -7z" />
+    <group
+        android:scaleX="0.34"
+        android:scaleY="0.34"
+        android:translateX="20"
+        android:translateY="20">
+        <path
+            android:pathData="M30,112C30,10 170,10 170,112"
+            android:strokeColor="#FF111114"
+            android:strokeWidth="18"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M30,112C30,10 170,10 170,112"
+            android:strokeColor="#FFE11D48"
+            android:strokeWidth="11"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M100,46C138,46 162,72 162,106C162,124 155,137 146,144L146,158C146,166 140,172 132,172L68,172C60,172 54,166 54,158L54,144C45,137 38,124 38,106C38,72 62,46 100,46Z"
+            android:fillColor="#FFFFFFFF"
+            android:strokeColor="#FF111114"
+            android:strokeWidth="5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M100,126L93,139Q100,143 107,139Z"
+            android:fillColor="#FF111114" />
+        <path
+            android:pathData="M70,158L130,158M78,150L78,168M89,150L89,168M100,150L100,168M111,150L111,168M122,150L122,168"
+            android:strokeColor="#FF111114"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M52,93L38,99M148,93L162,99"
+            android:strokeColor="#FF111114"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M55,89H145A3,3 0,0 1,148,92V94A3,3 0,0 1,145,97H55A3,3 0,0 1,52,94V92A3,3 0,0 1,55,89Z"
+            android:fillColor="#FF111114" />
+        <path
+            android:pathData="M58,94L96,94C97,108 92,120 80,121C66,122 58,110 58,94ZM104,94L142,94C142,110 134,122 120,121C108,120 103,108 104,94Z"
+            android:fillColor="#FF111114" />
+        <path
+            android:pathData="M65,99L74,99L65,113ZM111,99L120,99L111,113Z"
+            android:fillColor="#FFFFFFFF"
+            android:fillAlpha="0.6" />
+        <path
+            android:pathData="M29,86H33A11,11 0,0 1,44,97V123A11,11 0,0 1,33,134H29A11,11 0,0 1,18,123V97A11,11 0,0 1,29,86ZM167,86H171A11,11 0,0 1,182,97V123A11,11 0,0 1,171,134H167A11,11 0,0 1,156,123V97A11,11 0,0 1,167,86Z"
+            android:fillColor="#FFE11D48"
+            android:strokeColor="#FF111114"
+            android:strokeWidth="4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M38,94H38A4,4 0,0 1,42,98V122A4,4 0,0 1,38,126H38A4,4 0,0 1,34,122V98A4,4 0,0 1,38,94ZM162,94H162A4,4 0,0 1,166,98V122A4,4 0,0 1,162,126H162A4,4 0,0 1,158,122V98A4,4 0,0 1,162,94Z"
+            android:fillColor="#FF881337" />
+    </group>
 </vector>

@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Icona della notifica: la sagoma del teschio con cuffie (Android la colora da se'). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M12,2a10,10 0,1 1,0 20a10,10 0,1 1,0 -20zM12,9a3,3 0,1 0,0 6a3,3 0,1 0,0 -6z" />
+    <group
+        android:scaleX="0.135"
+        android:scaleY="0.135"
+        android:translateX="-1.5"
+        android:translateY="-1.5">
+        <path
+            android:pathData="M30,112C30,10 170,10 170,112"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="12"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M100,46C138,46 162,72 162,106C162,124 155,137 146,144L146,158C146,166 140,172 132,172L68,172C60,172 54,166 54,158L54,144C45,137 38,124 38,106C38,72 62,46 100,46ZM58,94L96,94C97,108 92,120 80,121C66,122 58,110 58,94ZM104,94L142,94C142,110 134,122 120,121C108,120 103,108 104,94ZM100,126L93,139Q100,143 107,139Z"
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd" />
+        <path
+            android:pathData="M29,86H33A11,11 0,0 1,44,97V123A11,11 0,0 1,33,134H29A11,11 0,0 1,18,123V97A11,11 0,0 1,29,86ZM167,86H171A11,11 0,0 1,182,97V123A11,11 0,0 1,171,134H167A11,11 0,0 1,156,123V97A11,11 0,0 1,167,86Z"
+            android:fillColor="#FFFFFFFF" />
+    </group>
 </vector>

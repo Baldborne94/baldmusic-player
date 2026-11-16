@@ -53,7 +53,14 @@ class MainActivity : ComponentActivity() {
             BaldMusicTheme {
                 // Senza una Surface il colore del testo predefinito resta nero: su sfondo
                 // scuro sparirebbero tutte le scritte senza colore esplicito.
-                Surface(modifier = Modifier.fillMaxSize(), color = Background, contentColor = Color.White) {
+                // Icone della barra di stato scure sul pop chiaro, chiare sullo scuro.
+                val pop = isPop
+                androidx.compose.runtime.LaunchedEffect(pop) {
+                    val style = if (pop) androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                    else androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                }
+                Surface(modifier = Modifier.fillMaxSize(), color = Background, contentColor = TextColor) {
                     AppScaffold(vm)
                 }
             }
