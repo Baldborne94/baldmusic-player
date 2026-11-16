@@ -26,4 +26,18 @@ class AppThemeTest {
         assertEquals(Mode.AUTO, AppTheme.parse("ARCOBALENO"))
         assertEquals(Mode.POP, AppTheme.parse("POP"))
     }
+
+    @Test
+    fun `testo del brano su copertina nera e bianco, non nero su nero`() {
+        // Lo sfondo del testo con la copertina di «All the Right Reasons»: quasi nero.
+        assertTrue(AppTheme.lightLyrics(pop = false, backgroundLuminance = 0.02f))
+        // Copertina chiara (giallo acceso): testo nero.
+        assertFalse(AppTheme.lightLyrics(pop = false, backgroundLuminance = 0.7f))
+    }
+
+    @Test
+    fun `nel pop il testo sta sul riquadro bianco ed e nero`() {
+        assertFalse(AppTheme.lightLyrics(pop = true, backgroundLuminance = 0.02f))
+        assertFalse(AppTheme.lightLyrics(pop = true, backgroundLuminance = 0.9f))
+    }
 }

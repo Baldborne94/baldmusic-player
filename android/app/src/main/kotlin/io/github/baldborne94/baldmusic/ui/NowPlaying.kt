@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,6 +83,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -91,6 +94,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import io.github.baldborne94.baldmusic.BaldMusicApp
+import io.github.baldborne94.baldmusic.core.library.AppTheme
 import io.github.baldborne94.baldmusic.core.lyrics.Lyrics
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
 import io.github.baldborne94.baldmusic.playback.albumId
@@ -235,10 +239,13 @@ fun NowPlayingScreen(
                         // Il testo si riduce da qui (o col tasto indietro), senza chiudere il lettore.
                         Box(Modifier.fillMaxSize()) {
                             LyricsView(vm, lyrics, lyricsLoading, color)
+                            val pop = isPop
                             IconButton(
                                 onClick = { showLyrics = false },
-                                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
-                            ) { Icon(Icons.Rounded.CloseFullscreen, "Riduci il testo", tint = Color.White) }
+                                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).size(40.dp)
+                                    .popCard(CircleShape, shadow = 2.dp, border = 2.dp).clip(CircleShape)
+                                    .background(if (pop) Color.White else Color.Black.copy(alpha = 0.35f)),
+                            ) { Icon(Icons.Rounded.CloseFullscreen, "Riduci il testo", tint = if (pop) PlayerText else Color.White) }
                         }
                     } else {
                         SwipeArtwork(vm, item)
@@ -249,7 +256,14 @@ fun NowPlayingScreen(
             // Titolo, artista, cuore.
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(item.title(), fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee())
+                    Text(
+                        item.title(),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = if (isPop) PopFont else null,
+                        maxLines = 1,
+                        modifier = Modifier.basicMarquee(),
+                    )
                     Text(
                         item.mediaMetadata.artist?.toString().orEmpty(),
                         fontSize = 16.sp,
@@ -277,14 +291,17 @@ fun NowPlayingScreen(
                     Icon(Icons.Rounded.Shuffle, "Casuale", tint = if (vm.shuffle) Accent else PlayerText)
                 }
                 IconButton(onClick = { vm.previous() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipPrevious, "Precedente", Modifier.size(42.dp)) }
+                // Nel pop rosso con l'icona bianca e il contorno nero; nello scuro bianco con l'icona nera.
+                val playColor = if (isPop) Accent else PlayerText
+                val playIcon = if (isPop) Color.White else PlayerOnText
                 Box(
-                    Modifier.size(72.dp).popCard(CircleShape, shadow = 4.dp, border = 3.dp).clip(CircleShape).background(PlayerText).clickable { vm.toggle() },
+                    Modifier.size(72.dp).popCard(CircleShape, shadow = 4.dp, border = 3.dp).clip(CircleShape).background(playColor).clickable { vm.toggle() },
                     contentAlignment = Alignment.Center,
                 ) {
                     when {
-                        vm.buffering -> CircularProgressIndicator(Modifier.size(30.dp), color = PlayerOnText, strokeWidth = 3.dp)
-                        vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = PlayerOnText, modifier = Modifier.size(40.dp))
-                        else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = PlayerOnText, modifier = Modifier.size(40.dp))
+                        vm.buffering -> CircularProgressIndicator(Modifier.size(30.dp), color = playIcon, strokeWidth = 3.dp)
+                        vm.isPlaying -> Icon(Icons.Rounded.Pause, "Pausa", tint = playIcon, modifier = Modifier.size(40.dp))
+                        else -> Icon(Icons.Rounded.PlayArrow, "Riproduci", tint = playIcon, modifier = Modifier.size(40.dp))
                     }
                 }
                 IconButton(onClick = { vm.next() }, Modifier.size(60.dp)) { Icon(Icons.Rounded.SkipNext, "Successivo", Modifier.size(42.dp)) }
@@ -372,31 +389,62 @@ private fun LikeButton(liked: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProgressBar(vm: PlayerViewModel) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     val duration = vm.duration.coerceAtLeast(1L).toFloat()
     Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Slider(
-            value = (dragging ?: vm.position.toFloat()).coerceIn(0f, duration),
-            onValueChange = { dragging = it },
-            onValueChangeFinished = {
-                dragging?.let { vm.seekTo(it.toLong()) }
-                dragging = null
-            },
-            valueRange = 0f..duration,
-            colors = SliderDefaults.colors(
-                thumbColor = PlayerText,
-                activeTrackColor = PlayerText,
-                inactiveTrackColor = PlayerText.copy(alpha = 0.25f),
-            ),
-            modifier = Modifier.height(28.dp),
-        )
+        val value = (dragging ?: vm.position.toFloat()).coerceIn(0f, duration)
+        val onChange: (Float) -> Unit = { dragging = it }
+        val onDone = {
+            dragging?.let { vm.seekTo(it.toLong()) }
+            dragging = null
+        }
+        if (isPop) {
+            // Pop: barra bianca col contorno nero, riempita di rosso; pallino nero bordato di bianco.
+            val ink = PlayerText
+            val red = Accent
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                onValueChangeFinished = onDone,
+                valueRange = 0f..duration,
+                modifier = Modifier.height(28.dp),
+                thumb = {
+                    Box(Modifier.size(22.dp).clip(CircleShape).background(ink).border(3.dp, Color.White, CircleShape))
+                },
+                track = { state ->
+                    val range = state.valueRange.endInclusive - state.valueRange.start
+                    val fraction = if (range > 0f) ((state.value - state.valueRange.start) / range).coerceIn(0f, 1f) else 0f
+                    val shape = RoundedCornerShape(8.dp)
+                    Box(Modifier.fillMaxWidth().height(14.dp).clip(shape).background(Color.White)) {
+                        Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(red))
+                        Box(Modifier.matchParentSize().border(3.dp, ink, shape))
+                    }
+                },
+            )
+        } else {
+            Slider(
+                value = value,
+                onValueChange = onChange,
+                onValueChangeFinished = onDone,
+                valueRange = 0f..duration,
+                colors = SliderDefaults.colors(
+                    thumbColor = PlayerText,
+                    activeTrackColor = PlayerText,
+                    inactiveTrackColor = PlayerText.copy(alpha = 0.25f),
+                ),
+                modifier = Modifier.height(28.dp),
+            )
+        }
         Row(Modifier.fillMaxWidth()) {
             val pos = (dragging?.toLong() ?: vm.position).coerceAtLeast(0)
-            Text(formatDuration(pos), fontSize = 12.sp, color = PlayerText.copy(alpha = 0.7f))
+            val timeColor = if (isPop) PlayerText else PlayerText.copy(alpha = 0.7f)
+            val timeWeight = if (isPop) FontWeight.Bold else FontWeight.Normal
+            Text(formatDuration(pos), fontSize = 12.sp, color = timeColor, fontWeight = timeWeight)
             Spacer(Modifier.weight(1f))
-            Text("-" + formatDuration((vm.duration - pos).coerceAtLeast(0)), fontSize = 12.sp, color = PlayerText.copy(alpha = 0.7f))
+            Text("-" + formatDuration((vm.duration - pos).coerceAtLeast(0)), fontSize = 12.sp, color = timeColor, fontWeight = timeWeight)
         }
     }
 }
@@ -422,14 +470,19 @@ private fun LyricsPeek(vm: PlayerViewModel, lyrics: Lyrics, onOpen: () -> Unit) 
     // Si ridisegna quando cambiano le righe, non a ogni passo della posizione.
     val preview by remember(lyrics) { derivedStateOf { lyrics.preview(vm.position + 300) } }
     val shown = preview ?: return
+    // Nel pop un riquadro bianco col contorno nero, come le altre schede; nello scuro un velo scuro.
+    val pop = isPop
+    val shape = RoundedCornerShape(10.dp)
     Column(
-        Modifier.fillMaxWidth().padding(top = 10.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onOpen)
-            .background(Color.Black.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(top = 10.dp).popCard(shape, shadow = 3.dp, border = 2.5.dp).clip(shape).clickable(onClick = onOpen)
+            .background(if (pop) Color.White else Color.Black.copy(alpha = 0.18f)).padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
+        if (pop) Text("TESTO", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp, color = Accent)
         Text(
             shown.current ?: "♪",
             fontSize = 17.sp,
             fontWeight = FontWeight.Bold,
+            color = PlayerText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -442,13 +495,21 @@ private fun LyricsPeek(vm: PlayerViewModel, lyrics: Lyrics, onOpen: () -> Unit) 
 /** Testo sincronizzato: la riga corrente in evidenza, le altre sfumate; tocca una riga per saltarci. */
 @Composable
 private fun LyricsView(vm: PlayerViewModel, lyrics: Lyrics?, loading: Boolean, color: Color) {
-    Box(Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).background(androidx.compose.ui.graphics.lerp(color, Color.Black, 0.25f))) {
+    // Nel pop un riquadro bianco col contorno nero; nello scuro il colore della copertina scurito,
+    // col testo chiaro o scuro secondo quanto è scuro (AppTheme.lightLyrics: mai nero su nero).
+    val pop = isPop
+    val background = if (pop) Color.White else androidx.compose.ui.graphics.lerp(color, Color.Black, 0.25f)
+    val ink = if (AppTheme.lightLyrics(pop, background.luminance())) Color.White else if (pop) PlayerText else Color.Black
+    val shape = RoundedCornerShape(12.dp)
+    // Nel pop lascia posto all'ombra netta (AnimatedContent taglia quello che esce).
+    val room = if (pop) 5.dp else 0.dp
+    Box(Modifier.fillMaxSize().padding(end = room, bottom = room).popCard(shape, shadow = 5.dp, border = 3.dp).clip(shape).background(background)) {
         when {
-            loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
+            loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = if (pop) Accent else ink)
             lyrics == null || lyrics.isEmpty -> Text(
                 "Testo non disponibile per questo brano.",
                 Modifier.align(Alignment.Center).padding(24.dp),
-                color = Color.White.copy(alpha = 0.8f),
+                color = ink.copy(alpha = 0.8f),
                 fontWeight = FontWeight.SemiBold,
             )
             lyrics.synced.isNotEmpty() -> {
@@ -466,9 +527,9 @@ private fun LyricsView(vm: PlayerViewModel, lyrics: Lyrics?, loading: Boolean, c
                             lineHeight = 30.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = when {
-                                i == current -> Color.White
-                                i < current -> Color.White.copy(alpha = 0.55f)
-                                else -> Color.Black.copy(alpha = 0.55f)
+                                i == current -> ink
+                                i < current -> ink.copy(alpha = 0.6f)
+                                else -> ink.copy(alpha = 0.35f)
                             },
                             modifier = Modifier.fillMaxWidth().clickable { vm.seekTo(line.timeMs) },
                         )
@@ -476,7 +537,7 @@ private fun LyricsView(vm: PlayerViewModel, lyrics: Lyrics?, loading: Boolean, c
                 }
             }
             else -> LazyColumn(contentPadding = PaddingValues(20.dp)) {
-                item { Text(lyrics.plain.orEmpty(), fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold) }
+                item { Text(lyrics.plain.orEmpty(), fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, color = ink) }
             }
         }
     }
