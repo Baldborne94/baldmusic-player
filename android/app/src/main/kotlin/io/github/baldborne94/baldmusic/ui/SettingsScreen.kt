@@ -193,6 +193,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
                 }) { Text("Scollega") }
             }
             Text("I brani arrivano dal server nella qualità originale, senza conversioni.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            ServerScanSetting()
             ServerSyncSetting()
             ServerDownloadsSetting()
         } else {
@@ -406,6 +407,27 @@ private fun SettingsLink(title: String, subtitle: String, onClick: () -> Unit) {
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = TextMuted)
     }
+}
+
+/** «Aggiorna libreria»: Navidrome rilegge la musica del PC, poi i brani nuovi compaiono anche qui e in Auto. */
+@Composable
+private fun ServerScanSetting() {
+    val scanner = androidx.compose.ui.platform.LocalContext.current.app.serverScan
+    val state by scanner.state.collectAsStateWithLifecycle()
+    Text("Aggiorna libreria del PC", fontWeight = FontWeight.SemiBold)
+    Text(
+        "Hai aggiunto musica sul PC? Navidrome la rilegge e i brani nuovi compaiono qui e in macchina. «Scansione completa» dopo aver sistemato i tag con Picard. " +
+            "Serve l'utente amministratore di Navidrome; senza tasto Navidrome lo fa comunque da solo ogni ora.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(enabled = !state.busy, onClick = { scanner.start(full = false) }) {
+            Text(if (state.busy) "Aggiorno…" else "Aggiorna libreria")
+        }
+        OutlinedButton(enabled = !state.busy, onClick = { scanner.start(full = true) }) { Text("Scansione completa") }
+    }
+    state.message?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
 }
 
 /** «Mi piace» e playlist uguali sul telefono e sul PC: interruttore, com'è andata e «Allinea adesso». */

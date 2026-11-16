@@ -102,6 +102,12 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
         call("ping")
     }
 
+    /** Fa rileggere a Navidrome la cartella della musica (come «Quick Scan»; [full] = «Full Scan»). Solo un amministratore. */
+    suspend fun startScan(full: Boolean = false): ScanStatus =
+        call("startScan", "fullScan" to (if (full) true else null)).scanStatus ?: ScanStatus(scanning = true)
+
+    suspend fun scanStatus(): ScanStatus = call("getScanStatus").scanStatus ?: ScanStatus()
+
     suspend fun albumList(type: String, size: Int = 50, offset: Int = 0): List<Album> =
         call("getAlbumList2", "type" to type, "size" to size, "offset" to offset).albumList2?.album.orEmpty()
 
