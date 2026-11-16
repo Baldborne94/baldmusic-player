@@ -19,4 +19,15 @@ object AppTheme {
 
     /** Il valore salvato nelle impostazioni; uno sconosciuto (o niente) è [DEFAULT]. */
     fun parse(saved: String?): Mode = Mode.entries.firstOrNull { it.name == saved } ?: DEFAULT
+
+    /**
+     * Il testo del brano in chiaro (bianco) o in scuro (nero) sul suo sfondo. Nel pop sta su un
+     * riquadro bianco, quindi nero; nello scuro lo sfondo è il colore della copertina scurito: con una
+     * copertina scura il testo è bianco. Prima le righe che dovevano ancora venire erano sempre nere,
+     * e con una copertina nera (Nickelback, «All the Right Reasons») non si leggevano.
+     */
+    fun lightLyrics(pop: Boolean, backgroundLuminance: Float): Boolean = !pop && backgroundLuminance < LYRICS_LIGHT_BELOW
+
+    /** Sotto questa luminanza (0 nero, 1 bianco) lo sfondo è scuro. */
+    const val LYRICS_LIGHT_BELOW = 0.4f
 }

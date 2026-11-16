@@ -1,13 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Il logo di BaldMusic: teschio con occhiali da sole e cuffie sul giallo pop (stesso disegno dell'app Android). -->
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff7a59"/>
-      <stop offset="1" stop-color="#c026d3"/>
+      <stop offset="0" stop-color="#ffd23f" />
+      <stop offset="1" stop-color="#ffb000" />
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="#0e0f13"/>
-  <circle cx="256" cy="256" r="176" fill="url(#g)"/>
-  <circle cx="256" cy="256" r="58" fill="#0e0f13"/>
-  <circle cx="256" cy="256" r="18" fill="url(#g)"/>
-  <path d="M256 112a144 144 0 0 1 144 144" fill="none" stroke="#0e0f13" stroke-opacity=".25" stroke-width="14" stroke-linecap="round"/>
+  <rect width="200" height="200" rx="44" fill="url(#g)" />
+  <g transform="translate(14 14) scale(0.86)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30,112C30,10 170,10 170,112" fill="none" stroke="#111114" stroke-width="18" />
+    <path d="M30,112C30,10 170,10 170,112" fill="none" stroke="#e11d48" stroke-width="11" />
+    <path d="M100,46C138,46 162,72 162,106C162,124 155,137 146,144L146,158C146,166 140,172 132,172L68,172C60,172 54,166 54,158L54,144C45,137 38,124 38,106C38,72 62,46 100,46Z" fill="#fff" stroke="#111114" stroke-width="5" />
+    <path d="M100,126L93,139Q100,143 107,139Z" fill="#111114" />
+    <path d="M70,158L130,158M78,150L78,168M89,150L89,168M100,150L100,168M111,150L111,168M122,150L122,168" fill="none" stroke="#111114" stroke-width="3" />
+    <path d="M52,93L38,99M148,93L162,99" fill="none" stroke="#111114" stroke-width="4" />
+    <path d="M55,89H145A3,3 0,0 1,148,92V94A3,3 0,0 1,145,97H55A3,3 0,0 1,52,94V92A3,3 0,0 1,55,89Z" fill="#111114" />
+    <path d="M58,94L96,94C97,108 92,120 80,121C66,122 58,110 58,94ZM104,94L142,94C142,110 134,122 120,121C108,120 103,108 104,94Z" fill="#111114" />
+    <path d="M65,99L74,99L65,113ZM111,99L120,99L111,113Z" fill="#fff" fill-opacity="0.6" />
+    <path d="M29,86H33A11,11 0,0 1,44,97V123A11,11 0,0 1,33,134H29A11,11 0,0 1,18,123V97A11,11 0,0 1,29,86ZM167,86H171A11,11 0,0 1,182,97V123A11,11 0,0 1,171,134H167A11,11 0,0 1,156,123V97A11,11 0,0 1,167,86Z" fill="#e11d48" stroke="#111114" stroke-width="4" />
+    <path d="M38,94H38A4,4 0,0 1,42,98V122A4,4 0,0 1,38,126H38A4,4 0,0 1,34,122V98A4,4 0,0 1,38,94ZM162,94H162A4,4 0,0 1,166,98V122A4,4 0,0 1,162,126H162A4,4 0,0 1,158,122V98A4,4 0,0 1,162,94Z" fill="#881337" />
+  </g>
 </svg>
