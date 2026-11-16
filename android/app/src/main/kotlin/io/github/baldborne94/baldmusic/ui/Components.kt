@@ -2,6 +2,7 @@ package io.github.baldborne94.baldmusic.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -123,7 +124,9 @@ fun Artwork(item: MediaItem?, modifier: Modifier = Modifier, shape: Shape = Roun
         modifier
             .aspectRatio(1f)
             .clip(shape)
-            .background(Brush.linearGradient(listOf(Surface2, Color(0xFF30333E)))),
+            .background(if (isPop) Brush.linearGradient(listOf(Surface2, LocalPalette.current.surface3)) else Brush.linearGradient(listOf(Surface2, Color(0xFF30333E))))
+            // Nel pop ogni copertina ha il contorno nero, come i fumetti.
+            .then(if (isPop) Modifier.border(2.dp, LocalPalette.current.ink, shape) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         // L'icona sta sotto: si vede finché la copertina non c'è (o se non si trova). AsyncImage
@@ -335,10 +338,10 @@ fun ContainerRow(item: MediaItem, subtitle: String? = item.subtitle(), pinned: B
 @Composable
 fun BigPlayButton(playing: Boolean, size: Dp = 56.dp, onClick: () -> Unit) {
     Box(
-        Modifier.size(size).clip(CircleShape).background(AccentBrush).clickable(onClick = onClick),
+        Modifier.size(size).popCard(CircleShape, shadow = 3.dp).clip(CircleShape).background(AccentBrush).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pausa" else "Riproduci", tint = Color.Black, modifier = Modifier.size(size * 0.55f))
+        Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (playing) "Pausa" else "Riproduci", tint = if (isPop) Color.White else Color.Black, modifier = Modifier.size(size * 0.55f))
     }
 }
 

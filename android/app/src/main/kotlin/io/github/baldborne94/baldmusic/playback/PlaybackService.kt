@@ -174,6 +174,11 @@ class PlaybackService : MediaLibraryService() {
         session = MediaLibrarySession.Builder(this, sessionPlayer, LibraryCallback())
             .setSessionActivity(openApp)
             .build()
+        // Nella barra delle notifiche la sagoma del logo (teschio con cuffie), non la nota di Media3.
+        setMediaNotificationProvider(
+            androidx.media3.session.DefaultMediaNotificationProvider.Builder(this).build()
+                .also { it.setSmallIcon(io.github.baldborne94.baldmusic.R.drawable.ic_notification) },
+        )
 
         // Mi piace, playlist, cronologia: Android Auto rilegge "La tua musica" e il cuore si aggiorna.
         scope.launch {

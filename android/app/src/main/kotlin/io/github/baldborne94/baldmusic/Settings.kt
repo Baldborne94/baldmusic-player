@@ -1,5 +1,6 @@
 package io.github.baldborne94.baldmusic
 
+import io.github.baldborne94.baldmusic.core.library.AppTheme
 import android.content.Context
 import androidx.core.content.edit
 import io.github.baldborne94.baldmusic.core.library.Crossfade
@@ -43,6 +44,16 @@ class Settings(context: Context) {
         prefs.edit { putString(KEY_REPLAY_GAIN, mode.name) }
         _replayGain.value = mode
         edited()
+    }
+
+    private val _theme = MutableStateFlow(AppTheme.parse(prefs.getString(KEY_THEME, null)))
+
+    /** Il tema: automatico (pop di giorno, scuro di sera, come il telefono), pop o scuro. */
+    val theme: StateFlow<AppTheme.Mode> = _theme.asStateFlow()
+
+    fun setTheme(mode: AppTheme.Mode) {
+        prefs.edit { putString(KEY_THEME, mode.name) }
+        _theme.value = mode
     }
 
     private val _crossfade = MutableStateFlow(
@@ -167,6 +178,7 @@ class Settings(context: Context) {
         const val KEY_LYRICS = "lyrics_online"
         const val KEY_REPLAY_GAIN = "replay_gain"
         const val KEY_CROSSFADE = "crossfade"
+        const val KEY_THEME = "tema"
         const val KEY_CONTINUE = "continue_listening"
         const val KEY_COVER_AUTO = "cover_auto"
         const val KEY_SYNC_SERVER = "sync_server"

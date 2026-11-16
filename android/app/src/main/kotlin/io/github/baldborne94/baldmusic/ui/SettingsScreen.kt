@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.MediaItem
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
+import io.github.baldborne94.baldmusic.core.library.AppTheme
 import io.github.baldborne94.baldmusic.core.library.Crossfade
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.ReplayGainMode
@@ -112,6 +113,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
     ) {
         val ui = LocalUi.current
         var lyricsOnline by remember { mutableStateOf(vm.lyricsOnline) }
+        ThemeSetting()
         Text("Ascolto", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         SettingsLink("Le tue statistiche", "Quanto ascolti, i tuoi artisti e brani preferiti") { ui.push(Screen.Stats) }
         SettingsLink("Pulizia della libreria", "Doppioni e anteprime di 30 secondi da buttare") { ui.push(Screen.Cleanup) }
@@ -266,6 +268,32 @@ fun SettingsScreen(vm: PlayerViewModel) {
     }
 }
 
+/** Il tema: automatico (pop di giorno, scuro di sera, come il telefono), pop o scuro. */
+@Composable
+private fun ThemeSetting() {
+    val settings = LocalContext.current.app.settings
+    val mode by settings.theme.collectAsState()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Tema", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(
+            "Automatico: pop (giallo, come il logo) quando il telefono è chiaro, scuro quando è scuro. " +
+                "Per averlo da solo la sera: impostazioni del telefono → Schermo → Modalità scura → «Dal tramonto all'alba».",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AppTheme.Mode.entries.forEach { m ->
+                FilterChip(
+                    selected = mode == m,
+                    onClick = { settings.setTheme(m) },
+                    label = { Text(m.label) },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = if (isPop) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black),
+                )
+            }
+        }
+    }
+}
+
 /** Dissolvenza tra i brani, come i DJ: Spenta, 3, 6, 9 o 12 secondi. */
 @Composable
 private fun CrossfadeSetting() {
@@ -285,7 +313,7 @@ private fun CrossfadeSetting() {
                     selected = seconds == s,
                     onClick = { settings.setCrossfade(s) },
                     label = { Text(if (s == 0) "Spenta" else "$s s") },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = androidx.compose.ui.graphics.Color.Black),
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = OnAccent),
                 )
             }
         }
@@ -315,7 +343,7 @@ private fun ReplayGainSetting() {
                     selected = mode == m,
                     onClick = { settings.setReplayGain(m) },
                     label = { Text(label) },
-                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = androidx.compose.ui.graphics.Color.Black),
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent, selectedLabelColor = OnAccent),
                 )
             }
         }

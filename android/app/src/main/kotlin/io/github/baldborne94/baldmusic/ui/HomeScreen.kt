@@ -120,7 +120,7 @@ fun HomeScreen(vm: PlayerViewModel) {
     LazyColumn(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(0f to Color(0xFF3A2A4E), 0.25f to Background)),
+            .background(Brush.verticalGradient(0f to if (isPop) LocalPalette.current.bar else Color(0xFF3A2A4E), 0.25f to Background)),
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item {
@@ -276,7 +276,7 @@ private fun QuickTileView(tile: QuickTile, vm: PlayerViewModel, modifier: Modifi
     }
     val playing = vm.playingContainer == containerId && vm.isPlaying
     Row(
-        modifier.height(56.dp).clip(RoundedCornerShape(6.dp)).background(Surface2).clickable(onClick = open),
+        modifier.height(56.dp).popCard(RoundedCornerShape(6.dp)).clip(RoundedCornerShape(6.dp)).background(if (isPop) Surface1 else Surface2).clickable(onClick = open),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when (tile) {
@@ -291,7 +291,7 @@ private fun QuickTileView(tile: QuickTile, vm: PlayerViewModel, modifier: Modifi
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 16.sp,
-            color = if (playing) Accent else Color.White,
+            color = if (playing) Accent else TextColor,
         )
     }
 }
@@ -301,7 +301,7 @@ private data class Mix(val title: String, val subtitle: String, val id: String)
 @Composable
 private fun MixCard(mix: Mix, onClick: () -> Unit) {
     Column(Modifier.width(150.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick)) {
-        Box(Modifier.size(150.dp).clip(RoundedCornerShape(8.dp)).background(tileBrush(mix.id))) {
+        Box(Modifier.size(150.dp).popCard(RoundedCornerShape(8.dp), shadow = 4.dp).clip(RoundedCornerShape(8.dp)).background(tileBrush(mix.id))) {
             Text(
                 mix.title,
                 Modifier.align(Alignment.BottomStart).padding(12.dp),
