@@ -33,7 +33,7 @@ export function Login() {
   return (
     <main className="login">
       <form className="login__card" onSubmit={submit}>
-        <img src="./icon.svg" alt="" width={72} height={72} />
+        <img src="./logo.svg" alt="" width={72} height={72} />
         <h1>BaldMusic</h1>
         <p className="muted">Collegati al tuo server Navidrome.</p>
         <label>
