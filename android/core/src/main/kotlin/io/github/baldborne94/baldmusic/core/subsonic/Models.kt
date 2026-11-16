@@ -123,6 +123,10 @@ internal data class SongList(val song: List<Song> = emptyList())
 @Serializable
 internal data class Playlists(val playlist: List<Playlist> = emptyList())
 
+/** A che punto è Navidrome nel rileggere la cartella della musica (`getScanStatus`). */
+@Serializable
+data class ScanStatus(val scanning: Boolean = false, val count: Int = 0)
+
 @Serializable
 internal data class ApiError(val code: Int = 0, val message: String = "")
 
@@ -140,6 +144,7 @@ internal data class Envelope(
     val searchResult3: SearchResult? = null,
     val starred2: SearchResult? = null,
     val song: Song? = null,
+    val scanStatus: ScanStatus? = null,
 )
 
 @Serializable
