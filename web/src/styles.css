@@ -2656,6 +2656,28 @@ kbd {
   border-right: var(--pop-line);
 }
 
+[data-theme="pop"] .settings .panel {
+  background: #fff;
+  box-shadow: var(--pop-shadow);
+}
+
+[data-theme="pop"] .side-lib__filter,
+[data-theme="pop"] .search-bar {
+  background: #fff;
+  border: 2px solid var(--ink);
+}
+
+[data-theme="pop"] .side-lib__filter:focus,
+[data-theme="pop"] .search-bar:focus-within {
+  background: #fff;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+/* Sui riquadri colorati di «Cerca» il testo bianco si legge meglio del nero. */
+[data-theme="pop"] .browse__tile {
+  color: #fff;
+}
+
 [data-theme="pop"] .browse__tile,
 [data-theme="pop"] .stats-top {
   border: var(--pop-line);

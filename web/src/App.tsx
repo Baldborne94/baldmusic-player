@@ -148,7 +148,7 @@ export function App() {
       <nav className="side" aria-label="Navigazione">
         <div className="side__box">
           <a className="brand" href="#/">
-            <img src="./icon.svg" alt="" width={28} height={28} /> BaldMusic
+            <img src="./logo.svg" alt="" width={28} height={28} /> BaldMusic
           </a>
           <a className={`side__link ${at("home") ? "is-active" : ""}`} href="#/">
             <Icon name="home" /> Home

@@ -35,7 +35,7 @@ export function Settings() {
   };
 
   return (
-    <section className="settings">
+    <section className="page settings">
       <header className="page-head">
         <h1>Impostazioni</h1>
       </header>
