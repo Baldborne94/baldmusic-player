@@ -77,6 +77,10 @@ class MainActivity : ComponentActivity() {
     /** «Ok Google, metti … su BaldMusic» dall'Assistente del telefono: il servizio cerca e suona. */
     private fun playFromSearch(intent: Intent) {
         if (intent.action != android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) return
-        vm.playFromSearch(intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty())
+        vm.playFromSearch(
+            intent.getStringExtra(android.app.SearchManager.QUERY).orEmpty(),
+            intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_TITLE),
+            intent.getStringExtra(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
+        )
     }
 }

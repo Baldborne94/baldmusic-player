@@ -84,6 +84,7 @@ Ogni caso: cosa fare → cosa deve succedere. Se qualcosa non torna, annota il n
 | A-3 | Durante una dissolvenza premi pausa, poi «avanti», poi trascina la barra | La dissolvenza si interrompe subito, niente due brani insieme |
 | A-4 | Volume uguale: Album / Brano / Spento con brani vecchi e recenti | Con Album o Brano i brani vecchi e nuovi hanno volume simile; mai distorsione |
 | A-4b | Volume uguale su «Album», casuale su una raccolta di file scaricati (anche senza tag dell'album) | Le canzoni hanno tutte più o meno lo stesso volume; aprendo un disco vero e ascoltandolo in ordine restano le differenze del disco |
+| A-4c | In macchina, volume dell'auto fisso: un brano recente da BaldMusic, poi lo stesso brano (o uno simile) da Spotify o YouTube Music | Più o meno lo stesso volume (prima BaldMusic era molto più bassa); con «Volume uguale» spento è come prima, al massimo del file |
 | A-5 | Impostazioni → «Misura adesso», poi lascia il telefono in carica | Il numero di brani misurati cresce; dopo, i brani scaricati hanno volume simile |
 | A-6 | Timer di spegnimento: 15 minuti e «fine brano», anche con «Ripeti il brano» e sull'ultimo brano della coda | Si abbassa e si ferma al momento giusto; finita la coda il timer si spegne e la volta dopo la musica non si ferma da sola |
 | A-7 | Cuffie Bluetooth: tasti play/pausa/avanti | Funzionano anche con l'app chiusa |
@@ -298,6 +299,7 @@ dell'unità principale sul telefono.
 | C-18 | Telefono collegato all'auto: «Ok Google, metti Vasco Rossi su BaldMusic», poi «Ok Google, metti musica su BaldMusic»; lo stesso col telefono in mano fuori dall'auto | L'Assistente riconosce BaldMusic e suona l'artista; senza nome parte un mix. Dal telefono si apre BaldMusic e parte la musica chiesta |
 | C-18b | Col PC di casa spento (o il telefono fuori da Tailscale): «Ok Google, metti <un artista del telefono> su BaldMusic» | Parte entro pochi secondi con la musica del telefono; nel resoconto «richiesta da Assistente…: ricerca «…»» e «coda nuova … N brani» (o «niente da suonare» se non c'è) |
 | C-18c | Mentre suona qualcosa, «Ok Google, metti Linkin Park su BaldMusic», poi «Ok Google, metti Metal mix su BaldMusic», poi un nome che non hai («metti Pippo Baudo su BaldMusic») | Parte Linkin Park anche se l'Assistente capisce «bald music»; «Metal mix» trova la raccolta Metal (se c'è); per il nome che non c'è l'auto dice «Non ho trovato «Pippo Baudo» su BaldMusic» e la musica di prima resta in coda |
+| C-18d | In macchina: «Ok Google, metti Numb dei Linkin Park su BaldMusic», poi «metti Albachiara di Vasco Rossi su BaldMusic», poi «metti la canzone Numb su BaldMusic» (brani che hai sul telefono o sul PC) | Parte proprio quel brano (non «Numb (Live)» o un altro con «Numb» nel titolo), poi «Continua ad ascoltare» va avanti con brani simili; nel resoconto «ricerca «…»» con titolo e artista se l'Assistente li ha mandati a parte |
 
 ## PC (sito nel browser)
 

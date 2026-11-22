@@ -34,18 +34,18 @@ class VolumeRulesTest {
 
     @Test
     fun `in modalita Brano senza guadagno del brano si usa quello dell'album`() {
-        near(0.5012f, Loudness.volume(ReplayGain(albumGain = -6f), ReplayGainMode.TRACK))
+        near(0.7943f, Loudness.volume(ReplayGain(albumGain = -6f), ReplayGainMode.TRACK))
     }
 
     @Test
     fun `un picco nullo o negativo non conta`() {
-        near(0.5012f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = 0f), ReplayGainMode.TRACK))
-        near(0.5012f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = -1f), ReplayGainMode.TRACK))
+        near(0.7943f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = 0f), ReplayGainMode.TRACK))
+        near(0.7943f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = -1f), ReplayGainMode.TRACK))
     }
 
     @Test
     fun `il volume misurato dall'app vale come quello dei tag`() {
-        near(0.5012f, Loudness.volume(ReplayGain(trackGain = -6f, measured = true), ReplayGainMode.ALBUM))
+        near(0.7943f, Loudness.volume(ReplayGain(trackGain = -6f, measured = true), ReplayGainMode.ALBUM))
     }
 
     @Test
@@ -53,7 +53,7 @@ class VolumeRulesTest {
         near(1f, Loudness.volume(ReplayGain(trackGain = Float.NaN), ReplayGainMode.TRACK))
         near(1f, Loudness.volume(ReplayGain(albumGain = Float.NEGATIVE_INFINITY), ReplayGainMode.ALBUM))
         near(1f, Loudness.volume(ReplayGain(trackGain = Float.POSITIVE_INFINITY), ReplayGainMode.TRACK))
-        near(0.5012f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = Float.NaN), ReplayGainMode.TRACK))
+        near(0.7943f, Loudness.volume(ReplayGain(trackGain = -6f, trackPeak = Float.NaN), ReplayGainMode.TRACK))
     }
 
     @Test

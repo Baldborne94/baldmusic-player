@@ -13,8 +13,19 @@ class LoudnessTest {
     private fun near(expected: Float, actual: Float) = assertEquals(expected, actual, 0.001f)
 
     @Test
+    fun `livello finale come Spotify, -14 LUFS, non -18 del vecchio ReplayGain`() {
+        // Un brano di oggi a -8 LUFS: ReplayGain (riferimento -18) dice -10 dB. In macchina col
+        // rumore della strada sembrava basso rispetto alle altre app: ora si abbassa di 6 dB (fino a -14).
+        near(0.501f, Loudness.volume(ReplayGain(trackGain = -10f), ReplayGainMode.TRACK))
+        // Un brano gia a -14 LUFS (guadagno -4) resta com'e.
+        near(1f, Loudness.volume(ReplayGain(trackGain = -4f), ReplayGainMode.TRACK))
+        assertEquals(4f, Loudness.PREAMP_DB)
+    }
+
+    @Test
     fun `un brano forte si abbassa del suo guadagno`() {
-        near(0.501f, Loudness.volume(ReplayGain(trackGain = -6f, albumGain = -6f), ReplayGainMode.ALBUM))
+        // -6 dB dai tag, +4 per arrivare a -14 LUFS: -2 dB.
+        near(0.794f, Loudness.volume(ReplayGain(trackGain = -6f, albumGain = -6f), ReplayGainMode.ALBUM))
     }
 
     @Test
@@ -29,10 +40,10 @@ class LoudnessTest {
 
     @Test
     fun `album o brano, e se manca uno si usa l'altro`() {
-        val rg = ReplayGain(trackGain = -10f, albumGain = -4f)
-        near(0.631f, Loudness.volume(rg, ReplayGainMode.ALBUM))
-        near(0.316f, Loudness.volume(rg, ReplayGainMode.TRACK))
-        near(0.316f, Loudness.volume(ReplayGain(trackGain = -10f), ReplayGainMode.ALBUM))
+        val rg = ReplayGain(trackGain = -10f, albumGain = -6f)
+        near(0.794f, Loudness.volume(rg, ReplayGainMode.ALBUM))
+        near(0.501f, Loudness.volume(rg, ReplayGainMode.TRACK))
+        near(0.501f, Loudness.volume(ReplayGain(trackGain = -10f), ReplayGainMode.ALBUM))
     }
 
     @Test

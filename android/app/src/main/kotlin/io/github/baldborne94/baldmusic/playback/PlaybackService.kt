@@ -833,7 +833,15 @@ class PlaybackService : MediaLibraryService() {
             startPositionMs: Long,
         ): ListenableFuture<MediaItemsWithStartPosition> = scope.future {
             val asked = mediaItems.singleOrNull()?.let { item ->
-                item.requestMetadata.searchQuery?.let { "ricerca «$it»" } ?: item.mediaId.ifEmpty { "ricerca senza parole" }
+                item.requestMetadata.searchQuery?.let { q ->
+                    // Nel registro anche titolo e artista se l'Assistente li ha mandati a parte.
+                    val x = item.requestMetadata.extras
+                    val parts = listOfNotNull(
+                        x?.getString(android.provider.MediaStore.EXTRA_MEDIA_TITLE)?.let { "titolo «$it»" },
+                        x?.getString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST)?.let { "artista «$it»" },
+                    )
+                    "ricerca «$q»" + if (parts.isEmpty()) "" else " (" + parts.joinToString(", ") + ")"
+                } ?: item.mediaId.ifEmpty { "ricerca senza parole" }
             } ?: "${mediaItems.size} brani"
             // Anche all'arrivo: una richiesta a voce che poi non suona niente si vede lo stesso.
             trace("richiesta da ${caller(controller)}: $asked")
@@ -871,7 +879,15 @@ class PlaybackService : MediaLibraryService() {
             }
 
             // «Ok Google, metti … su BaldMusic»: niente ID, solo cosa cercare (anche niente: un mix).
-            VoiceQuery.searchOf(single.mediaId, single.requestMetadata.searchQuery)?.let { return voice.play(it) }
+            VoiceQuery.searchOf(single.mediaId, single.requestMetadata.searchQuery)?.let { search ->
+                // Titolo e artista che l'Assistente manda a parte quando chiedi un brano.
+                val extras = single.requestMetadata.extras
+                return voice.play(
+                    search,
+                    extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_TITLE),
+                    extras?.getString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST),
+                )
+            }
             // Un podcast intero o «Da ascoltare»: una puntata sola, da dove eri (non tutto l'archivio).
             MediaId.parse(single.mediaId)?.let { app.podcastSource.toPlay(it) }?.let { return voice.episode(it) }
 
