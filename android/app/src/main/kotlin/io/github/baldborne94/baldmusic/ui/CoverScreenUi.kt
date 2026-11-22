@@ -161,6 +161,8 @@ internal fun CoverScreenContent(player: CoverPlayer, onClose: () -> Unit, onTouc
     val context = LocalContext.current
     val library by context.app.userData.state.collectAsState()
     val liked = item != null && library.isLiked(item.mediaId)
+    // Una puntata di un podcast: scorrere di lato chiude invece di cambiare puntata.
+    val episode = item != null && io.github.baldborne94.baldmusic.core.podcast.PodcastSource.episodeKey(item.mediaId) != null
 
     // Un tocco mostra i comandi per qualche secondo.
     var touchedAt by remember { mutableLongStateOf(0L) }
@@ -217,12 +219,15 @@ internal fun CoverScreenContent(player: CoverPlayer, onClose: () -> Unit, onTouc
                 }
                 detectTapGestures(onTap = { touched(1) }, onDoubleTap = { touched(2) })
             }
-            .pointerInput(Unit) {
+            .pointerInput(episode) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
-                        when (CoverScreen.swipe(drag, size.width.toFloat())) {
-                            1 -> player.next()
-                            -1 -> player.previous()
+                        // Con una puntata scorrere chiude lo schermo, mai un'altra puntata per sbaglio.
+                        when (CoverScreen.swipe(drag, size.width.toFloat(), episode)) {
+                            CoverScreen.Swipe.NEXT -> player.next()
+                            CoverScreen.Swipe.PREVIOUS -> player.previous()
+                            CoverScreen.Swipe.CLOSE -> onClose()
+                            CoverScreen.Swipe.NONE -> Unit
                         }
                         drag = 0f
                     },

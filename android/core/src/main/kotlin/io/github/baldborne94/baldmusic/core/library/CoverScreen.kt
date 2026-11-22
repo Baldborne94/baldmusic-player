@@ -66,15 +66,20 @@ object CoverScreen {
         else -> null
     }
 
+    /** Cosa fa uno scorrimento di lato. */
+    enum class Swipe { NONE, NEXT, PREVIOUS, CLOSE }
+
     /**
      * Uno scorrimento di lato di [dragPx] punti (negativo = verso sinistra), su uno schermo largo
-     * [widthPx]: +1 il brano dopo (verso sinistra, come sfogliare), −1 quello prima, 0 niente
-     * (meno di un quinto dello schermo: era un tocco un po' mosso).
+     * [widthPx]: il brano dopo (verso sinistra, come sfogliare) o quello prima; niente se è meno
+     * di un quinto dello schermo (era un tocco un po' mosso). Con una puntata ([episode]) chiude lo
+     * schermo e basta: scorrendo per tornare indietro cambiava puntata per sbaglio.
      */
-    fun swipe(dragPx: Float, widthPx: Float): Int = when {
-        widthPx <= 0f || kotlin.math.abs(dragPx) < widthPx / 5f -> 0
-        dragPx < 0f -> 1
-        else -> -1
+    fun swipe(dragPx: Float, widthPx: Float, episode: Boolean = false): Swipe = when {
+        widthPx <= 0f || kotlin.math.abs(dragPx) < widthPx / 5f -> Swipe.NONE
+        episode -> Swipe.CLOSE
+        dragPx < 0f -> Swipe.NEXT
+        else -> Swipe.PREVIOUS
     }
 
     /** Da quando si è fermato: resta lo stesso finché non riparte. */

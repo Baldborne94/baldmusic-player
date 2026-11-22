@@ -55,10 +55,18 @@ class CoverScreenTest {
 
     @Test
     fun `scorrere di lato cambia brano, un tocco mosso no`() {
-        assertEquals(1, CoverScreen.swipe(-300f, 1000f))
-        assertEquals(-1, CoverScreen.swipe(300f, 1000f))
-        assertEquals(0, CoverScreen.swipe(-150f, 1000f))
-        assertEquals(0, CoverScreen.swipe(500f, 0f))
+        assertEquals(CoverScreen.Swipe.NEXT, CoverScreen.swipe(-300f, 1000f))
+        assertEquals(CoverScreen.Swipe.PREVIOUS, CoverScreen.swipe(300f, 1000f))
+        assertEquals(CoverScreen.Swipe.NONE, CoverScreen.swipe(-150f, 1000f))
+        assertEquals(CoverScreen.Swipe.NONE, CoverScreen.swipe(500f, 0f))
+    }
+
+    @Test
+    fun `con una puntata scorrere di lato chiude lo schermo, mai un'altra puntata`() {
+        // Scorrendo per tornare indietro cambiava puntata per sbaglio (resoconto dell'utente).
+        assertEquals(CoverScreen.Swipe.CLOSE, CoverScreen.swipe(-300f, 1000f, episode = true))
+        assertEquals(CoverScreen.Swipe.CLOSE, CoverScreen.swipe(300f, 1000f, episode = true))
+        assertEquals(CoverScreen.Swipe.NONE, CoverScreen.swipe(-150f, 1000f, episode = true))
     }
 
     @Test
