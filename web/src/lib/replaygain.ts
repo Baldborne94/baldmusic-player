@@ -14,6 +14,13 @@ export interface ReplayGain {
 }
 
 /**
+ * Quanto più forte del riferimento di ReplayGain (−18 LUFS) finisce ogni brano: +4 dB = −14 LUFS,
+ * il livello di Spotify e YouTube, come sul telefono (`Loudness.PREAMP_DB`). Con −18 i brani di
+ * oggi scendevano di 9–10 dB e sembravano bassi. Si abbassa comunque e basta, mai oltre il picco.
+ */
+export const PREAMP_DB = 4;
+
+/**
  * Volume da 0 a 1 per un brano con la modalità scelta. Il guadagno dell'album vale solo
  * ascoltando un disco ([fromAlbum]); in raccolte, playlist, mix e casuale ogni brano al suo
  * livello, come sul telefono (`Loudness.volume`).
@@ -25,7 +32,7 @@ export function replayGainVolume(rg: ReplayGain | undefined, mode: ReplayGainMod
   const useAlbum = mode === "album" && album && (fromAlbum || !track);
   const [gain, peak] = useAlbum ? [rg.albumGain, rg.albumPeak] : track ? [rg.trackGain, rg.trackPeak] : [rg.albumGain, rg.albumPeak];
   if (gain === undefined || gain === null) return 1;
-  let v = Math.pow(10, gain / 20);
+  let v = Math.pow(10, (gain + PREAMP_DB) / 20);
   if (peak && peak > 0) v = Math.min(v, 1 / peak);
   return Math.max(0, Math.min(1, v));
 }

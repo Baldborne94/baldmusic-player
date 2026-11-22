@@ -19,6 +19,14 @@ enum class ReplayGainMode { ALBUM, TRACK, OFF }
 object Loudness {
 
     /**
+     * Quanto più forte del riferimento di ReplayGain (−18 LUFS, anche quello misurato dall'app)
+     * finisce ogni brano: +4 dB = −14 LUFS, il livello di Spotify e YouTube. Con −18 i brani di
+     * oggi (−8/−9 LUFS) scendevano di 9–10 dB e in macchina, col rumore della strada, BaldMusic
+     * sembrava molto più bassa delle altre app. Si abbassa comunque e basta, mai oltre il picco.
+     */
+    const val PREAMP_DB = 4f
+
+    /**
      * Volume da 0 a 1 per [rg] con la modalità scelta. Il guadagno dell'album vale solo ascoltando
      * un disco ([fromAlbum]: il brano è stato scelto dal suo album). Prima valeva sempre, e per i
      * file del telefono senza tag dell'album (Android li raggruppa per cartella) una raccolta
@@ -34,7 +42,7 @@ object Loudness {
         // Un guadagno che non è un numero (tag rovinato) vale come mancante: NaN darebbe un volume
         // NaN al player, e -Infinity il silenzio.
         if (gain == null || !gain.isFinite()) return 1f
-        var v = 10f.pow(gain / 20f)
+        var v = 10f.pow((gain + PREAMP_DB) / 20f)
         if (peak != null && peak.isFinite() && peak > 0f) v = min(v, 1f / peak)
         return v.coerceIn(0f, 1f)
     }

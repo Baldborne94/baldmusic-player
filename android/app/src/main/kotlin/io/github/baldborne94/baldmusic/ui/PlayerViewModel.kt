@@ -217,13 +217,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Una richiesta a voce arrivata all'app («Ok Google, metti … su BaldMusic»): il servizio la
      * tratta come quelle che arrivano dall'auto (niente ID, solo le parole da cercare).
      */
-    fun playFromSearch(query: String) {
+    fun playFromSearch(query: String, title: String? = null, artist: String? = null) {
         viewModelScope.launch {
             // Aperta adesso dall'Assistente: il collegamento al servizio può non esserci ancora.
             val b = browser ?: androidx.compose.runtime.snapshotFlow { browser }.filterNotNull().first()
             playingFrom = query.ifBlank { null }
             playingContainer = null
-            val request = MediaItem.RequestMetadata.Builder().setSearchQuery(query).build()
+            // Titolo e artista, se l'Assistente li ha capiti, viaggiano con la richiesta (come da Android Auto).
+            val extras = Bundle().apply {
+                title?.let { putString(android.provider.MediaStore.EXTRA_MEDIA_TITLE, it) }
+                artist?.let { putString(android.provider.MediaStore.EXTRA_MEDIA_ARTIST, it) }
+            }
+            val request = MediaItem.RequestMetadata.Builder().setSearchQuery(query).setExtras(extras).build()
             b.setMediaItem(MediaItem.Builder().setRequestMetadata(request).build())
             b.prepare()
             b.play()

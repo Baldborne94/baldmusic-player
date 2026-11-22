@@ -333,7 +333,7 @@ private fun ReplayGainSetting() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Volume uguale tra i brani", fontWeight = FontWeight.SemiBold)
         Text(
-            "Abbassa i brani più forti allo stesso livello degli altri, con il ReplayGain scritto nei file o, se manca, il volume misurato dall'app. " +
+            "Abbassa i brani più forti allo stesso livello degli altri (lo stesso di Spotify), con il ReplayGain scritto nei file o, se manca, il volume misurato dall'app. " +
                 "Album: ascoltando un disco restano le differenze volute, in raccolte, playlist e casuale ogni brano allo stesso livello. Brano: sempre ogni brano allo stesso livello.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,

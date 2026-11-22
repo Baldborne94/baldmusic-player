@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { replayGainVolume } from "./replaygain";
+import { PREAMP_DB, replayGainVolume } from "./replaygain";
 
 describe("replayGainVolume", () => {
+  it("livello finale come Spotify (-14 LUFS), non -18 del vecchio ReplayGain", () => {
+    // Un brano di oggi a -8 LUFS (guadagno -10): prima scendeva di 10 dB e sembrava basso.
+    expect(replayGainVolume({ trackGain: -10 }, "track")).toBeCloseTo(0.501, 3);
+    expect(replayGainVolume({ trackGain: -4 }, "track")).toBe(1);
+    expect(PREAMP_DB).toBe(4);
+  });
+
   it("abbassa i brani forti, non alza quelli piani", () => {
-    expect(replayGainVolume({ trackGain: -6, albumGain: -6 }, "album")).toBeCloseTo(0.501, 3);
+    expect(replayGainVolume({ trackGain: -6, albumGain: -6 }, "album")).toBeCloseTo(0.794, 3);
     expect(replayGainVolume({ trackGain: 4 }, "track")).toBe(1);
   });
 
@@ -12,10 +19,10 @@ describe("replayGainVolume", () => {
   });
 
   it("album o brano, e se manca uno si usa l'altro", () => {
-    const rg = { trackGain: -10, albumGain: -4 };
-    expect(replayGainVolume(rg, "album")).toBeCloseTo(0.631, 3);
-    expect(replayGainVolume(rg, "track")).toBeCloseTo(0.316, 3);
-    expect(replayGainVolume({ trackGain: -10 }, "album")).toBeCloseTo(0.316, 3);
+    const rg = { trackGain: -10, albumGain: -6 };
+    expect(replayGainVolume(rg, "album")).toBeCloseTo(0.794, 3);
+    expect(replayGainVolume(rg, "track")).toBeCloseTo(0.501, 3);
+    expect(replayGainVolume({ trackGain: -10 }, "album")).toBeCloseTo(0.501, 3);
   });
 
   it("senza tag o spento suona com'è", () => {
@@ -33,6 +40,6 @@ describe("album solo ascoltando un disco", () => {
     expect(replayGainVolume(soft, "album", false)).toBeCloseTo(replayGainVolume(soft, "track"), 6);
     expect(replayGainVolume(loud, "album", true)).toBeCloseTo(replayGainVolume(soft, "album", true), 6);
     // Solo il guadagno dell'album: si usa quello.
-    expect(replayGainVolume({ albumGain: -6 }, "album", false)).toBeCloseTo(Math.pow(10, -6 / 20), 6);
+    expect(replayGainVolume({ albumGain: -6 }, "album", false)).toBeCloseTo(Math.pow(10, (-6 + PREAMP_DB) / 20), 6);
   });
 });

@@ -349,15 +349,16 @@ describe("player: volume", () => {
     const p = await open();
     // Da una raccolta: il guadagno del brano, anche in modalità Album.
     p.player.play([song("a", { replayGain: { trackGain: -12, albumGain: -6 } })], 0, false, { label: "Raccolta", id: "playlist/r" });
-    expect(audioOf("a")!.volume).toBeCloseTo(0.2512, 3);
-    // Dal suo disco: il guadagno dell'album.
+    // -12 dB dai tag, +4 per arrivare a -14 LUFS (PREAMP_DB): -8 dB.
+    expect(audioOf("a")!.volume).toBeCloseTo(0.3981, 3);
+    // Dal suo disco: il guadagno dell'album (-6 + 4 = -2 dB).
     p.player.play([song("a", { replayGain: { trackGain: -12, albumGain: -6 } })], 0, false, { label: "Disco", id: "album/x" });
     const a = audioOf("a")!;
-    expect(a.volume).toBeCloseTo(0.501, 3);
+    expect(a.volume).toBeCloseTo(0.7943, 3);
     p.player.setVolume(0.5);
-    expect(a.volume).toBeCloseTo(0.2506, 3);
+    expect(a.volume).toBeCloseTo(0.5 * 0.7943, 3);
     p.player.setReplayGain("track");
-    expect(a.volume).toBeCloseTo(0.5 * 0.2512, 3);
+    expect(a.volume).toBeCloseTo(0.5 * 0.3981, 3);
     p.player.setReplayGain("off");
     expect(a.volume).toBe(0.5);
     expect(p.storage.getItem("baldmusic.volume")).toBe("0.5");
@@ -421,7 +422,7 @@ describe("player: dissolvenza", () => {
     const b = audioOf("b")!.ready(200);
     a.at(195);
     vi.advanceTimersByTime(10_000);
-    expect(b.volume).toBeCloseTo(0.5 * 0.501, 3);
+    expect(b.volume).toBeCloseTo(0.5 * 0.7943, 3);
   });
 
   it("mai tra due brani attaccati dello stesso disco (traccia 1 → 2)", async () => {

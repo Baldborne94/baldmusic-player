@@ -13,6 +13,7 @@ object VoiceQuery {
         Kind.PLAYLIST to Regex("^(la |le )?(raccolta|raccolte|playlist)\\s+", RegexOption.IGNORE_CASE),
         Kind.ALBUM to Regex("^(l'|l’|il |lo )?(album|disco)\\s+", RegexOption.IGNORE_CASE),
         Kind.ARTIST to Regex("^(l'|l’)?(artista)\\s+", RegexOption.IGNORE_CASE),
+        Kind.TRACK to Regex("^(la |il |una |un )?(canzone|brano|pezzo|traccia)\\s+", RegexOption.IGNORE_CASE),
     )
 
     /**
@@ -66,6 +67,76 @@ object VoiceQuery {
         val q = query.trim()
         kinds.forEach { (kind, regex) -> regex.find(q)?.let { return q.substring(it.range.last + 1).trim() to kind } }
         return q to null
+    }
+
+    /** Un brano chiesto per titolo e, se detto, artista («Numb dei Linkin Park»). */
+    data class SongAsk(val title: String, val artist: String?)
+
+    /** Quante divisioni titolo/artista provare al massimo: ognuna è una ricerca. */
+    const val MAX_SONG_ASKS = 5
+
+    /** Le parole tra titolo e artista: «Numb dei Linkin Park», «Albachiara di Vasco», «Numb by …», «Numb - …». */
+    private val byArtist = Regex("""\s+(?:di|dei|degli|del|della|dello|delle|by)\s+|\s+[-–]\s+""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Le divisioni in titolo e artista da provare quando la richiesta intera non trova niente.
+     * Prima l'artista nominava solo un artista («Linkin Park» funzionava), ma «Numb dei Linkin Park»
+     * cercava la frase intera dentro titoli e artisti e non trovava niente. In ordine: titolo e
+     * artista che l'Assistente manda a parte ([title], [artist]), poi le parole in mezzo («di»,
+     * «dei», «by», «-», dall'ultima), poi senza parole in mezzo l'artista nelle ultime 2, 1 o 3 parole.
+     */
+    fun songAsks(query: String, title: String? = null, artist: String? = null): List<SongAsk> {
+        val out = mutableListOf<SongAsk>()
+        if (!title.isNullOrBlank()) out += SongAsk(title.trim(), artist?.trim()?.ifBlank { null })
+        val q = parse(withoutAppName(query)).first
+        byArtist.findAll(q).toList().asReversed().forEach { m ->
+            val t = q.substring(0, m.range.first).trim()
+            val a = q.substring(m.range.last + 1).trim()
+            if (t.isNotEmpty() && a.isNotEmpty()) out += SongAsk(t, a)
+        }
+        val words = q.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        for (k in listOf(2, 1, 3)) {
+            if (words.size > k) out += SongAsk(words.dropLast(k).joinToString(" "), words.takeLast(k).joinToString(" "))
+        }
+        return out.distinct().take(MAX_SONG_ASKS)
+    }
+
+    /** «I Queen», «the Beatles», «l'Orchestra»: l'articolo davanti all'artista non conta. */
+    private val article = Regex("""^(?:i|gli|le|la|il|lo|the)\s+|^l'""")
+
+    private fun artistKey(name: String) = ArtistNames.key(name).replace(article, "")
+
+    /** Il brano è di [asked] (anche «A feat. B» è di A e di B). */
+    private fun artistMatches(asked: String, artist: String?): Boolean {
+        val a = artistKey(asked)
+        val b = artist?.let(::artistKey).orEmpty()
+        return a.isNotEmpty() && b.isNotEmpty() && (b.contains(a) || a.contains(b))
+    }
+
+    /** I brani trovati che sono [ask]: titolo che lo contiene e artista giusto, i migliori prima. */
+    fun songsFor(ask: SongAsk, results: List<LibraryNode>): List<LibraryNode> {
+        val title = ArtistNames.key(ask.title)
+        if (title.isEmpty()) return emptyList()
+        val tracks = results.filter { n ->
+            n.playable && ArtistNames.key(n.title).contains(title) && (ask.artist == null || artistMatches(ask.artist, n.artist ?: n.subtitle))
+        }
+        return rankSongs(ask.title, tracks)
+    }
+
+    /**
+     * I brani col titolo uguale a [title] prima, poi quelli che cominciano così, poi gli altri
+     * («Numb» prima di «Numb (Live)» e di «Numb Little Bug»); a parità, l'ordine della ricerca.
+     */
+    fun rankSongs(title: String, tracks: List<LibraryNode>): List<LibraryNode> {
+        val t = ArtistNames.key(title)
+        return tracks.sortedBy { n ->
+            val k = ArtistNames.key(n.title)
+            when {
+                k == t -> 0
+                k.startsWith(t) -> 1
+                else -> 2
+            }
+        }
     }
 
     private val podcast = Regex(
