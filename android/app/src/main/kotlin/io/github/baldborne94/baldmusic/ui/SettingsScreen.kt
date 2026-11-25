@@ -196,6 +196,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
             ServerScanSetting()
             ServerSyncSetting()
             ServerDownloadsSetting(vm)
+            NasTrashSetting()
         } else {
             Text(
                 "Inserisci l'indirizzo del PC: a casa va bene http://192.168.x.x:4533, fuori casa serve l'indirizzo di Tailscale (es. http://100.x.x.x:4533 o https://pc.tail1234.ts.net).",
@@ -407,6 +408,59 @@ private fun SettingsLink(title: String, subtitle: String, onClick: () -> Unit) {
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = TextMuted)
     }
+}
+
+/**
+ * «Elimina dal NAS»: File Browser sul NAS (guida in server/README.md) sposta nel cestino del NAS
+ * i file dei brani che elimini dall'app. Navidrome da solo non sa cancellare file.
+ */
+@Composable
+private fun NasTrashSetting() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val nas = context.app.nasFiles
+    val ready by nas.ready.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var url by rememberSaveable { mutableStateOf("") }
+    var user by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var music by rememberSaveable { mutableStateOf(io.github.baldborne94.baldmusic.core.nas.NasTrash.Config().musicFolder) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+    Text("Eliminare i brani anche dal NAS", fontWeight = FontWeight.SemiBold)
+    Text(
+        "Navidrome non sa cancellare i file: lo fa File Browser, un secondo programma sul NAS (guida «File Browser» in server/README.md). " +
+            "Con «Elimina dal NAS» (⋮ di un brano del server, o selezionandone più d'uno) il file va in X:\\Cestino BaldMusic, mai cancellato davvero.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    val account = remember(ready) { nas.account() }
+    if (ready && account != null) {
+        Text("Collegato a File Browser come ${account.user} (${account.url}), musica in ${account.config.musicFolder}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = { nas.disconnect(); status = null }) { Text("Scollega File Browser") }
+    } else {
+        OutlinedTextField(url, { url = it }, Modifier.fillMaxWidth(), label = { Text("Indirizzo di File Browser (es. https://nas.tailnet.ts.net:8444)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+        OutlinedTextField(user, { user = it }, Modifier.fillMaxWidth(), label = { Text("Utente di File Browser") }, singleLine = true)
+        OutlinedTextField(
+            password, { password = it }, Modifier.fillMaxWidth(),
+            label = { Text("Password di File Browser") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        )
+        OutlinedTextField(music, { music = it }, Modifier.fillMaxWidth(), label = { Text("Cartella della musica in File Browser") }, singleLine = true)
+        OutlinedButton(
+            enabled = !busy && url.isNotBlank() && user.isNotBlank() && password.isNotEmpty() && music.isNotBlank(),
+            onClick = {
+                busy = true
+                status = "Provo l'accesso…"
+                scope.launch {
+                    status = nas.connect(url, user, password, music) ?: "Collegato a File Browser ✓"
+                    if (nas.ready.value) password = ""
+                    busy = false
+                }
+            },
+        ) { Text(if (busy) "Provo…" else "Collega File Browser") }
+    }
+    status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
 }
 
 /** «Aggiorna libreria»: Navidrome rilegge la musica del PC, poi i brani nuovi compaiono anche qui e in Auto. */

@@ -113,6 +113,11 @@ data class Ui(
      * di sistema; [onDone] solo se sono stati buttati davvero.
      */
     val trashFiles: ((uris: List<android.net.Uri>, title: String, note: String?, onDone: () -> Unit) -> Unit)? = null,
+    /**
+     * «Elimina dal NAS» per i brani del server tra [items], dopo una conferma: il file va nel cestino
+     * del NAS (File Browser). Null se File Browser non è impostato.
+     */
+    val trashOnNas: ((items: List<MediaItem>) -> Unit)? = null,
 )
 
 /** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
@@ -147,6 +152,9 @@ fun AppScaffold(vm: PlayerViewModel) {
     var infoFor by remember { mutableStateOf<Pair<Long, String>?>(null) }
     var episodeInfo by remember { mutableStateOf<String?>(null) }
     var trashAsk by remember { mutableStateOf<TrashAsk?>(null) }
+    // «Elimina dal NAS» in attesa di conferma.
+    var nasAsk by remember { mutableStateOf<List<MediaItem>?>(null) }
+    val nasReady by vm.nasReady.collectAsStateWithLifecycle()
     var trashing by remember { mutableStateOf<TrashAsk?>(null) }
     val lib by vm.library.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -164,7 +172,7 @@ fun AppScaffold(vm: PlayerViewModel) {
     }
     val canTrash = android.os.Build.VERSION.SDK_INT >= 30
 
-    val ui = remember(tab) {
+    val ui = remember(tab, nasReady) {
         Ui(
             open = { id, title -> stacks.getValue(tab).add(Screen.Detail(id, title)) },
             trackMenu = { item, playlist -> menuFor = item to playlist },
@@ -174,6 +182,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             push = { stacks.getValue(tab).add(it) },
             trash = if (canTrash) { items, title, note, onDone -> trashAsk = TrashAsk(items.filter { localFileUri(it) != null }, title, note, onDone) } else null,
             trashFiles = if (canTrash) { uris, title, note, onDone -> trashAsk = TrashAsk(emptyList(), title, note, onDone, uris) } else null,
+            trashOnNas = if (nasReady) { items -> nasAsk = items.filter { vm.isServerTrack(it) }.takeIf { it.isNotEmpty() } } else null,
         )
     }
 
@@ -285,11 +294,29 @@ fun AppScaffold(vm: PlayerViewModel) {
                         { trash(listOf(item), "Eliminare “${item.title()}” dal telefono?", null) {} }
                     },
                     onInfo = localTrackId(item)?.let { id -> { infoFor = id to item.title() } },
-                    extra = podcastActions(context.app.podcasts, item) { episodeInfo = item.mediaId },
+                    extra = podcastActions(context.app.podcasts, item) { episodeInfo = item.mediaId } +
+                        listOfNotNull(
+                            ui.trashOnNas?.takeIf { vm.isServerTrack(item) }?.let { ask ->
+                                Triple(Icons.Rounded.Delete, "Elimina dal NAS", { ask(listOf(item)) })
+                            },
+                        ),
                 )
             }
 
             infoFor?.let { (id, title) -> TrackInfoDialog(id, title, onDismiss = { infoFor = null }) }
+            nasAsk?.let { items ->
+                ConfirmDialog(
+                    title = if (items.size == 1) "Eliminare “${items[0].title()}” dal NAS?" else "Eliminare ${items.size} brani dal NAS?",
+                    text = "Il file va nel cestino del NAS (X:\\Cestino BaldMusic, con le sue cartelle): da lì si rimette a posto. " +
+                        "Esce da raccolte, playlist e «mi piace», sul telefono e nel sito.",
+                    confirm = "Elimina",
+                    onDismiss = { nasAsk = null },
+                    onConfirm = {
+                        nasAsk = null
+                        vm.trashOnNas(items)
+                    },
+                )
+            }
             episodeInfo?.let { id -> EpisodeInfoDialog(id, onDismiss = { episodeInfo = null }) }
 
             // Dopo un aggiornamento, una volta: cosa c'è di nuovo.

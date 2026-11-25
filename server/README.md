@@ -174,6 +174,34 @@ Copia le cartelle nuove in `Musica` sul NAS. Navidrome le legge entro un'ora, op
 
 Il RAID 1 protegge da un disco rotto, non da una cancellazione sbagliata o da un guasto del NAS. Con un disco USB esterno, l'app di backup di UGOS può copiare `Musica` e `docker` ogni settimana.
 
+### 7. Eliminare i brani dal telefono (File Browser)
+
+Navidrome non sa cancellare i file: nessuna app che passa da lui può toglierli dal NAS. Per «Elimina dal NAS» nell'app del telefono serve **File Browser**, un secondo programma in Docker che vede la cartella condivisa. L'app non cancella mai davvero: sposta il file in **`Cestino BaldMusic`**, accanto alla cartella della musica, con le stesse sottocartelle. Navidrome non lo vede più, e per recuperarlo basta rimetterlo a posto da Esplora file (`X:\Cestino BaldMusic\…` → `X:\Musica\…`).
+
+Serve che la musica stia in una **sottocartella** della cartella condivisa (es. `Baldmusic\Musica`), così il cestino sta fuori da quella che legge Navidrome.
+
+1. In **File**, dentro la cartella dei dati di Docker, crea `filebrowser/database` e `filebrowser/config`.
+2. **Docker** → **Progetto** → **Crea**: nome `filebrowser`, e incolla [`docker-compose.filebrowser.yml`](docker-compose.filebrowser.yml). Prima di confermare sostituisci `/volume1/Baldmusic` (la cartella condivisa che contiene `Musica`) e `/volume1/Docker` coi percorsi veri (tasto destro → **Proprietà**). Avvia.
+3. **Password del primo avvio**: Docker → **Contenitore** → `filebrowser` → **Registro** (log). C'è una riga con la password creata a caso per l'utente `admin`.
+4. **Tailscale**: in `serve.json` (nella cartella di configurazione di Tailscale) aggiungi la porta **8444** verso File Browser, accanto a quelle che ci sono già. Per esempio, con Navidrome sulla 8443:
+
+   ```json
+   {
+     "TCP": { "443": { "HTTPS": true }, "8443": { "HTTPS": true }, "8444": { "HTTPS": true } },
+     "Web": {
+       "${TS_CERT_DOMAIN}:443":  { "Handlers": { "/": { "Proxy": "http://127.0.0.1:8899" } } },
+       "${TS_CERT_DOMAIN}:8443": { "Handlers": { "/": { "Proxy": "http://127.0.0.1:4533" } } },
+       "${TS_CERT_DOMAIN}:8444": { "Handlers": { "/": { "Proxy": "http://127.0.0.1:8090" } } }
+     }
+   }
+   ```
+
+   Lascia le righe che avevi già (qui la 443 è un esempio). Poi riavvia il contenitore di Tailscale.
+5. Dal PC (con Tailscale) apri `https://<nome-del-nas>.<la-tua-rete>.ts.net:8444` ed entra con `admin` e la password del registro. In **Impostazioni** → **Profilo** cambiala con una tua.
+6. Sul telefono: **Impostazioni** → **Server Navidrome** → **Eliminare i brani anche dal NAS**. Inserisci l'indirizzo con `:8444`, l'utente, la password e la cartella della musica come la vede File Browser (`/Musica`), poi **Collega File Browser**. La password resta sul telefono cifrata e non va nel backup.
+
+Da lì in poi, su un brano del server: ⋮ → **Elimina dal NAS**, oppure tieni premuto, selezionane altri e tocca il cestino rosso. Il file va in `Cestino BaldMusic` ed esce da raccolte, playlist e «mi piace», sul telefono e nel sito. Navidrome rilegge la musica subito se sei l'amministratore, altrimenti entro un'ora. Il cestino non si svuota da solo: quando sei sicuro, svuotalo da Esplora file.
+
 ## Problemi comuni
 
 | Sintomo | Causa probabile |

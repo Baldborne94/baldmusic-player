@@ -428,6 +428,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         app.userData.mergeTracks(keep)
     }
 
+    /** File Browser impostato: «Elimina dal NAS» per i brani del server. */
+    val nasReady: StateFlow<Boolean> get() = app.nasFiles.ready
+
+    /** Il brano è del server (si può eliminare dal NAS). */
+    fun isServerTrack(item: MediaItem): Boolean = app.nasFiles.serverSong(item.mediaId) != null
+
+    /**
+     * «Elimina dal NAS»: i file dei brani del server tra [items] vanno nel cestino del NAS (mai
+     * cancellati davvero), escono dalla coda, da raccolte, playlist e «mi piace».
+     */
+    fun trashOnNas(items: List<MediaItem>) {
+        val songs = items.mapNotNull { app.nasFiles.serverSong(it.mediaId) }
+        if (songs.isEmpty()) return
+        viewModelScope.launch {
+            val outcome = app.nasFiles.trash(songs)
+            val gone = outcome.moved.mapTo(HashSet()) { MediaId.track(RemoteSource.KEY, it, null).toString() }
+            queue.indices.reversed().filter { UserLibrary.baseId(queue[it].mediaId) in gone }.forEach { removeAt(it) }
+            android.widget.Toast.makeText(getApplication(), outcome.message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     /** Dopo che i file sono finiti nel cestino: via dalla coda, dalla tua musica e dalla libreria. */
     fun forgetTrashed(items: List<MediaItem>) {
         val gone = items.mapTo(HashSet()) { UserLibrary.baseId(it.mediaId) }
