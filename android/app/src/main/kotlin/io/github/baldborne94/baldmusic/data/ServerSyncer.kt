@@ -66,6 +66,24 @@ class ServerSyncer(private val app: BaldMusicApp) {
         }
     }
 
+    /**
+     * «Ricomincia dal NAS» (scelta dell'utente: «che prenda dal NAS d'ora in poi e rifaccia
+     * l'ambiente pulito»): la tua musica sul telefono si svuota (cuori, playlist, raccolte,
+     * ascolti, recenti, ricerche; i file e i podcast non si toccano) e si dimentica l'ultimo
+     * allineamento. Così il giro subito dopo è come il primo: unisce soltanto, non toglie niente
+     * sul server, e riporta sul telefono «mi piace», playlist e ascolti del server.
+     */
+    suspend fun startOver() {
+        mutex.withLock {
+            val creds = app.settings.credentials ?: return
+            stateFile(creds.url, creds.user).delete()
+            songs = null
+            app.userData.replaceAll(io.github.baldborne94.baldmusic.core.library.UserLibrary())
+        }
+        app.settings.touch()
+        syncNow()
+    }
+
     /** Allinea adesso (anche dal tasto nelle Impostazioni); un allineamento alla volta. */
     suspend fun syncNow(): Unit = mutex.withLock {
         if (!app.settings.syncWithServer) return

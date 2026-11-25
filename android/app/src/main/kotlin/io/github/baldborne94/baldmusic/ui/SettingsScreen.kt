@@ -470,6 +470,34 @@ private fun ServerSyncSetting() {
             }
         }) { Text(if (busy) "Allineo…" else "Allinea adesso") }
     }
+    // Tutto dal server: la tua musica sul telefono riparte pulita e si riprende dal NAS.
+    var confirmStartOver by remember { mutableStateOf(false) }
+    // Solo con l'allineamento acceso: è lui che riporta tutto dal server.
+    if (on) OutlinedButton(enabled = !busy, onClick = { confirmStartOver = true }) { Text("Ricomincia dal server") }
+    if (confirmStartOver) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmStartOver = false },
+            title = { Text("Ricominciare dal server?") },
+            text = {
+                Text(
+                    "Sul telefono si svuota «La tua musica»: cuori, playlist, raccolte, più ascoltati, recenti e ricerche. " +
+                        "Subito dopo si riprende tutto dal server: i suoi «mi piace», le sue playlist e gli ascolti per le statistiche. " +
+                        "Sul server non si toglie niente. I file, i podcast e gli scaricati restano; il backup in Download resta quello di prima.",
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirmStartOver = false
+                    busy = true
+                    scope.launch {
+                        runCatching { sync.startOver() }
+                        busy = false
+                    }
+                }) { Text("Ricomincia") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmStartOver = false }) { Text("Annulla") } },
+        )
+    }
 }
 
 /** Album e playlist del PC salvati sul telefono: quanti, quanto spazio, «Togli tutti». */
