@@ -26,7 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.outlined.ArrowCircleDown
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DownloadForOffline
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
@@ -34,12 +37,15 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
 import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +74,7 @@ import io.github.baldborne94.baldmusic.core.library.LetterIndex
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
+import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.ServerDownloads
 import io.github.baldborne94.baldmusic.playback.group
 import io.github.baldborne94.baldmusic.playback.kind
@@ -167,17 +174,14 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                         tracks = tracks,
                         containers = containers,
                         onAddAll = { ui.addToPlaylist(tracks) },
+                        // Il tasto ⬇ come su Spotify: album, playlist e raccolte del server.
+                        download = remember(downloads, downloaded, mediaId) { downloads.status(mediaId, downloaded) },
+                        onDownload = { vm.download(mediaId) },
+                        // Con la cartella scelta conferma il cestino (app + Android): niente seconda domanda qui.
+                        askBeforeRemove = androidx.compose.ui.platform.LocalContext.current.app.settings.downloadFolder == null,
+                        onRemoveDownload = { vm.removeDownloads(setOf(mediaId), "Togliere “$shownTitle” dal telefono?", ui.trashFiles) },
                         menuItems = buildList {
                             if (tracks.isNotEmpty()) add("Seleziona brani" to { reordering = false; selecting = true })
-                            if (ServerDownloads.downloadable(mediaId)) {
-                                val set = downloads.sets.firstOrNull { it.container == mediaId }
-                                if (set == null) add("Scarica sul telefono" to { vm.download(mediaId) })
-                                else {
-                                    val done = set.songs.count { it.id in downloaded }
-                                    val label = if (done < set.songs.size) "Togli dal telefono (scaricati $done di ${set.songs.size})" else "Togli dal telefono"
-                                    add(label to { vm.removeDownload(mediaId) })
-                                }
-                            }
                             if (playlistId != null && tracks.size > 1) {
                                 add("Riordina brani" to { selecting = false; selected.clear(); reordering = true })
                                 add("Ordina per titolo" to { vm.sortPlaylist(playlistId, byArtist = false) })
@@ -388,6 +392,10 @@ private fun HeroHeader(
     tracks: List<MediaItem>,
     containers: List<MediaItem>,
     onAddAll: () -> Unit,
+    download: ServerDownloads.Status? = null,
+    onDownload: () -> Unit = {},
+    onRemoveDownload: () -> Unit = {},
+    askBeforeRemove: Boolean = true,
     menuItems: List<Pair<String, () -> Unit>> = emptyList(),
     onRename: (() -> Unit)?,
     onDelete: (() -> Unit)?,
@@ -434,6 +442,7 @@ private fun HeroHeader(
             Text(sub, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = TextColor.copy(alpha = 0.8f), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         }
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            download?.let { DownloadButton(it, title, askBeforeRemove, onDownload, onRemoveDownload) }
             if (tracks.isNotEmpty()) {
                 IconButton(onClick = onAddAll) { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi tutto a una playlist", tint = TextMuted) }
             }
@@ -464,6 +473,62 @@ private fun HeroHeader(
                 BigPlayButton(playingHere) { vm.playOrToggle(mediaId, from = title) }
             }
         }
+    }
+}
+
+/**
+ * Il tasto ⬇ di un album, una playlist o una raccolta del server, come su Spotify: un tocco la
+ * scarica sul telefono; mentre scarica il cerchio si riempie; scaricata è piena col colore
+ * dell'app, e un tocco chiede se toglierla (i brani restano sul server).
+ */
+@Composable
+private fun DownloadButton(status: ServerDownloads.Status, title: String, ask: Boolean, onDownload: () -> Unit, onRemove: () -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    val accent = Accent
+    val muted = TextMuted
+    val description = when (status.state) {
+        ServerDownloads.Status.State.NONE -> "Scarica sul telefono"
+        ServerDownloads.Status.State.DOWNLOADING -> "Sto scaricando: ${status.done} di ${status.total}"
+        ServerDownloads.Status.State.DONE -> "Scaricata sul telefono"
+    }
+    IconButton(onClick = {
+        when {
+            status.state == ServerDownloads.Status.State.NONE -> onDownload()
+            ask -> confirm = true
+            else -> onRemove()
+        }
+    }) {
+        when (status.state) {
+            ServerDownloads.Status.State.NONE ->
+                Icon(Icons.Outlined.ArrowCircleDown, description, tint = muted, modifier = Modifier.size(28.dp))
+            ServerDownloads.Status.State.DOWNLOADING -> Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { status.progress },
+                    modifier = Modifier.size(26.dp),
+                    color = accent,
+                    trackColor = muted.copy(alpha = 0.3f),
+                    strokeWidth = 2.5.dp,
+                )
+                Icon(Icons.Rounded.ArrowDownward, description, tint = accent, modifier = Modifier.size(14.dp))
+            }
+            ServerDownloads.Status.State.DONE ->
+                Icon(Icons.Rounded.DownloadForOffline, description, tint = accent, modifier = Modifier.size(28.dp))
+        }
+    }
+    if (confirm) {
+        val downloading = status.state == ServerDownloads.Status.State.DOWNLOADING
+        AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { Text(if (downloading) "Fermare lo scaricamento?" else "Togliere dal telefono?") },
+            text = {
+                Text(
+                    if (downloading) "«$title»: scaricati ${status.done} brani su ${status.total}. Si ferma e quelli già scaricati si tolgono dal telefono; sul server restano tutti."
+                    else "«$title» non si sentirà più senza rete. Sul server resta tutta: puoi riscaricarla quando vuoi.",
+                )
+            },
+            confirmButton = { TextButton(onClick = { confirm = false; onRemove() }) { Text(if (downloading) "Ferma e togli" else "Togli") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("Annulla") } },
+        )
     }
 }
 

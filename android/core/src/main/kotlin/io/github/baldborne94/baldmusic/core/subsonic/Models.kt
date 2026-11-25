@@ -23,6 +23,8 @@ data class Song(
     val played: String? = null,
     /** OpenSubsonic (Navidrome): il ReplayGain letto dai tag del file. */
     val replayGain: SongReplayGain? = null,
+    /** L'estensione del file originale ("mp3", "flac"), per il nome del file scaricato. */
+    val suffix: String? = null,
 )
 
 @Serializable
