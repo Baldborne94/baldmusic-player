@@ -142,6 +142,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { runCatching { app.serverDownloads.remove(container) } }
     }
 
+    /**
+     * Togli dal telefono album e playlist scaricati ([containers]). I file nella cartella scelta sono
+     * brani del telefono: vanno nel cestino di Android ([trashFiles], conferma dell'app e finestra di
+     * sistema; scelta dell'utente), e solo se li butti davvero si tolgono. Senza file nella cartella
+     * (o senza cestino, prima di Android 11) si tolgono e basta.
+     */
+    fun removeDownloads(
+        containers: Set<String>,
+        title: String,
+        trashFiles: ((List<android.net.Uri>, String, String?, () -> Unit) -> Unit)?,
+    ) {
+        viewModelScope.launch {
+            val files = runCatching { app.serverDownloads.trashable(containers) }.getOrDefault(emptyList())
+            if (files.isEmpty() || trashFiles == null) {
+                containers.forEach { runCatching { app.serverDownloads.remove(it) } }
+                return@launch
+            }
+            trashFiles(files.map { it.media }, title, "Sul server restano tutti: cuori, playlist e ascolti tornano ai brani del server.") {
+                viewModelScope.launch { runCatching { app.serverDownloads.removeAfterTrash(containers, files) } }
+            }
+        }
+    }
+
     fun checkUpdates(force: Boolean = false) {
         app.updater.scope.launch { app.updater.check(force) }
     }

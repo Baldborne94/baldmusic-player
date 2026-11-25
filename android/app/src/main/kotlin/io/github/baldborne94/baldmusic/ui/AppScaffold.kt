@@ -107,10 +107,23 @@ data class Ui(
      * di Android 11 non c'è il cestino).
      */
     val trash: ((items: List<MediaItem>, title: String, note: String?, onDone: () -> Unit) -> Unit)?,
+    /**
+     * Come [trash], ma per file del telefono dati per indirizzo di MediaStore (i brani scaricati dal
+     * server nella cartella scelta): nel cestino di Android dopo la conferma dell'app e la finestra
+     * di sistema; [onDone] solo se sono stati buttati davvero.
+     */
+    val trashFiles: ((uris: List<android.net.Uri>, title: String, note: String?, onDone: () -> Unit) -> Unit)? = null,
 )
 
 /** Una richiesta di cestino in attesa delle conferme; [note] sostituisce la frase finale. */
-private class TrashAsk(val items: List<MediaItem>, val title: String, val note: String?, val onDone: () -> Unit)
+private class TrashAsk(
+    val items: List<MediaItem>,
+    val title: String,
+    val note: String?,
+    val onDone: () -> Unit,
+    /** File dati per indirizzo invece che come brani ([Ui.trashFiles]). */
+    val uris: List<android.net.Uri> = emptyList(),
+)
 
 /** L'ID di MediaStore di un brano del telefono; null per gli altri brani. */
 fun localTrackId(item: MediaItem): Long? =
@@ -160,6 +173,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             back = { stacks.getValue(tab).let { if (it.size > 1) it.removeAt(it.lastIndex) } },
             push = { stacks.getValue(tab).add(it) },
             trash = if (canTrash) { items, title, note, onDone -> trashAsk = TrashAsk(items.filter { localFileUri(it) != null }, title, note, onDone) } else null,
+            trashFiles = if (canTrash) { uris, title, note, onDone -> trashAsk = TrashAsk(emptyList(), title, note, onDone, uris) } else null,
         )
     }
 
@@ -281,7 +295,7 @@ fun AppScaffold(vm: PlayerViewModel) {
             WhatsNewDialog(vm)
 
             trashAsk?.let { ask ->
-                val n = ask.items.size
+                val n = ask.items.size + ask.uris.size
                 ConfirmDialog(
                     title = ask.title,
                     text = (if (n == 1) "Il file va nel cestino di Android" else "I $n file vanno nel cestino di Android") +
@@ -291,7 +305,7 @@ fun AppScaffold(vm: PlayerViewModel) {
                     onDismiss = { trashAsk = null },
                 ) {
                     trashAsk = null
-                    val uris = ask.items.mapNotNull(::localFileUri)
+                    val uris = ask.items.mapNotNull(::localFileUri) + ask.uris
                     if (uris.isNotEmpty() && android.os.Build.VERSION.SDK_INT >= 30) {
                         val request = android.provider.MediaStore.createTrashRequest(context.contentResolver, uris, true)
                         trashing = ask

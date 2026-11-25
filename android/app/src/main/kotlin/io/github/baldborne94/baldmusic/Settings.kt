@@ -93,6 +93,16 @@ class Settings(context: Context) {
             edited()
         }
 
+    /**
+     * La cartella scelta per i brani scaricati dal server (un permesso del selettore di Android,
+     * `content://…/tree/…`); null = dentro l'app, come prima.
+     */
+    var downloadFolder: String?
+        get() = prefs.getString(KEY_DOWNLOAD_FOLDER, null)
+        set(value) {
+            prefs.edit { if (value == null) remove(KEY_DOWNLOAD_FOLDER) else putString(KEY_DOWNLOAD_FOLDER, value) }
+        }
+
     /** La chiave dell'applicazione su AcoustID (acoustid.org/new-application) per riconoscere i brani dal suono. */
     var acoustIdKey: String?
         get() = prefs.getString(KEY_ACOUSTID, null)?.takeIf { it.isNotBlank() }
@@ -182,6 +192,7 @@ class Settings(context: Context) {
         const val KEY_CONTINUE = "continue_listening"
         const val KEY_COVER_AUTO = "cover_auto"
         const val KEY_SYNC_SERVER = "sync_server"
+        const val KEY_DOWNLOAD_FOLDER = "download_folder"
         const val KEY_ACOUSTID = "acoustid_key"
         const val KEY_RECOGNITION_PROBLEM = "recognition_problem"
     }

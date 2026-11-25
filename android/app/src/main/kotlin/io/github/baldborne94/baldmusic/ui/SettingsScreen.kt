@@ -195,7 +195,7 @@ fun SettingsScreen(vm: PlayerViewModel) {
             Text("I brani arrivano dal server nella qualità originale, senza conversioni.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             ServerScanSetting()
             ServerSyncSetting()
-            ServerDownloadsSetting()
+            ServerDownloadsSetting(vm)
         } else {
             Text(
                 "Inserisci l'indirizzo del PC: a casa va bene http://192.168.x.x:4533, fuori casa serve l'indirizzo di Tailscale (es. http://100.x.x.x:4533 o https://pc.tail1234.ts.net).",
@@ -474,25 +474,51 @@ private fun ServerSyncSetting() {
 
 /** Album e playlist del PC salvati sul telefono: quanti, quanto spazio, «Togli tutti». */
 @Composable
-private fun ServerDownloadsSetting() {
+private fun ServerDownloadsSetting(vm: PlayerViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val ui = LocalUi.current
     val store = context.app.serverDownloads
     val downloads by store.state.collectAsStateWithLifecycle()
     val present by store.present.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
-    val megabytes = remember(present) { store.bytes() / (1024 * 1024) }
-    Text("Scaricati dal PC", fontWeight = FontWeight.SemiBold)
+    var megabytes by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(present) { megabytes = withContext(kotlinx.coroutines.Dispatchers.IO) { store.bytes() / (1024 * 1024) } }
+    var folder by remember { mutableStateOf(context.app.settings.downloadFolder) }
+    // Il selettore di cartelle di Android: il permesso di scriverci resta anche dopo un riavvio.
+    val pick = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, io.github.baldborne94.baldmusic.data.DownloadFolder.FLAGS) }
+            context.app.settings.downloadFolder = uri.toString()
+            folder = uri.toString()
+        }
+    }
+    Text("Scaricati dal server", fontWeight = FontWeight.SemiBold)
     Text(
         if (downloads.sets.isEmpty()) {
-            "Da un album o una playlist del server: ⋮ → «Scarica sul telefono». Si ascoltano anche senza rete (Server → «Scaricati sul telefono», anche in macchina), nella qualità originale."
+            "Da un album, una playlist o una raccolta del server: il tasto ⬇ accanto al play. Si ascoltano anche senza rete (Server → «Scaricati sul telefono», anche in macchina), nella qualità originale."
         } else {
             val songs = downloads.songIds.size
-            "${downloads.sets.size} tra album e playlist · ${present.count { it in downloads.songIds }} di $songs brani sul telefono · $megabytes MB"
+            "${downloads.sets.size} tra album e playlist · ${present.count { it in downloads.songIds }} di $songs brani sul telefono" + (megabytes?.let { " · $it MB" } ?: "")
         },
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.bodySmall,
     )
+    // Dove vanno: una cartella scelta (brani normali del telefono, una sottocartella per album o
+    // raccolta; dentro Music diventano anche raccolte del telefono) o, senza, dentro l'app.
+    Text(
+        folder?.let { "Cartella: ${io.github.baldborne94.baldmusic.data.DownloadFolder.labelOf(android.net.Uri.parse(it))} · una sottocartella per album o raccolta. Sono brani normali del telefono e restano se disinstalli l'app; se la cartella è proprio Music, ogni album o raccolta scaricata diventa anche una raccolta del telefono." }
+            ?: "Cartella: dentro l'app (spariscono se la disinstalli). Scegli una cartella, per esempio Music, per averli come brani normali del telefono.",
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(onClick = { runCatching { pick.launch(null) } }) { Text(if (folder == null) "Scegli cartella" else "Cambia cartella") }
+        if (folder != null) {
+            OutlinedButton(onClick = { context.app.settings.downloadFolder = null; folder = null }) { Text("Dentro l'app") }
+        }
+    }
     if (downloads.sets.isNotEmpty()) {
-        OutlinedButton(onClick = { scope.launch { downloads.sets.forEach { store.remove(it.container) } } }) { Text("Togli tutti dal telefono") }
+        OutlinedButton(onClick = {
+            vm.removeDownloads(downloads.sets.map { it.container }.toSet(), "Togliere tutti gli scaricati dal telefono?", ui.trashFiles)
+        }) { Text("Togli tutti dal telefono") }
     }
 }

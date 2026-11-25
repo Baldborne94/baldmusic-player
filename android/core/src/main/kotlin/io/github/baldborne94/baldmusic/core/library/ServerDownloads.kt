@@ -27,6 +27,26 @@ data class ServerDownloads(val sets: List<DownloadedSet> = emptyList()) {
 
     fun without(container: String) = copy(sets = sets.filterNot { it.container == container })
 
+    /** Lo stato del tasto ⬇ di una raccolta, un album o una playlist del server (come su Spotify). */
+    data class Status(val state: State, val done: Int = 0, val total: Int = 0) {
+        enum class State { NONE, DOWNLOADING, DONE }
+
+        /** Da 0 a 1, per il cerchio che si riempie mentre scarica. */
+        val progress: Float get() = if (total == 0) 1f else done.toFloat() / total
+    }
+
+    /**
+     * Il tasto ⬇ di [container]: da scaricare, mentre scarica (brani già sul telefono su quelli
+     * chiesti, da [present]) o scaricato. Null se non si può scaricare (brani del telefono, artisti).
+     */
+    fun status(container: String, present: Set<String>): Status? {
+        if (!downloadable(container)) return null
+        val set = sets.firstOrNull { it.container == container } ?: return Status(Status.State.NONE)
+        val done = set.songs.count { it.id in present }
+        val total = set.songs.size
+        return Status(if (done < total) Status.State.DOWNLOADING else Status.State.DONE, done, total)
+    }
+
     /**
      * Cosa fare coi file sul telefono ([present], per ID del brano): scaricare quelli che mancano,
      * nell'ordine in cui li hai chiesti, e cancellare quelli che nessun album o playlist vuole più
@@ -64,6 +84,39 @@ data class ServerDownloads(val sets: List<DownloadedSet> = emptyList()) {
     }
 
     companion object {
+        /** I caratteri che Android (e le schede SD in FAT) non accettano nei nomi dei file. */
+        private val forbidden = Regex("""[\\/:*?"<>|\p{Cntrl}]""")
+
+        /** Un nome di file o cartella valido: niente caratteri vietati, niente punti o spazi in fondo, non troppo lungo. */
+        fun safeName(raw: String, max: Int = 120): String {
+            val clean = forbidden.replace(raw, "_").replace(Regex("\\s+"), " ").trim().trim('.', ' ')
+            return clean.take(max).trim().trim('.', ' ').ifEmpty { "Senza titolo" }
+        }
+
+        /** La sottocartella di un album («Artista - Album») o di una playlist o raccolta (il suo nome). */
+        fun folderName(set: DownloadedSet): String {
+            val album = MediaId.parse(set.container)?.kind == RemoteSource.ALBUM
+            return safeName(if (album && !set.subtitle.isNullOrBlank()) "${set.subtitle} - ${set.title}" else set.title)
+        }
+
+        /**
+         * Il nome del file scaricato: in un album il numero di traccia («13 - Numb.mp3», «2-03 - …»
+         * per il disco 2), in una playlist o raccolta l'artista («Linkin Park - Numb.mp3»).
+         */
+        fun fileName(song: Song, set: DownloadedSet): String {
+            val album = MediaId.parse(set.container)?.kind == RemoteSource.ALBUM
+            val base = when {
+                album && song.track != null -> {
+                    val disc = song.discNumber?.takeIf { it > 1 }?.let { "$it-" }.orEmpty()
+                    "$disc${song.track.toString().padStart(2, '0')} - ${song.title}"
+                }
+                !album && !song.artist.isNullOrBlank() -> "${song.artist} - ${song.title}"
+                else -> song.title
+            }
+            val ext = song.suffix?.trim()?.lowercase()?.takeIf { it.matches(Regex("[a-z0-9]{1,5}")) } ?: "mp3"
+            return "${safeName(base)}.$ext"
+        }
+
         /** Gli album e le playlist del server che si possono scaricare. */
         fun downloadable(container: String): Boolean {
             val id = MediaId.parse(container) ?: return false
