@@ -289,3 +289,17 @@ fun ServerSync.Matcher.moved(lib: UserLibrary): Map<String, TrackRef> =
         .distinctBy { it.id }
         .mapNotNull { t -> toServer(t)?.let(::toPhone)?.let { t.id to it } }
         .toMap()
+
+/**
+ * File cancellati dal telefono (dopo il passaggio al NAS l'utente ha tolto la musica dal
+ * telefono): preferiti, playlist e ascolti puntavano ancora ai file che non ci sono più, e
+ * toccandoli non partiva niente. Qui, per ogni brano del telefono che non è più tra [phoneIds],
+ * lo stesso brano sul server (artista, titolo e durata), da passare a [UserLibrary.mergeTracks].
+ * Quelli che il server non ha restano come sono.
+ */
+fun ServerSync.Matcher.gone(lib: UserLibrary, phoneIds: Set<String>): Map<String, TrackRef> =
+    (lib.liked + lib.playlists.flatMap { it.tracks } + lib.plays.values.map { it.track })
+        .filter { t -> MediaId.parse(t.id)?.let { it.source == LocalCatalog.KEY && it.isTrack } == true && t.id !in phoneIds }
+        .distinctBy { it.id }
+        .mapNotNull { t -> sameSong(t.artist, t.title, t.durationMs)?.let { s -> toPhone(s.id) }?.let { t.id to it } }
+        .toMap()
