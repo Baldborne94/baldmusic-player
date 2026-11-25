@@ -27,6 +27,9 @@ data class Credentials(val url: String, val user: String, val salt: String, val 
 
 class SubsonicException(message: String, val code: Int? = null) : IOException(message)
 
+/** Brani per richiesta quando si aggiungono a una playlist: gli ID vanno nell'indirizzo, come nell'app web. */
+const val PLAYLIST_CHUNK = 200
+
 /** Porta predefinita di Navidrome. */
 const val DEFAULT_PORT = 4533
 
@@ -162,6 +165,12 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
     suspend fun replacePlaylist(id: String, name: String?, songIds: List<String>) {
         call("createPlaylist", "playlistId" to id, *songIds.map { "songId" to it }.toTypedArray())
         if (name != null) call("updatePlaylist", "playlistId" to id, "name" to name)
+    }
+
+    /** Cambia nome o commento di una playlist e aggiunge brani in fondo, a blocchi (gli ID vanno nell'indirizzo). */
+    suspend fun updatePlaylist(id: String, name: String? = null, comment: String? = null, add: List<String> = emptyList()) {
+        if (name != null || comment != null) call("updatePlaylist", "playlistId" to id, "name" to name, "comment" to comment)
+        add.chunked(PLAYLIST_CHUNK).forEach { chunk -> call("updatePlaylist", "playlistId" to id, *chunk.map { "songIdToAdd" to it }.toTypedArray()) }
     }
 
     suspend fun deletePlaylist(id: String) {

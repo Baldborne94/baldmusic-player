@@ -37,7 +37,8 @@ class ServerScanner(private val app: BaldMusicApp) {
                 // L'albero del server si rilegge (anche in Android Auto) e i brani nuovi compaiono.
                 app.settings.touch()
                 _state.value = State(message = "Libreria aggiornata ✓ ($it brani)")
-                app.serverSync.syncNow()
+                // I file nuovi sul NAS: si rileggono i brani e le raccolte seguono le cartelle.
+                app.serverSync.syncNow(reread = true)
             }.onFailure { e ->
                 _state.value = State(message = if (e is ServerScan.Failed) e.message else ServerScan.errorMessage(e))
             }
