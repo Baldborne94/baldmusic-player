@@ -28,6 +28,9 @@ class QueueOrderTest {
         assertTrue(QueueOrder.wrapsAround("me/liked"))
         assertTrue(QueueOrder.wrapsAround("me/top"))
         assertTrue(QueueOrder.wrapsAround("me/mix/drive"))
+        // Le raccolte e le playlist del server (la musica sul NAS) come quelle del telefono.
+        assertTrue(QueueOrder.wrapsAround("remote/playlist/c1"))
+        assertFalse(QueueOrder.wrapsAround("remote/album/a1"))
         assertFalse(QueueOrder.wrapsAround("local/album/x"))
         assertFalse(QueueOrder.wrapsAround("local/artist/y"))
         assertFalse(QueueOrder.wrapsAround("podcast/show/z"))

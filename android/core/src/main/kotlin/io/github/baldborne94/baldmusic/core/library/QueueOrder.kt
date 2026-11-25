@@ -29,7 +29,8 @@ object QueueOrder {
     /** Le tue raccolte, playlist, preferiti, più ascoltati e mix: sì; album, artisti, cartelle: no. */
     fun wrapsAround(containerId: String?): Boolean {
         val id = MediaId.parse(containerId ?: return false) ?: return false
-        return id.source == PersonalSource.KEY && id.kind in WRAPPING
+        // Anche le raccolte e le playlist del server: con la musica sul NAS sono le stesse cartelle.
+        return (id.source == PersonalSource.KEY && id.kind in WRAPPING) || (id.source == RemoteSource.KEY && id.kind == RemoteSource.PLAYLIST)
     }
 
     private val WRAPPING = setOf(PersonalSource.PLAYLIST, PersonalSource.LIKED, PersonalSource.TOP, PersonalSource.MIX)
