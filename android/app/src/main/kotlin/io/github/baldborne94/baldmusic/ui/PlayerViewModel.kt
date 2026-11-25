@@ -111,7 +111,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     init {
         viewModelScope.launch {
             val token = SessionToken(application, ComponentName(application, PlaybackService::class.java))
-            val b = MediaBrowser.Builder(application, token).buildAsync().await()
+            val b = MediaBrowser.Builder(application, token)
+                // Quello che il servizio non riesce a suonare (un brano che non c'è più, una ricerca
+                // senza risultati) si dice subito, ovunque tu sia nell'app.
+                .setListener(object : MediaBrowser.Listener {
+                    @OptIn(androidx.media3.common.util.UnstableApi::class)
+                    override fun onError(controller: androidx.media3.session.MediaController, sessionError: androidx.media3.session.SessionError) {
+                        android.widget.Toast.makeText(application, sessionError.message, android.widget.Toast.LENGTH_LONG).show()
+                    }
+                })
+                .buildAsync().await()
             b.addListener(listener)
             browser = b
             sync(b)

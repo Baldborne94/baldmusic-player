@@ -6,6 +6,7 @@ import io.github.baldborne94.baldmusic.core.library.ArtistNames
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
 import io.github.baldborne94.baldmusic.core.library.ServerSync
 import io.github.baldborne94.baldmusic.core.library.SyncState
+import io.github.baldborne94.baldmusic.core.library.gone
 import io.github.baldborne94.baldmusic.core.library.moved
 import io.github.baldborne94.baldmusic.core.subsonic.Song
 import io.github.baldborne94.baldmusic.core.subsonic.md5Hex
@@ -65,6 +66,24 @@ class ServerSyncer(private val app: BaldMusicApp) {
         }
     }
 
+    /**
+     * «Ricomincia dal NAS» (scelta dell'utente: «che prenda dal NAS d'ora in poi e rifaccia
+     * l'ambiente pulito»): la tua musica sul telefono si svuota (cuori, playlist, raccolte,
+     * ascolti, recenti, ricerche; i file e i podcast non si toccano) e si dimentica l'ultimo
+     * allineamento. Così il giro subito dopo è come il primo: unisce soltanto, non toglie niente
+     * sul server, e riporta sul telefono «mi piace», playlist e ascolti del server.
+     */
+    suspend fun startOver() {
+        mutex.withLock {
+            val creds = app.settings.credentials ?: return
+            stateFile(creds.url, creds.user).delete()
+            songs = null
+            app.userData.replaceAll(io.github.baldborne94.baldmusic.core.library.UserLibrary())
+        }
+        app.settings.touch()
+        syncNow()
+    }
+
     /** Allinea adesso (anche dal tasto nelle Impostazioni); un allineamento alla volta. */
     suspend fun syncNow(): Unit = mutex.withLock {
         if (!app.settings.syncWithServer) return
@@ -90,6 +109,16 @@ class ServerSyncer(private val app: BaldMusicApp) {
             // Cambio di server (dal PC al NAS): i brani del server di prima passano allo stesso
             // brano sul nuovo, anche quelli scaricati (i file si rinominano, non si riscaricano).
             var moved = false
+            // Musica cancellata dal telefono: cuori, playlist e ascolti di quei file passano allo
+            // stesso brano del server (prima toccandoli non partiva niente). Solo col permesso della
+            // musica: senza, il telefono sembrerebbe vuoto e passerebbe tutto al server.
+            if (app.local.hasPermission()) {
+                val gone = match.gone(before, phone.mapTo(HashSet()) { it.id })
+                if (gone.isNotEmpty()) {
+                    app.userData.mergeTracks(gone)
+                    before = app.userData.value
+                }
+            }
             if (fresh) {
                 val moves = match.moved(before)
                 if (moves.isNotEmpty()) {

@@ -96,6 +96,9 @@ class PlaybackService : MediaLibraryService() {
     private var shuffleFromCurrent = false
     /** L'ordine del casuale della coda ripresa ([QueueSnapshot.orderIn]), da rimettere appena arriva. */
     private var restoredOrder: List<Int>? = null
+
+    /** Quando un brano toccato non si è trovato: il «play» che segue non fa ripartire la coda di prima ([PlayGuard]). */
+    @Volatile private var refusedAt: Long? = null
     /** La coda di prima, per riconoscere i brani appena aggiunti ([QueueOrder.insertion]). */
     private var knownQueue: List<String> = emptyList()
     /** Cosa hai già sentito o saltato nella raccolta che stai ascoltando ([ListeningSession]). */
@@ -163,6 +166,11 @@ class PlaybackService : MediaLibraryService() {
                 super.seekToDefaultPosition(mediaItemIndex)
             }
             override fun play() {
+                if (io.github.baldborne94.baldmusic.core.library.PlayGuard.ignorePlay(refusedAt, android.os.SystemClock.elapsedRealtime())) {
+                    refusedAt = null
+                    trace("play ignorato da ${caller()}: il brano chiesto non si trova, la coda di prima non riparte")
+                    return
+                }
                 trace("play da ${caller()}")
                 super.play()
             }
@@ -856,7 +864,11 @@ class PlaybackService : MediaLibraryService() {
                 // Niente trovato: la coda di prima resta com'era (prima si svuotava, e Android Auto
                 // restava fermo su una schermata vuota) e l'auto dice cosa non ha trovato.
                 val search = mediaItems.singleOrNull()?.let { VoiceQuery.searchOf(it.mediaId, it.requestMetadata.searchQuery) }
-                session.sendError(SessionError(SessionError.ERROR_BAD_VALUE, VoiceQuery.notFound(search)))
+                // Un brano toccato (non una ricerca a voce) che non si trova: il «play» che segue non
+                // deve far ripartire la coda di prima (prima ripartiva il podcast).
+                val direct = search == null && mediaItems.singleOrNull()?.mediaId?.isNotEmpty() == true
+                if (direct) refusedAt = android.os.SystemClock.elapsedRealtime()
+                session.sendError(SessionError(SessionError.ERROR_BAD_VALUE, if (direct) io.github.baldborne94.baldmusic.core.library.PlayGuard.MISSING else VoiceQuery.notFound(search)))
                 throw UnsupportedOperationException("Niente da suonare per $asked")
             }
             trace("coda nuova da ${caller(controller)}: $asked → ${result.mediaItems.size} brani, dal ${result.startIndex + 1}")
