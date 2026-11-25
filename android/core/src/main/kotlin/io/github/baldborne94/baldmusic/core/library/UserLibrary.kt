@@ -209,25 +209,37 @@ data class UserLibrary(
      * [TOP_COLLECTIONS] con più ascolti (somma degli ascolti dei loro brani), poi tutte le altre
      * dalla A alla Z. Ognuna una volta sola. Senza ascolti un gruppo solo, senza titolo.
      */
-    fun collectionGroups(): List<Pair<String?, List<UserPlaylist>>> {
-        val all = collections
+    fun collectionGroups(): List<Pair<String?, List<UserPlaylist>>> = collectionGroups(
+        collections,
+        id = { MediaId(PersonalSource.KEY, PersonalSource.PLAYLIST, it.id).toString() },
+        name = { it.name },
+        plays = ::playsOf,
+    )
+
+    /** Gli ascolti dei brani di una raccolta, sommati. */
+    fun playsOf(pl: UserPlaylist): Int = pl.tracks.sumOf { allPlays[baseId(it.id)]?.count ?: 0 }
+
+    /**
+     * Le stesse regole per raccolte di ogni tipo (quelle del telefono e quelle del server):
+     * [id] è il contenitore come sta negli ascoltati di recente.
+     */
+    fun <T> collectionGroups(all: List<T>, id: (T) -> String, name: (T) -> String, plays: (T) -> Int): List<Pair<String?, List<T>>> {
         if (all.isEmpty()) return emptyList()
-        val byId = all.associateBy { it.id }
+        val byId = all.associateBy(id)
         val recentOnes = recent.mapNotNull { c ->
-            val id = MediaId.parse(c.id)
-            if (id?.source == PersonalSource.KEY && id.kind == PersonalSource.PLAYLIST) byId[id.id] else null
-        }.distinctBy { it.id }.take(RECENT_COLLECTIONS)
-        val shown = recentOnes.mapTo(HashSet()) { it.id }
+            MediaId.parse(c.id)?.copy(parent = null)?.toString()?.let { byId[it] }
+        }.distinctBy(id).take(RECENT_COLLECTIONS)
+        val shown = recentOnes.mapTo(HashSet(), id)
         val topOnes = all.asSequence()
-            .filter { it.id !in shown }
-            .map { pl -> pl to pl.tracks.sumOf { allPlays[baseId(it.id)]?.count ?: 0 } }
+            .filter { id(it) !in shown }
+            .map { it to plays(it) }
             .filter { it.second > 0 }
-            .sortedWith(compareByDescending<Pair<UserPlaylist, Int>> { it.second }.thenBy { it.first.name.lowercase() })
+            .sortedWith(compareByDescending<Pair<T, Int>> { it.second }.thenBy { name(it.first).lowercase() })
             .take(TOP_COLLECTIONS)
             .map { it.first }
             .toList()
-        topOnes.mapTo(shown) { it.id }
-        val rest = all.filter { it.id !in shown }.sortedBy { it.name.lowercase() }
+        topOnes.mapTo(shown, id)
+        val rest = all.filter { id(it) !in shown }.sortedBy { name(it).lowercase() }
         if (recentOnes.isEmpty() && topOnes.isEmpty()) return listOf(null to rest)
         return listOfNotNull(
             recentOnes.takeIf { it.isNotEmpty() }?.let { "Ascoltate di recente" to it },

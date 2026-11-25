@@ -1,6 +1,8 @@
 package io.github.baldborne94.baldmusic.core
 
 import io.github.baldborne94.baldmusic.core.library.ContainerRef
+import io.github.baldborne94.baldmusic.core.library.LibraryNode
+import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.LibraryNode.Kind
 import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.PersonalSource
@@ -86,5 +88,53 @@ class CollectionGroupsTest {
         assertEquals(PersonalSource.shownBy(lib, page), PersonalSource.shownBy(lib.copy(plays = plays("d1" to 4)), page))
         // Ascoltata un'altra raccolta: va in cima.
         assertNotEquals(PersonalSource.shownBy(lib, page), PersonalSource.shownBy(lib.touchRecent(heard("Rock")), page))
+    }
+
+    private fun server(name: String) = LibraryNode(
+        mediaId = MediaId(RemoteSource.KEY, RemoteSource.PLAYLIST, "s-$name").toString(),
+        title = name,
+        kind = Kind.PLAYLIST,
+        subtitle = "Raccolta · 10 brani",
+    )
+
+    @Test
+    fun `con la musica solo sul NAS le raccolte del server stanno in Raccolte`() = runBlocking {
+        // Il telefono non ha più musica: nessuna raccolta sua (resoconto: «non vedo le raccolte»).
+        val lib = UserLibrary(recent = listOf(ContainerRef(server("Movie").mediaId, "Movie", kind = Kind.PLAYLIST.name)))
+        val source = PersonalSource(serverCollections = { listOf(server("Rock"), server("Anime"), server("Movie")) }) { lib }
+        val nodes = source.children(MediaId(PersonalSource.KEY, PersonalSource.COLLECTIONS))
+        assertEquals(listOf("Movie", "Anime", "Rock"), nodes.map { it.title })
+        assertEquals(listOf("Ascoltate di recente", "Tutte le altre", "Tutte le altre"), nodes.map { it.group })
+        assertEquals("remote/playlist/s-Movie", nodes[0].mediaId)
+    }
+
+    @Test
+    fun `una raccolta del server col nome di una del telefono con brani non si ripete`() = runBlocking {
+        val lib = UserLibrary(playlists = listOf(collection("Disney", "d1"), collection("Vuota")))
+        val source = PersonalSource(serverCollections = { listOf(server("disney"), server("Vuota"), server("Rock")) }) { lib }
+        val nodes = source.children(MediaId(PersonalSource.KEY, PersonalSource.COLLECTIONS))
+        // Disney del telefono (suona senza rete); Vuota due volte: quella del telefono non ha brani.
+        assertEquals(
+            listOf("me/playlist/disney", "remote/playlist/s-Rock", "me/playlist/vuota", "remote/playlist/s-Vuota"),
+            nodes.map { it.mediaId },
+        )
+    }
+
+    @Test
+    fun `il numero delle raccolte conta anche quelle del server gia lette, senza rete`() = runBlocking {
+        val lib = UserLibrary(playlists = listOf(collection("Disney", "d1")))
+        val source = PersonalSource(
+            serverCollections = { error("niente rete per contare") },
+            knownServerCollections = { listOf(server("Rock"), server("Anime")) },
+        ) { lib }
+        assertEquals("3 raccolte", source.sections().first { it.mediaId == "me/collections" }.subtitle)
+    }
+
+    @Test
+    fun `la ricerca trova anche le raccolte del server`() = runBlocking {
+        val lib = UserLibrary(playlists = listOf(collection("Disney", "d1")))
+        val source = PersonalSource(serverCollections = { listOf(server("Disney"), server("Disney Pixar"), server("Rock")) }) { lib }
+        assertEquals(listOf("Disney", "Disney Pixar"), source.search("disney").map { it.title })
+        assertEquals("me/playlist/disney", source.search("disney").first().mediaId)
     }
 }

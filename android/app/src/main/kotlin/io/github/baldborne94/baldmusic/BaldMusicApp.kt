@@ -106,6 +106,9 @@ class BaldMusicApp : Application() {
             library = { userData.value },
             // I mix per decennio vengono dai decenni della musica del telefono.
             decades = { local.children(MediaId(LocalCatalog.KEY, LocalCatalog.DECADES)) },
+            // Le raccolte del server (la musica sul NAS) stanno in «Raccolte» con quelle del telefono.
+            serverCollections = { remoteSource()?.collectionsOrLast().orEmpty() },
+            knownServerCollections = { remoteSource()?.lastCollections.orEmpty() },
         )
         backups.start()
         serverSync.start()

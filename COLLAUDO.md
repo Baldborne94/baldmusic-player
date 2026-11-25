@@ -306,6 +306,7 @@ dell'unità principale sul telefono.
 | C-18e | Metti in pausa un podcast; poi tocca un brano che non c'è più sul telefono (in una playlist o in «Più ascoltati», dopo averne spostato o cancellato il file) | Non riparte il podcast: compare l'avviso «Questo brano non si trova più sul telefono…»; nel resoconto «niente da suonare» e «play ignorato» |
 | C-18f | Con server collegato, cancella dal telefono alcuni brani che sono anche sul NAS (cuore, in una playlist, tra i più ascoltati); poi Impostazioni → Server → «Allinea adesso» | Gli stessi brani restano tra i preferiti, nelle playlist e tra i più ascoltati, e toccandoli partono dal NAS; quelli che il NAS non ha restano e dicono «non si trova più» |
 | C-18g | Impostazioni → Server → «Ricomincia dal server» → Ricomincia; poi guarda Libreria e il sito | Sul telefono restano solo i «mi piace» e le playlist del NAS (le stesse del sito); più ascoltati e statistiche dagli ascolti del NAS; nel sito non manca niente; i podcast e gli scaricati restano |
+| C-18h | Senza musica sul telefono, col server (NAS) collegato: Home e Libreria → Raccolte; poi in Android Auto «La tua musica → Raccolte»; poi a voce «metti la raccolta Disney Italia» | Ci sono le raccolte del NAS (le cartelle, le stesse del sito), con l'ultima ascoltata in cima; in Server → Playlist non si ripetono; un brano toccato suona fino in fondo e poi riparte dall'inizio della raccolta; col NAS spento le raccolte già viste restano (aprirle chiede la rete) |
 
 ## PC (sito nel browser)
 

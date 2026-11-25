@@ -6,9 +6,15 @@ import io.github.baldborne94.baldmusic.core.subsonic.Artist
 import io.github.baldborne94.baldmusic.core.subsonic.Playlist
 import io.github.baldborne94.baldmusic.core.subsonic.Song
 import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * La libreria sul server Navidrome. [offline]: album e playlist scaricati sul telefono, che si
@@ -32,6 +38,8 @@ class RemoteSource(
         section(RECENT, "Aggiunti di recente", grid = true),
         section(ALBUMS, "Album", grid = true),
         section(ARTISTS, "Artisti"),
+        // Le cartelle della musica sul server (raccolte dell'app web), a parte dalle playlist.
+        section(COLLECTIONS, "Raccolte", grid = true),
         section(PLAYLISTS, "Playlist", grid = true),
         section(STARRED, "Preferiti"),
         section(RANDOM, "Mix casuale"),
@@ -52,8 +60,10 @@ class RemoteSource(
             .map { albumNode(it).copy(group = ArtistNames.letter(it.name)) }
         ARTISTS -> client.artists().sortedBy { ArtistNames.sortKey(it.orderName) }
             .map { artistNode(it).copy(group = ArtistNames.letter(it.orderName)) }
-        // L'elenco delle raccolte eliminate dell'app web non è una playlist da ascoltare.
-        PLAYLISTS -> client.playlists().filterNot { it.isAppData }.map(::playlistNode)
+        // L'elenco delle raccolte eliminate dell'app web non è una playlist da ascoltare;
+        // le raccolte stanno in «Raccolte».
+        PLAYLISTS -> client.playlists().filterNot { it.isAppData || it.isPcCollection }.map(::playlistNode)
+        COLLECTIONS -> collections()
         STARRED -> client.starred().song.map { songNode(it, id) }
         RANDOM -> {
             val songs = if (id.id == null) client.randomSongs(100).also { lastRandom = it } else lastRandom
@@ -96,6 +106,42 @@ class RemoteSource(
         DOWNLOADED_SET -> offline().set(requireNotNull(id.id))?.songs.orEmpty().map { songNode(it, id.copy(parent = null)) }
         else -> emptyList()
     }
+
+    /** L'ultimo elenco delle raccolte letto dal server: senza rete si mostra questo. */
+    @Volatile var lastCollections: List<LibraryNode> = emptyList()
+        private set
+
+    /**
+     * Le raccolte del server: ogni prima cartella della musica di Navidrome è una playlist
+     * riconosciuta dal commento ([Playlist.isPcCollection], le crea l'app web), dalla A alla Z.
+     */
+    suspend fun collections(): List<LibraryNode> =
+        client.playlists().filter { it.isPcCollection }
+            .sortedBy { ArtistNames.sortKey(it.name) }
+            .map { playlistNode(it).copy(subtitle = "Raccolta · ${count(it.songCount ?: 0)}") }
+            .also { lastCollections = it }
+
+    /**
+     * Le raccolte per «La tua musica» (Home, Libreria, Auto): mai un errore e mai più di
+     * [waitMs] di attesa (in macchina col server spento o fuori rete); senza risposta l'ultimo
+     * elenco letto. La lettura lenta finisce per conto suo, e chi chiede mentre è in corso
+     * aspetta quella invece di farne un'altra.
+     */
+    suspend fun collectionsOrLast(waitMs: Long = LibraryTree.SEARCH_WAIT_MS): List<LibraryNode> {
+        val job = synchronized(this) {
+            reading?.takeIf { it.isActive } ?: background.async { collections() }.also { reading = it }
+        }
+        return try {
+            withTimeoutOrNull(waitMs) { job.await() } ?: lastCollections
+        } catch (e: CancellationException) {
+            if (job.isCancelled) lastCollections else throw e
+        } catch (e: Exception) {
+            lastCollections
+        }
+    }
+
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Volatile private var reading: Deferred<List<LibraryNode>>? = null
 
     override suspend fun node(id: MediaId): LibraryNode? =
         if (id.kind == DOWNLOADED_SET) id.id?.let { offline().set(it) }?.let(::downloadedNode) else null
@@ -190,6 +236,7 @@ class RemoteSource(
         const val ALBUMS = "albums"
         const val ARTISTS = "artists"
         const val PLAYLISTS = "playlists"
+        const val COLLECTIONS = "collections"
         const val STARRED = "starred"
         const val RANDOM = "random"
         const val ALBUM = "album"

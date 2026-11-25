@@ -77,12 +77,12 @@ class RemoteSourceTest {
     fun `le sezioni del server`() = runTest {
         val sections = source.sections()
         assertEquals(
-            listOf("remote/recent", "remote/albums", "remote/artists", "remote/playlists", "remote/starred", "remote/random"),
+            listOf("remote/recent", "remote/albums", "remote/artists", "remote/collections", "remote/playlists", "remote/starred", "remote/random"),
             sections.map { it.mediaId },
         )
         assertTrue(sections.all { it.kind == Kind.SECTION })
-        // Le sezioni di album e playlist si mostrano a griglia, le altre a lista.
-        assertEquals(listOf(true, true, false, true, false, false), sections.map { it.gridChildren })
+        // Le sezioni di album, raccolte e playlist si mostrano a griglia, le altre a lista.
+        assertEquals(listOf(true, true, false, true, true, false, false), sections.map { it.gridChildren })
     }
 
     @Test
@@ -291,6 +291,51 @@ class RemoteSourceTest {
         assertTrue(lists.all { it.kind == Kind.PLAYLIST })
         val entries = source.children(id(RemoteSource.PLAYLIST, "p2"))
         assertEquals(listOf("remote/track/t1|remote/playlist/p2", "remote/track/t2|remote/playlist/p2"), entries.map { it.mediaId })
+    }
+
+    private val withCollections = """"playlists":{"playlist":[
+        {"id":"p1","name":"Viaggio","songCount":3},
+        {"id":"c1","name":"Movie Soundtracks","songCount":40,"comment":"Raccolta della cartella «Movie Soundtracks»"},
+        {"id":"c2","name":"Disney Italia","songCount":1,"coverArt":"pl-c2","comment":"Raccolta della cartella «Disney Italia»"}
+    ]}"""
+
+    @Test
+    fun `le raccolte del server stanno in Raccolte, non tra le playlist`() = runTest {
+        nd["getPlaylists"] = withCollections
+        assertEquals(listOf("Viaggio"), source.children(id(RemoteSource.PLAYLISTS)).map { it.title })
+        val collections = source.children(id(RemoteSource.COLLECTIONS))
+        // Dalla A alla Z, e si aprono come le playlist del server.
+        assertEquals(listOf("Disney Italia", "Movie Soundtracks"), collections.map { it.title })
+        assertEquals(listOf("remote/playlist/c2", "remote/playlist/c1"), collections.map { it.mediaId })
+        assertEquals(listOf("Raccolta · 1 brano", "Raccolta · 40 brani"), collections.map { it.subtitle })
+        assertEquals("remote/pl-c2", collections[0].artwork)
+    }
+
+    @Test
+    fun `senza risposta dal server le raccolte sono l'ultimo elenco letto, senza errori`() = kotlinx.coroutines.runBlocking {
+        nd["getPlaylists"] = withCollections
+        assertEquals(2, source.collectionsOrLast().size)
+        // Il server non risponde più come prima (spento, fuori rete): resta l'elenco di prima.
+        nd.routes.remove("getPlaylists")
+        assertEquals(listOf("Disney Italia", "Movie Soundtracks"), source.collectionsOrLast().map { it.title })
+    }
+
+    @Test
+    fun `un server che non risponde fa aspettare le raccolte al massimo il tempo dato`() = kotlinx.coroutines.runBlocking {
+        val gate = java.util.concurrent.CountDownLatch(1)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                gate.await(10, java.util.concurrent.TimeUnit.SECONDS)
+                return MockResponse.Builder().body("""{"subsonic-response":{"status":"ok",$withCollections}}""").build()
+            }
+        }
+        try {
+            val start = System.nanoTime()
+            assertEquals(emptyList(), source.collectionsOrLast(waitMs = 300))
+            assertTrue((System.nanoTime() - start) / 1_000_000 < 3_000)
+        } finally {
+            gate.countDown()
+        }
     }
 
     @Test

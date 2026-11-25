@@ -11,6 +11,14 @@ class PersonalSource(
     private val now: () -> Long = { System.currentTimeMillis() },
     /** I decenni della musica del telefono, per i loro mix (li sa il catalogo locale). */
     private val decades: suspend () -> List<LibraryNode> = { emptyList() },
+    /**
+     * Le raccolte del server (le cartelle della musica di Navidrome), che stanno in «Raccolte»
+     * insieme a quelle del telefono: con la musica solo sul NAS sono tutte lì. Non deve
+     * aspettare a lungo né fallire ([RemoteSource.collectionsOrLast]).
+     */
+    private val serverCollections: suspend () -> List<LibraryNode> = { emptyList() },
+    /** L'ultimo elenco già letto di [serverCollections], per contarle senza andare in rete. */
+    private val knownServerCollections: () -> List<LibraryNode> = { emptyList() },
     private val library: () -> UserLibrary,
 ) : MusicSource {
 
@@ -22,7 +30,7 @@ class PersonalSource(
         val lib = library()
         return listOf(
             // Prima le raccolte: le cartelle sono il modo in cui organizzi la musica (anche in auto).
-            section(COLLECTIONS, "Raccolte", grid = true, subtitle = collections(lib.collections.size)),
+            section(COLLECTIONS, "Raccolte", grid = true, subtitle = collections(collectionNodes(lib, knownServerCollections()).size)),
             section(LIKED, "Brani che ti piacciono", subtitle = count(lib.liked.size)),
             // I mix: gli stessi in Home e in Android Auto.
             section(MIXES, "I tuoi mix", grid = true),
@@ -39,7 +47,7 @@ class PersonalSource(
             TOP -> lib.topTracks().mapNotNull { trackNode(it, MediaId(KEY, TOP)) }
             RECENT -> lib.recent.mapNotNull { recentNode(lib, it) }
             // Prima quelle che ascolti (in auto si scorre poco), poi le altre dalla A alla Z.
-            COLLECTIONS -> lib.collectionGroups().flatMap { (group, list) -> list.map { playlistNode(it).copy(group = group) } }
+            COLLECTIONS -> collectionNodes(lib, serverCollections())
             PLAYLISTS -> lib.playlists.filterNot { it.isCollection }.map(::playlistNode)
             PLAYLIST -> lib.playlists.firstOrNull { it.id == id.id }?.let { pl ->
                 pl.tracks.mapNotNull { trackNode(it, MediaId(KEY, PLAYLIST, pl.id)) }
@@ -48,6 +56,21 @@ class PersonalSource(
             MIX -> mixTracks(lib, id.id.orEmpty()).mapNotNull { trackNode(it, MediaId(KEY, MIX, id.id)) }
             else -> emptyList()
         }
+    }
+
+    /**
+     * Le raccolte del telefono e del server insieme, con le stesse regole d'ordine
+     * ([UserLibrary.collectionGroups]). Una del server con lo stesso nome di una del telefono
+     * che ha dei brani (l'hai scaricata in Music) non si ripete: quella del telefono suona
+     * anche senza rete.
+     */
+    private fun collectionNodes(lib: UserLibrary, server: List<LibraryNode>): List<LibraryNode> {
+        val phone = lib.collections
+        val onPhone = phone.filter { it.tracks.isNotEmpty() }.mapTo(HashSet()) { ArtistNames.key(it.name) }
+        val all = phone.map { playlistNode(it) to lib.playsOf(it) } +
+            server.filterNot { ArtistNames.key(it.title) in onPhone }.map { it to 0 }
+        return lib.collectionGroups(all, id = { it.first.mediaId }, name = { it.first.title }, plays = { it.second })
+            .flatMap { (group, list) -> list.map { it.first.copy(group = group) } }
     }
 
     /**
@@ -119,7 +142,10 @@ class PersonalSource(
         // Come nel resto della ricerca: maiuscole, accenti e apostrofi diversi non contano.
         val q = ArtistNames.key(query)
         if (q.isEmpty()) return emptyList()
-        return library().playlists.filter { ArtistNames.key(it.name).contains(q) }.map(::playlistNode)
+        // Anche le raccolte del server: «metti la raccolta Disney» con la musica solo sul NAS.
+        val phone = library().playlists.filter { ArtistNames.key(it.name).contains(q) }.map(::playlistNode)
+        val names = phone.mapTo(HashSet()) { ArtistNames.key(it.title) }
+        return phone + serverCollections().filter { ArtistNames.key(it.title).let { n -> n.contains(q) && n !in names } }
     }
 
     private fun section(kind: String, title: String, grid: Boolean = false, subtitle: String? = null) =
