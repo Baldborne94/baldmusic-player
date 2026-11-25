@@ -436,6 +436,7 @@ private fun ServerSyncSetting() {
     val context = androidx.compose.ui.platform.LocalContext.current
     val sync = context.app.serverSync
     val status by sync.status.collectAsStateWithLifecycle()
+    val collections by sync.collections.collectAsStateWithLifecycle()
     var on by remember { mutableStateOf(context.app.settings.syncWithServer) }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
@@ -445,7 +446,9 @@ private fun ServerSyncSetting() {
             Text(
                 "Un cuore o una playlist fatti sul telefono (anche in macchina) compaiono su Navidrome e nell'app web, e viceversa; " +
                     "lo stesso brano si riconosce anche se è un file diverso. Gli ascolti si sommano: più ascoltati, mix e statistiche contano " +
-                    "anche quello che senti dal PC, e il PC quello che senti sul telefono (anche in macchina senza rete). Le raccolte restano di ogni dispositivo.",
+                    "anche quello che senti dal PC, e il PC quello che senti sul telefono (anche in macchina senza rete). " +
+                    "Le raccolte del server seguono le cartelle della musica (cartelle nuove, brani aggiunti, cartelle rinominate) come nel sito; " +
+                    "quelle del telefono restano sue.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -462,10 +465,11 @@ private fun ServerSyncSetting() {
     }
     if (on) {
         status?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
+        collections?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
         OutlinedButton(enabled = !busy, onClick = {
             busy = true
             scope.launch {
-                sync.syncNow()
+                sync.syncNow(reread = true)
                 busy = false
             }
         }) { Text(if (busy) "Allineo…" else "Allinea adesso") }

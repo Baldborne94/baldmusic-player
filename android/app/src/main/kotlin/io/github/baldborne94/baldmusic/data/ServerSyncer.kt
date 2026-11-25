@@ -8,7 +8,10 @@ import io.github.baldborne94.baldmusic.core.library.ServerSync
 import io.github.baldborne94.baldmusic.core.library.SyncState
 import io.github.baldborne94.baldmusic.core.library.gone
 import io.github.baldborne94.baldmusic.core.library.moved
+import io.github.baldborne94.baldmusic.core.subsonic.ServerCollections
+import io.github.baldborne94.baldmusic.core.subsonic.ServerCollectionsSync
 import io.github.baldborne94.baldmusic.core.subsonic.Song
+import io.github.baldborne94.baldmusic.core.subsonic.SubsonicClient
 import io.github.baldborne94.baldmusic.core.subsonic.md5Hex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -84,11 +87,15 @@ class ServerSyncer(private val app: BaldMusicApp) {
         syncNow()
     }
 
-    /** Allinea adesso (anche dal tasto nelle Impostazioni); un allineamento alla volta. */
-    suspend fun syncNow(): Unit = mutex.withLock {
+    /**
+     * Allinea adesso (anche dal tasto nelle Impostazioni); un allineamento alla volta.
+     * [reread]: rilegge subito tutti i brani del server (dopo «Aggiorna libreria»: file nuovi sul NAS).
+     */
+    suspend fun syncNow(reread: Boolean = false): Unit = mutex.withLock {
         if (!app.settings.syncWithServer) return
         val creds = app.settings.credentials ?: return
         val client = app.subsonic() ?: return
+        if (reread) songs = null
         runCatching {
             var before = app.userData.value
             val starred = client.starred().song.map { it.id }.toSet()
@@ -102,6 +109,8 @@ class ServerSyncer(private val app: BaldMusicApp) {
             // Brani del server riletti adesso: anche gli ascolti (servono i playCount di adesso).
             val fresh = known == null || !known.map { it.id }.toSet().containsAll(needed)
             val all = if (!fresh) known!! else client.allSongs().also { songs = Triple(server, now, it) }
+            // Le raccolte del NAS seguono le cartelle anche senza aprire il sito (come il web).
+            if (fresh) syncCollections(client, creds.url, creds.user, all)
             val phone = app.local.allTracks().map(LocalCatalog::ref)
             val file = stateFile(creds.url, creds.user)
             val state = runCatching { json.decodeFromString(SyncState.serializer(), file.readText()) }.getOrDefault(SyncState())
@@ -155,6 +164,37 @@ class ServerSyncer(private val app: BaldMusicApp) {
         }.onFailure {
             Log.w(TAG, "Allineamento col server non riuscito", it)
             _status.value = "Non allineati: ${it.message ?: "server non raggiungibile"}"
+        }
+    }
+
+    private val _collections = MutableStateFlow<String?>(null)
+    /** Com'è andato l'ultimo allineamento delle raccolte del server, per le Impostazioni. */
+    val collections: StateFlow<String?> = _collections.asStateFlow()
+
+    /**
+     * Le raccolte del server allineate alle cartelle della musica ([ServerCollectionsSync], le
+     * stesse regole del sito). Un errore qui non ferma l'allineamento di cuori e playlist.
+     */
+    private suspend fun syncCollections(client: SubsonicClient, url: String, user: String, all: List<Song>) {
+        val file = File(app.filesDir, "raccolte-${md5Hex("$url|$user").take(12)}.json")
+        runCatching {
+            val saved = runCatching { json.decodeFromString(ServerCollections.State.serializer(), file.readText()) }.getOrNull()
+            val result = ServerCollectionsSync(client, user).run(all, saved)
+            result.state?.let { file.writeText(json.encodeToString(ServerCollections.State.serializer(), it)) }
+            _collections.value = when {
+                result.noRealPath -> "Raccolte non allineate: in Navidrome (Players) attiva «Report Real Path» per il lettore del telefono"
+                result.changed -> "Raccolte allineate ✓ (${listOfNotNull(
+                    result.created.takeIf { it > 0 }?.let { "$it nuove" },
+                    result.added.takeIf { it > 0 }?.let { "$it brani aggiunti" },
+                    result.followed.takeIf { it > 0 }?.let { "$it cartelle rinominate" },
+                ).joinToString(", ")})"
+                else -> "Raccolte allineate ✓"
+            }
+            // Raccolte nuove o cambiate: le pagine si rileggono (anche in Android Auto).
+            if (result.changed) app.settings.touch()
+        }.onFailure {
+            Log.w(TAG, "Allineamento delle raccolte non riuscito", it)
+            _collections.value = "Raccolte non allineate: ${it.message ?: "server non raggiungibile"}"
         }
     }
 

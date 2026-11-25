@@ -25,6 +25,11 @@ data class Song(
     val replayGain: SongReplayGain? = null,
     /** L'estensione del file originale ("mp3", "flac"), per il nome del file scaricato. */
     val suffix: String? = null,
+    /**
+     * Il percorso del file: vero ("/music/Disney/…") solo con «Report Real Path» attivo nel
+     * lettore di Navidrome, altrimenti uno finto «Artista/Album/brano» ([ServerCollections.isRealPath]).
+     */
+    val path: String? = null,
 )
 
 @Serializable
