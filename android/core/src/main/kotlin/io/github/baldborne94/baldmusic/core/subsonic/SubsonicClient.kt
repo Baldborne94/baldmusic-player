@@ -168,8 +168,10 @@ class SubsonicClient(val creds: Credentials, private val http: OkHttpClient) {
     }
 
     /** Cambia nome o commento di una playlist e aggiunge brani in fondo, a blocchi (gli ID vanno nell'indirizzo). */
-    suspend fun updatePlaylist(id: String, name: String? = null, comment: String? = null, add: List<String> = emptyList()) {
-        if (name != null || comment != null) call("updatePlaylist", "playlistId" to id, "name" to name, "comment" to comment)
+    suspend fun updatePlaylist(id: String, name: String? = null, comment: String? = null, add: List<String> = emptyList(), removeIndexes: List<Int> = emptyList()) {
+        if (name != null || comment != null || removeIndexes.isNotEmpty()) {
+            call("updatePlaylist", "playlistId" to id, "name" to name, "comment" to comment, *removeIndexes.map { "songIndexToRemove" to it }.toTypedArray())
+        }
         add.chunked(PLAYLIST_CHUNK).forEach { chunk -> call("updatePlaylist", "playlistId" to id, *chunk.map { "songIdToAdd" to it }.toTypedArray()) }
     }
 
