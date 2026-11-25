@@ -143,6 +143,18 @@ class RemoteSource(
     private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var reading: Deferred<List<LibraryNode>>? = null
 
+    /**
+     * «Togli da questa raccolta» (o playlist) del server: escono i brani [songIds], i file restano
+     * sul NAS. La playlist si rilegge subito prima, così si tolgono le righe giuste anche se è
+     * cambiata nel frattempo (dal sito). Una raccolta non li riprende: chi allinea le cartelle
+     * (sito e telefono) aggiunge solo i brani arrivati dopo. Quanti ne ha tolti.
+     */
+    suspend fun removeFromPlaylist(playlistId: String, songIds: Set<String>): Int {
+        val indexes = indexesOf(client.playlist(playlistId).entry.map { it.id }, songIds)
+        if (indexes.isNotEmpty()) client.updatePlaylist(playlistId, removeIndexes = indexes)
+        return indexes.size
+    }
+
     override suspend fun node(id: MediaId): LibraryNode? =
         if (id.kind == DOWNLOADED_SET) id.id?.let { offline().set(it) }?.let(::downloadedNode) else null
 
@@ -231,6 +243,10 @@ class RemoteSource(
     )
 
     companion object {
+        /** Le righe da togliere (anche un brano che c'è due volte), dall'ultima: così gli indici restano giusti. */
+        fun indexesOf(entries: List<String>, songIds: Set<String>): List<Int> =
+            entries.indices.filter { entries[it] in songIds }.reversed()
+
         const val KEY = "remote"
         const val RECENT = "recent"
         const val ALBUMS = "albums"

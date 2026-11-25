@@ -98,6 +98,9 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
     val playlistId = personalPlaylistId(mediaId)
     // Una raccolta è una playlist nata da una cartella del telefono: si modifica allo stesso modo.
     val isCollection = playlistId?.let { pid -> lib.playlists.firstOrNull { it.id == pid }?.isCollection } == true
+    // Una raccolta del NAS: i brani si tolgono (dal ⋮ o selezionandoli), i file restano sul NAS.
+    val serverCollection = playlistId == null && vm.isServerCollection(mediaId)
+    val removableFrom = playlistId ?: mediaId.takeIf { serverCollection }
     val kind = node?.kind
     val list = items.orEmpty()
     // Una volta per elenco, non a ogni ridisegno: con migliaia di brani si sente.
@@ -267,9 +270,9 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                         IconButton(enabled = chosen.isNotEmpty(), onClick = { ui.addToPlaylist(chosen) }) {
                             Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Aggiungi a una playlist o raccolta")
                         }
-                        if (playlistId != null) {
-                            IconButton(enabled = chosen.isNotEmpty(), onClick = { vm.removeFromPlaylist(playlistId, chosen); selected.clear() }) {
-                                Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection) "Togli dalla raccolta" else "Togli dalla playlist")
+                        if (removableFrom != null) {
+                            IconButton(enabled = chosen.isNotEmpty(), onClick = { vm.removeFromPlaylist(removableFrom, chosen); selected.clear() }) {
+                                Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection || serverCollection) "Togli dalla raccolta" else "Togli dalla playlist")
                             }
                         }
                         val trash = ui.trash
@@ -331,7 +334,7 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                             liked = lib.isLiked(item.mediaId),
                             number = if (numbered) item.mediaMetadata.trackNumber else null,
                             onClick = { if (selecting) toggle(item) else vm.play(item, from = shownTitle) },
-                            onMenu = { ui.trackMenu(item, playlistId) },
+                            onMenu = { ui.trackMenu(item, removableFrom) },
                             onSwipeQueue = { vm.enqueue(item) },
                             selected = if (selecting) item.mediaId in selected else null,
                             // Pressione lunga: si comincia a selezionare (il menu resta sul ⋮).

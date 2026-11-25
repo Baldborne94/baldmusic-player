@@ -339,6 +339,26 @@ class RemoteSourceTest {
     }
 
     @Test
+    fun `togli da una raccolta del server - escono le righe di quei brani, rilette subito prima`() = runTest {
+        nd["getPlaylist?id=c1"] = """"playlist":{"id":"c1","name":"Disney","entry":[${song("t1", "Uno")},${song("t2", "Due")},${song("t3", "Tre")},${song("t2", "Due")}]}"""
+        nd["updatePlaylist"] = """"x":1"""
+        assertEquals(2, source.removeFromPlaylist("c1", setOf("t2")))
+        assertEquals("getPlaylist", server.takeRequest().url.encodedPath.substringAfterLast('/'))
+        val update = server.takeRequest().url
+        assertEquals("c1", update.queryParameter("playlistId"))
+        assertEquals(listOf("3", "1"), update.queryParameterValues("songIndexToRemove"))
+        // Niente da togliere: nessuna scrittura.
+        assertEquals(0, source.removeFromPlaylist("c1", setOf("sparito")))
+        assertEquals(listOf("getPlaylist?id=c1", "updatePlaylist", "getPlaylist?id=c1"), nd.calls.toList())
+    }
+
+    @Test
+    fun `le righe da togliere vanno dall'ultima`() {
+        assertEquals(listOf(4, 2, 0), RemoteSource.indexesOf(listOf("a", "b", "a", "c", "a"), setOf("a")))
+        assertEquals(emptyList(), RemoteSource.indexesOf(listOf("a"), setOf("z")))
+    }
+
+    @Test
     fun `preferiti del server, coi brani che tornano ai preferiti`() = runTest {
         nd["getStarred2"] = """"starred2":{"album":[{"id":"a1"}],"song":[${song("t1", "Uno")}]}"""
         val starred = source.children(id(RemoteSource.STARRED))

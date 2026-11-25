@@ -18,6 +18,7 @@ import androidx.media3.session.SessionToken
 import io.github.baldborne94.baldmusic.BaldMusicApp
 import io.github.baldborne94.baldmusic.app
 import io.github.baldborne94.baldmusic.core.library.LocalCatalog
+import io.github.baldborne94.baldmusic.core.library.MediaId
 import io.github.baldborne94.baldmusic.core.library.RemoteSource
 import io.github.baldborne94.baldmusic.core.library.UserLibrary
 import io.github.baldborne94.baldmusic.core.podcast.PodcastSource
@@ -366,8 +367,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun restoreCollection(folder: io.github.baldborne94.baldmusic.core.library.FolderCollection) = app.userData.restoreFolder(folder)
     fun createPlaylist(name: String, first: List<MediaItem> = emptyList()) = app.userData.createPlaylist(name, first.map { it.toTrackRef() })
     fun addToPlaylist(playlistId: String, items: List<MediaItem>) = app.userData.addToPlaylist(playlistId, items.map { it.toTrackRef() })
-    fun removeFromPlaylist(playlistId: String, item: MediaItem) = app.userData.removeFromPlaylist(playlistId, item.mediaId)
-    fun removeFromPlaylist(playlistId: String, items: List<MediaItem>) = app.userData.removeFromPlaylist(playlistId, items.map { it.mediaId })
+    fun removeFromPlaylist(playlistId: String, item: MediaItem) = removeFromPlaylist(playlistId, listOf(item))
+
+    /**
+     * Toglie brani da una tua playlist o raccolta del telefono ([playlistId] = il suo ID) o da una
+     * raccolta del NAS ([playlistId] = `remote/playlist/…`, [isServerCollection]): lì cambia solo la
+     * raccolta su Navidrome, i file restano sul NAS e i brani tolti non rientrano da soli.
+     */
+    fun removeFromPlaylist(playlistId: String, items: List<MediaItem>) {
+        val server = serverPlaylist(playlistId)
+        if (server == null) {
+            app.userData.removeFromPlaylist(playlistId, items.map { it.mediaId })
+            return
+        }
+        val songs = items.mapNotNullTo(HashSet()) { MediaId.parse(it.mediaId)?.takeIf { m -> m.source == RemoteSource.KEY && m.isTrack }?.id }
+        viewModelScope.launch {
+            runCatching { app.remoteSource()?.removeFromPlaylist(server, songs) }
+                .onSuccess {
+                    // La pagina e «Raccolte» si rileggono dal server.
+                    app.tree.invalidate()
+                    app.settings.touch()
+                }
+                .onFailure {
+                    android.widget.Toast.makeText(getApplication(), "Non sono riuscito a toglierli: ${it.message ?: "server non raggiungibile"}", android.widget.Toast.LENGTH_LONG).show()
+                }
+        }
+    }
+
+    /** Una raccolta del NAS (le cartelle della musica sul server): i suoi brani si possono togliere. */
+    fun isServerCollection(mediaId: String): Boolean =
+        serverPlaylist(mediaId) != null && app.remoteSource()?.lastCollections?.any { it.mediaId == mediaId } == true
+
+    private fun serverPlaylist(mediaId: String): String? =
+        MediaId.parse(mediaId)?.takeIf { it.source == RemoteSource.KEY && it.kind == RemoteSource.PLAYLIST && it.parent == null }?.id
     fun reorderPlaylist(playlistId: String, items: List<MediaItem>) = app.userData.reorderPlaylist(playlistId, items.map { it.mediaId })
     fun sortPlaylist(playlistId: String, byArtist: Boolean) = app.userData.sortPlaylist(playlistId, byArtist)
     fun renamePlaylist(playlistId: String, name: String) = app.userData.renamePlaylist(playlistId, name)
