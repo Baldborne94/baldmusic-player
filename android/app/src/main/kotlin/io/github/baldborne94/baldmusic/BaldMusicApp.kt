@@ -56,6 +56,8 @@ class BaldMusicApp : Application() {
     /** «Mi piace» e playlist uguali sul telefono e su Navidrome. */
     val serverSync by lazy { io.github.baldborne94.baldmusic.data.ServerSyncer(this) }
     val serverScan by lazy { io.github.baldborne94.baldmusic.data.ServerScanner(this) }
+    /** Eliminare i brani anche dal NAS (nel suo cestino), con File Browser. */
+    val nasFiles by lazy { io.github.baldborne94.baldmusic.data.NasFiles(this) }
     val backups: Backups by lazy { Backups(this, userData, local, podcasts) { settings } }
 
     /** I podcast che segui (anche quello privato di Patreon): un cambio di puntate rilegge l'albero. */

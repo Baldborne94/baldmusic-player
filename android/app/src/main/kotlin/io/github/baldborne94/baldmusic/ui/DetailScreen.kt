@@ -275,6 +275,15 @@ fun DetailScreen(vm: PlayerViewModel, mediaId: String, title: String) {
                                 Icon(Icons.Rounded.RemoveCircleOutline, if (isCollection || serverCollection) "Togli dalla raccolta" else "Togli dalla playlist")
                             }
                         }
+                        // Brani del server: nel cestino del NAS (File Browser).
+                        val nas = ui.trashOnNas
+                        if (nas != null && chosen.any { vm.isServerTrack(it) }) {
+                            IconButton(onClick = {
+                                nas(chosen)
+                                selected.clear()
+                                selecting = false
+                            }) { Icon(Icons.Rounded.Delete, "Elimina dal NAS", tint = Danger) }
+                        }
                         val trash = ui.trash
                         if (trash != null && chosen.any { localFileUri(it) != null }) {
                             IconButton(onClick = {

@@ -1,0 +1,23 @@
+# File Browser sul NAS UGREEN, per «Elimina dal NAS» nell'app del telefono (Navidrome non sa
+# cancellare file). Docker → Progetto → Crea (nome «filebrowser»), incolla questo.
+# Guida passo passo in server/README.md, «7. Eliminare i brani dal telefono».
+#
+# Prima di creare il progetto cambia:
+#   - /volume1/Baldmusic → la cartella condivisa che CONTIENE la cartella della musica (es. Baldmusic,
+#                          con dentro Musica): il cestino «Cestino BaldMusic» nasce accanto a Musica,
+#                          fuori da quella che legge Navidrome.
+#   - /volume1/Docker    → la cartella dove i programmi salvano i loro dati (come per Navidrome).
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: unless-stopped
+    # Come amministratore del NAS: può spostare i file della musica, qualunque utente li abbia copiati.
+    user: "0:0"
+    ports:
+      # Solo sul NAS: da fuori si arriva con Tailscale (porta 8444, vedi la guida), mai aperto alla rete.
+      - "127.0.0.1:8090:80"
+    volumes:
+      - /volume1/Baldmusic:/srv
+      - /volume1/Docker/filebrowser/database:/database
+      - /volume1/Docker/filebrowser/config:/config
