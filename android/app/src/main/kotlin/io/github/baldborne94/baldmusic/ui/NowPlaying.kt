@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Radio
@@ -172,13 +173,29 @@ fun NowPlayingScreen(
             // Barra in alto: chiudi, da dove arriva, menu.
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Rounded.KeyboardArrowDown, "Chiudi", Modifier.size(32.dp)) }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                // La playlist o raccolta da cui viene il brano: toccandola si torna alla sua pagina.
+                val fromTitle = vm.playingFrom ?: item.mediaMetadata.albumTitle?.toString().orEmpty()
+                val fromPage = io.github.baldborne94.baldmusic.core.library.PlayingFrom.container(item.mediaId, vm.playingContainer)
+                val goToSource: (() -> Unit)? = fromPage?.let { page ->
+                    { onNavigate(page, if (page == vm.playingContainer) fromTitle else "") }
+                }
+                Column(
+                    Modifier.weight(1f).then(if (goToSource != null) Modifier.clickable(onClickLabel = "Apri la pagina", onClick = goToSource) else Modifier),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text("IN RIPRODUZIONE DA", fontSize = 10.sp, letterSpacing = 1.sp, color = PlayerText.copy(alpha = 0.75f))
-                    Text(vm.playingFrom ?: item.mediaMetadata.albumTitle?.toString().orEmpty(), fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(fromTitle, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "Altro") }
                     androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        goToSource?.let { go ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (fromTitle.isNotBlank()) "Vai a «$fromTitle»" else "Vai alla playlist") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.QueueMusic, null) },
+                                onClick = { menu = false; go() },
+                            )
+                        }
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Aggiungi a playlist") },
                             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null) },
@@ -220,6 +237,14 @@ fun NowPlayingScreen(
                             leadingIcon = { Icon(Icons.Rounded.Timer, null) },
                             onClick = { menu = false; sleepSheet = true },
                         )
+                        // Il file del brano del server nel cestino del NAS (File Browser), dopo la conferma.
+                        ui.trashOnNas?.takeIf { vm.isServerTrack(item) }?.let { ask ->
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Elimina dal NAS", color = Danger) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = Danger) },
+                                onClick = { menu = false; ask(listOf(item)) },
+                            )
+                        }
                         // Solo per i brani del telefono: i tag del server li legge Navidrome.
                         if (localTrackId(item) != null || episode) {
                             androidx.compose.material3.DropdownMenuItem(
